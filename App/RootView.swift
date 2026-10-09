@@ -8,6 +8,7 @@ struct RootView: View {
     @State private var search = ""
     @State private var editing: Recipe?
     @State private var showingNew = false
+    @State private var showingImport = false
 
     private var visible: [Recipe] {
         library.recipes.filter { recipe in
@@ -31,6 +32,12 @@ struct RootView: View {
         .task { await library.run() }
         .sheet(isPresented: $showingNew) {
             RecipeEditorView(recipe: Recipe(title: "")) { saved in
+                Task { await library.save(saved) }
+                selection = saved.id
+            }
+        }
+        .sheet(isPresented: $showingImport) {
+            ImportURLView { saved in
                 Task { await library.save(saved) }
                 selection = saved.id
             }
@@ -90,7 +97,10 @@ struct RootView: View {
         .navigationTitle(tag ?? "All Recipes")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { showingNew = true } label: { Label("Add Recipe", systemImage: "plus") }
+                Menu {
+                    Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
+                    Button("Import from Web…", systemImage: "globe") { showingImport = true }
+                } label: { Label("Add Recipe", systemImage: "plus") }
             }
         }
     }

@@ -20,6 +20,11 @@ bin/install_cli.sh                     # installs `recipes` to ~/.local/bin
 
 iCloud setup: the container `iCloud.com.garrabrant.recipes` must exist on the developer team (Xcode creates it on first signed build with automatic signing). Open the app on the Mac once so the container exists before using the CLI.
 
+## Adding from the web
+
+- **Share menu:** in Safari (Mac or iPhone), Share → *Save to Recipes*. The `ShareExtension` target imports the page into the iCloud library, which syncs to your other devices.
+- **In the app:** + → *Import from Web…*, paste a URL.
+
 ## CLI (for agents)
 
 ```bash
@@ -28,6 +33,7 @@ recipes show "tomato soup" [--json]     # id, id prefix, or title
 recipes search tomato basil [--json]
 recipes add --title "Soup" --ingredient "6 tomatoes" --step "Simmer." --tag soup
 recipes add --from recipe.json          # or `--from -` for stdin; an existing id is replaced
+recipes import https://example.com/recipe   # from any page with schema.org recipe data
 recipes delete <id>
 recipes schema                          # example JSON
 recipes path                            # recipe folder
