@@ -21,6 +21,7 @@ targets:
     dependencies:
       - package: RecipeKit
         product: RecipeKit
+      - target: ShareExtension
     info:
       path: App/Info.plist
       properties:
@@ -42,3 +43,28 @@ targets:
         CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: App/Recipes-iOS.entitlements
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: YES
+  ShareExtension:
+    type: app-extension
+    supportedDestinations: [iOS, macOS]
+    sources: [ShareExtension]
+    dependencies:
+      - package: RecipeKit
+        product: RecipeKit
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Save to Recipes
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.garrabrant.recipes.share
+        CODE_SIGN_ENTITLEMENTS[sdk=macosx*]: App/Recipes-macOS.entitlements
+        CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: App/Recipes-iOS.entitlements
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES

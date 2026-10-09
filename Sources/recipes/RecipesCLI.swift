@@ -3,7 +3,7 @@ import Foundation
 import RecipeKit
 
 @main
-struct RecipesCLI: ParsableCommand {
+struct RecipesCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "recipes",
         abstract: "Read and create recipes in the Recipes app library.",
@@ -11,7 +11,7 @@ struct RecipesCLI: ParsableCommand {
         The library is the iCloud Drive folder the Recipes app syncs between Mac and iPhone. \
         Override it with --dir or RECIPES_DIR. Run `recipes schema` for the JSON format.
         """,
-        subcommands: [List.self, Show.self, Search.self, Add.self, Delete.self, Path.self, Schema.self]
+        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Delete.self, Path.self, Schema.self]
     )
 }
 
@@ -139,6 +139,22 @@ struct Add: ParsableCommand {
         FileHandle.standardError.write(Data(
             "note: iCloud library not found; saved to \(location.directory.path). Open the Recipes app once to enable sync.\n".utf8
         ))
+    }
+}
+
+struct Import: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Import a recipe from a web page that publishes schema.org recipe data.")
+    @OptionGroup var library: LibraryOptions
+    @Argument(help: "Recipe page URL.") var url: String
+    @Flag(name: .long, help: "Output the saved recipe as JSON.") var json = false
+
+    func run() async throws {
+        guard let parsed = URL(string: url), parsed.scheme?.hasPrefix("http") == true else {
+            throw ValidationError("Not a web URL: \(url)")
+        }
+        let recipe = try await RecipeImporter.recipe(from: parsed)
+        let saved = try library.store.save(recipe)
+        if json { try printJSON(saved) } else { print("Saved \(shortID(saved))  \(saved.title)") }
     }
 }
 
