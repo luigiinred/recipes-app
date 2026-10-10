@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>teamID</key>
+	<string>A2VG7FKNF9</string>
+	<key>destination</key>
+	<string>upload</string>
+	<!-- Cloud-managed signing: xcodebuild resolves the App Store distribution
+	     profile from the App Store Connect API key (-allowProvisioningUpdates). -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+</dict>
+</plist>
