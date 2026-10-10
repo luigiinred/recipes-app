@@ -26,6 +26,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Recipes
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
@@ -54,6 +56,8 @@ targets:
       path: ShareExtension/Info.plist
       properties:
         CFBundleDisplayName: Save to Recipes
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController

@@ -6,3 +6,7 @@ DerivedData/
 .DS_Store
 xcuserdata/
 build-*/
+
+# Secrets — never commit (this repo is public)
+.env
+*.p8
