@@ -69,6 +69,20 @@ Missing references are recorded on the first run (that run reports a failure); r
 
 ## CLI (for agents)
 
+Install the prebuilt, notarized binary (macOS, universal x86_64 + arm64):
+
+```bash
+curl -fL https://github.com/luigiinred/recipes-app/releases/latest/download/recipes.zip \
+  -o /tmp/recipes.zip \
+  && unzip -o /tmp/recipes.zip -d /tmp/recipes-cli \
+  && mkdir -p ~/.local/bin \
+  && install -m 0755 /tmp/recipes-cli/recipes ~/.local/bin/recipes \
+  && rm -rf /tmp/recipes.zip /tmp/recipes-cli \
+  && ~/.local/bin/recipes --help
+```
+
+`~/.local/bin` must be on your `PATH`. To build from source instead, run `bin/install_cli.sh`.
+
 ```bash
 recipes list [--tag soup] [--collection favorites|want-to-cook|recent|uncategorized] [--json]
 recipes show "tomato soup" [--json]       # id, id prefix, or title; step timestamps print as links
@@ -91,6 +105,8 @@ recipes path                              # library folder
 ```
 
 Only `title` is required in recipe JSON. `stepTimestamps` is an optional array of seconds parallel to `steps` (`null` for none).
+
+The release workflow (`.github/workflows/release-cli.yml`) builds the universal binary, signs it with a Developer ID, notarizes it, and attaches `recipes.zip` to every `v*` release. It needs these repository secrets: `CERTIFICATE_P12` (base64 Developer ID Application `.p12`), `CERTIFICATE_P12_PASSWORD`, `KEYCHAIN_PASSWORD` (any value), and `ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_AUTH_KEY` (the App Store Connect API key used for notarization).
 
 ## Limitations
 

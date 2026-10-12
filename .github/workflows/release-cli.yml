@@ -1,0 +1,114 @@
+name: release-cli
+
+# Builds the `recipes` command-line tool as a universal macOS binary, signs it
+# with a Developer ID Application certificate, notarizes it with an App Store
+# Connect API key, and attaches `recipes.zip` to the matching GitHub release.
+#
+# `bin/cut-release.sh` already creates releases tagged `v*-build.*`; pushing such
+# a tag (or running this workflow by hand) drops the CLI onto that release, which
+# the README one-liner then downloads from /releases/latest/download/recipes.zip.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CERTIFICATE_P12           base64 of the Developer ID Application .p12 export
+#   CERTIFICATE_P12_PASSWORD  the .p12 export password
+#   KEYCHAIN_PASSWORD         any password for the throwaway CI keychain
+#   ASC_KEY_ID                App Store Connect API key ID (notarization)
+#   ASC_ISSUER_ID             App Store Connect API key issuer ID
+#   ASC_AUTH_KEY              contents of the AuthKey_<KEY_ID>.p8 file
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to attach the CLI to (defaults to the latest release).'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TEAM_ID: A2VG7FKNF9
+
+jobs:
+  release-cli:
+    # Needs Swift >= 6.0 (swift-argument-parser 1.8.2 declares tools-version 6.0).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal binary
+        run: |
+          swift build -c release --product recipes --arch arm64 --arch x86_64
+          BIN_DIR="$(swift build --show-bin-path -c release --arch arm64 --arch x86_64)"
+          echo "BIN_DIR=$BIN_DIR" >> "$GITHUB_ENV"
+          lipo -info "$BIN_DIR/recipes"
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_P12_PASSWORD: ${{ secrets.CERTIFICATE_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" \
+            -P "$CERTIFICATE_P12_PASSWORD" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Sign binary
+        run: |
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep 'Developer ID Application' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+          [[ -n "$IDENTITY" ]] || { echo "No Developer ID Application identity found" >&2; exit 1; }
+          echo "Signing with: $IDENTITY"
+          codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN_DIR/recipes"
+          codesign --verify --verbose=2 "$BIN_DIR/recipes"
+
+      - name: Notarize and staple
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_AUTH_KEY: ${{ secrets.ASC_AUTH_KEY }}
+        run: |
+          printf '%s\n' "$ASC_AUTH_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          cd "$BIN_DIR"
+          /usr/bin/zip -q "$RUNNER_TEMP/recipes.zip" recipes
+          xcrun notarytool submit "$RUNNER_TEMP/recipes.zip" \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$ASC_KEY_ID" \
+            --issuer "$ASC_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$RUNNER_TEMP/recipes.zip"
+          cp "$RUNNER_TEMP/recipes.zip" recipes.zip
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+            if [[ -z "$TAG" ]]; then
+              TAG="$(gh release list --limit 1 --json tagName -q '.[0].tagName')"
+            fi
+          fi
+          # cut-release.sh creates the release right after pushing the tag; give it a beat.
+          for _ in {1..30}; do
+            gh release view "$TAG" >/dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$(git rev-parse HEAD)" \
+              --title "Recipes $TAG" --generate-notes
+          fi
+          gh release upload "$TAG" recipes.zip --clobber
+          echo "Uploaded recipes.zip to $TAG"
