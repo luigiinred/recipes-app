@@ -24,6 +24,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.food-and-drink</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Recipes uses the camera to scan recipes from books and printouts.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Recipes keeps your grocery list in sync with a list in the Reminders app.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Recipes keeps your grocery list in sync with a list in the Reminders app.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.garrabrant.recipes</key>

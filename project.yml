@@ -2,11 +2,14 @@ name: Recipes
 options:
   bundleIdPrefix: com.garrabrant
   deploymentTarget:
-    iOS: "17.0"
-    macOS: "14.0"
+    iOS: "26.0"
+    macOS: "26.0"
 packages:
   RecipeKit:
     path: .
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    exactVersion: 1.19.4
 settings:
   base:
     DEVELOPMENT_TEAM: A2VG7FKNF9
@@ -22,10 +25,15 @@ targets:
       - package: RecipeKit
         product: RecipeKit
       - target: ShareExtension
+    scheme:
+      testTargets: [RecipesTests, RecipesUITests]
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Recipes
+        NSRemindersFullAccessUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
+        NSRemindersUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
+        NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts.
         CFBundleIconName: AppIcon
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
@@ -75,3 +83,32 @@ targets:
         CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: App/Recipes-iOS.entitlements
         CODE_SIGN_STYLE: Automatic
         SKIP_INSTALL: YES
+  RecipesTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: RecipesTests
+        excludes: ["__Snapshots__/**"]
+    dependencies:
+      - target: Recipes
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.garrabrant.recipes.tests
+        TEST_HOST[sdk=macosx*]: $(BUILT_PRODUCTS_DIR)/Recipes.app/Contents/MacOS/Recipes
+        BUNDLE_LOADER[sdk=macosx*]: $(TEST_HOST)
+  RecipesUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [macOS, iOS]
+    sources: [RecipesUITests]
+    dependencies:
+      - target: Recipes
+      - package: RecipeKit
+        product: RecipeKit
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.garrabrant.recipes.uitests
+        TEST_TARGET_NAME: Recipes
