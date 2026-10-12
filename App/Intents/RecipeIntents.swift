@@ -21,7 +21,7 @@ struct SaveRecipeIntent: AppIntent {
         let saved = try await Task.detached { try library.add(result) }.value
         let dialog: IntentDialog = result.isComplete
             ? "Saved \(saved.title)."
-            : "Saved \(saved.title), but I couldn't find the full recipe. Open Recipes to finish it."
+            : IntentDialog(stringLiteral: "Saved \(saved.title), but I couldn't find the full recipe. Open Recipes to finish it. \(result.message ?? "")")
         return .result(value: RecipeEntity(saved), dialog: dialog)
     }
 }

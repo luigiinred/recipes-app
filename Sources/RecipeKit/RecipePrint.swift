@@ -14,7 +14,11 @@ public enum RecipePrint {
         if !recipe.summary.isEmpty { body += "<p class=\"summary\">\(esc(recipe.summary))</p>" }
         if !facts.isEmpty { body += "<p class=\"facts\">\(esc(facts.joined(separator: "  ·  ")))</p>" }
         if !recipe.ingredients.isEmpty {
-            body += "<h2>Ingredients</h2><ul>" + recipe.ingredients.map { "<li>\(esc($0))</li>" }.joined() + "</ul>"
+            body += "<h2>Ingredients</h2>"
+            for group in recipe.ingredientGroups {
+                if let title = group.title { body += "<h3>\(esc(title))</h3>" }
+                body += "<ul>" + group.items.map { "<li>\(esc($0.text))</li>" }.joined() + "</ul>"
+            }
         }
         if !recipe.steps.isEmpty {
             body += "<h2>Method</h2><ol>" + recipe.steps.map { "<li>\(esc($0))</li>" }.joined() + "</ol>"
@@ -26,6 +30,7 @@ public enum RecipePrint {
         <html><head><meta charset="utf-8"><style>
         body { font-family: Georgia, serif; font-size: 12pt; line-height: 1.45; }
         h1 { font-size: 24pt; margin-bottom: 4pt; }
+        h3 { font-size: 11pt; margin: 10pt 0 4pt; }
         h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1pt; margin-top: 18pt; }
         .summary { font-style: italic; } .facts, .source { color: #666; font-size: 10pt; }
         li { margin-bottom: 5pt; }

@@ -15,6 +15,13 @@ public enum RecipeStandards {
     Never use ingredient lists, cuisines, adjectives or site keywords as tags.
     """
 
+    /// The part of the rules the on-device model needs when writing a recipe from captions, kept short for its small context window.
+    public static let extractionRules = """
+    - ingredients: one per ingredient, with an amount and a unit from the list when the cook says them, such as "1 1/2 cups flour". \
+    Use digits and fractions like 1/2. Put preparation after a comma in the item.
+    - steps: short imperative sentences, with no numbering.
+    """
+
     private static let stepPrefix = try! NSRegularExpression(pattern: #"^\s*(?:(?:step\s*)?\d+\s*[.):\-–]+\s*|[-–•*]\s+)"#, options: .caseInsensitive)
 
     /// A page or video title without the site name tacked on: "Best Cookies | Preppy Kitchen", "Cookies Recipe by Tasty".
@@ -23,6 +30,19 @@ public enum RecipeStandards {
         if let bar = title.range(of: " | ") { title = String(title[..<bar.lowerBound]) }
         if let by = title.range(of: #" Recipe by [^|]+$"#, options: [.regularExpression, .caseInsensitive]) { title.removeSubrange(by) }
         return title.isEmpty ? text : title
+    }
+
+    /// Sections in order, with blank titles and sections that hold no ingredients dropped; a later heading at the same spot wins.
+    public static func standardSections(_ sections: [IngredientSection], ingredientCount: Int) -> [IngredientSection] {
+        var result: [IngredientSection] = []
+        for section in sections.sorted(by: { $0.start < $1.start }) {
+            let title = section.title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            let trimmed = title.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespaces))
+            guard !trimmed.isEmpty, section.start >= 0, section.start < ingredientCount else { continue }
+            if result.last?.start == section.start { result.removeLast() }
+            result.append(IngredientSection(title: trimmed, start: section.start))
+        }
+        return result
     }
 
     public static func standardStep(_ text: String) -> String {
@@ -44,7 +64,13 @@ extension Recipe {
         var recipe = self
         recipe.title = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         recipe.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        recipe.ingredients = ingredients.map { Ingredient(parsing: $0).text }.filter { !$0.isEmpty }
+        let parsed = ingredients.map { Ingredient(parsing: $0).text }
+        let keptIngredients = parsed.indices.filter { !parsed[$0].isEmpty }
+        recipe.ingredients = keptIngredients.map { parsed[$0] }
+        recipe.ingredientSections = RecipeStandards.standardSections(
+            ingredientSections.map { section in IngredientSection(title: section.title, start: keptIngredients.filter { $0 < section.start }.count) },
+            ingredientCount: recipe.ingredients.count
+        )
 
         let cleaned = steps.map(RecipeStandards.standardStep)
         let kept = cleaned.indices.filter { !cleaned[$0].isEmpty }

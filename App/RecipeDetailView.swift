@@ -232,16 +232,24 @@ struct RecipeDetailView: View {
     private var ingredients: some View {
         section("Ingredients") {
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { index, text in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
-                            .onTapGesture { toggle(&checkedIngredients, index) }
-                            .accessibilityAddTraits(.isButton)
-                        IngredientLine(text: text)
-                            .strikethrough(checkedIngredients.contains(index))
-                            .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
-                            .multilineTextAlignment(.leading)
+                ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
+                    if let title = group.title {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.top, 6)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    ForEach(group.items, id: \.index) { index, text in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
+                                .onTapGesture { toggle(&checkedIngredients, index) }
+                                .accessibilityAddTraits(.isButton)
+                            IngredientLine(text: text)
+                                .strikethrough(checkedIngredients.contains(index))
+                                .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
                 }
             }
@@ -280,6 +288,7 @@ struct RecipeDetailView: View {
                             .accessibilityLabel("Play from \(Recipe.clock(seconds))")
                         }
                     }
+                    StepIngredientChips(recipe: recipe, step: index).padding(.leading, 38)
                     if let imageID = recipe.stepImage(forStep: index) {
                         StepImageView(id: imageID).padding(.leading, 38)
                     }

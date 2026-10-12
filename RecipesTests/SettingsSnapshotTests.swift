@@ -7,7 +7,7 @@ import Testing
 struct SettingsSnapshotTests {
     @Test("settings")
     func settings() {
-        assertPageSnapshots(of: SettingsView(), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: SettingsView(intelligenceOverride: (.notEnabled, false)), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
     @Test("add to the planner: search and pick")

@@ -15,9 +15,11 @@ A recipe manager for iPhone, iPad, and Mac, synced through iCloud Drive, with a 
 - **Siri and Shortcuts** (App Intents): save a recipe from a link (for example one sent to you in Messages), find a recipe, start cooking, and add a recipe's ingredients to groceries. Recipes are indexed for Spotlight.
 - **Search** lives in the tab bar on iPhone: a separate button that grows into a full search bar and tucks the tabs away.
 - **Settings** (gear on iPhone, ⌘, on Mac): which meal new calendar entries default to (or automatic by time of day), meals shown in the planner, week start, list style, review-before-saving imports, Reminders sync, and keeping the screen awake while cooking. Settings also has **Export all data as JSON**: one file with every recipe, photo (base64), planned meal, grocery item, and feed.
+- **Ingredient sections** ("Potato chips", "Cinnamon sugar"): add headings by hand in the editor, or tap **Group with Apple Intelligence** to sort a long list by the part of the dish it's for. Scans and video descriptions with `For the sauce:` lines get sections automatically. Under every step, chips show the ingredients that step uses (matched from the step's text), and cook mode lists them in large type.
 - **Ingredients** show the amount in bold and the preparation in grey italics (`**2 tbsp** butter *softened*`).
 - **Developer Tools** (Settings): add built-in sample recipes, a sample week plan and groceries, or import a batch of real recipes (AllRecipes, Tasty, Serious Eats, BBC Good Food, Food Network, YouTube) to try every importer.
 - The share extension opens the same editor as the app and, once saved, offers **Open in Recipes** (`recipes://recipe/<id>`).
+- **Apple Intelligence** (Settings shows what's ready on this device, and why when it isn't): writing a recipe from a video's captions, grouping ingredients, and Image Playground photos. When the model isn't available, imports still work and say why.
 - **Printing** and sharing.
 - Layouts respond to width (ingredients and steps sit side by side when there's room), including iPad multitasking, landscape, and wide dual-screen canvases.
 - Feeds (subscribing to recipe blogs) are built but hidden behind `AppFeatures.feeds`.
@@ -98,6 +100,8 @@ recipes scan page.jpg [--save]            # text recognition on a photo or PDF
 recipes plan [add|remove|list] ...        # meal calendar
 recipes groceries [add|add-recipe|check|remove|clear|list] ...   # the app mirrors these into Reminders
 recipes feeds [add|remove|entries|list] ...
+recipes sections "Soup" [--save]            # group ingredients into sections (on-device model)
+recipes ai-check                          # is Apple Intelligence ready? tries the recipe-writing model
 recipes export [-o all.json]              # everything as one JSON document
 recipes delete <id>
 recipes schema                            # example JSON
