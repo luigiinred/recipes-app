@@ -17,6 +17,7 @@ public enum RecipeTextParser {
         var title: String?
         var summary: [String] = []
         var ingredients: [String] = []
+        var sections: [IngredientSection] = []
         var steps: [String] = []
         var servings: Int?
         var prep: Int?
@@ -50,7 +51,11 @@ public enum RecipeTextParser {
             case .header:
                 summary.append(line)
             case .ingredients:
-                ingredients.append(stripBullet(line))
+                if let name = subheading(line) {
+                    sections.append(IngredientSection(title: name, start: ingredients.count))
+                } else {
+                    ingredients.append(stripBullet(line))
+                }
             case .steps:
                 appendStep(line, to: &steps)
             }
@@ -63,6 +68,7 @@ public enum RecipeTextParser {
             prepMinutes: prep,
             cookMinutes: cook,
             ingredients: ingredients,
+            ingredientSections: RecipeStandards.standardSections(sections, ingredientCount: ingredients.count),
             steps: steps
         )
     }
@@ -74,6 +80,16 @@ public enum RecipeTextParser {
         guard key.count < 40 else { return nil }
         if key.hasPrefix("ingredients") { return .ingredients }
         if ["instructions", "directions", "method", "how to make", "preparation"].contains(where: { key.hasPrefix($0) }) { return .steps }
+        return nil
+    }
+
+    /// "For the sauce:" or "Cinnamon sugar" on a line of its own, between ingredients.
+    static func subheading(_ line: String) -> String? {
+        let text = stripBullet(line).trimmingCharacters(in: .whitespaces)
+        guard text.count <= 40, !text.contains(where: \.isNumber), IngredientParser.split(text).quantity.isEmpty else { return nil }
+        let name = text.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespaces))
+        let lowered = name.lowercased()
+        if text.hasSuffix(":") || lowered.hasPrefix("for the ") || lowered.hasPrefix("for ") { return name }
         return nil
     }
 

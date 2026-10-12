@@ -54,13 +54,17 @@ public enum YouTubeImporter {
         progress?(.began(1))
         var (recipe, complete) = build(from: video, extracted: nil)
         progress?(.finished(1))
-        if !complete, let transcript = video.transcript, TranscriptRecipeExtractor.isAvailable {
+        var aiNote: String?
+        if !complete, let transcript = video.transcript, AppleIntelligence.status.isAvailable {
             progress?(.began(2))
-            if let extracted = await TranscriptRecipeExtractor.extract(title: video.title, transcript: transcript) {
-                (recipe, complete) = build(from: video, extracted: extracted)
+            switch await TranscriptRecipeExtractor.run(title: video.title, transcript: transcript) {
+            case .extracted(let extracted): (recipe, complete) = build(from: video, extracted: extracted)
+            case .unavailable(let status): aiNote = status.explanation
+            case .failed(let reason): aiNote = "Apple Intelligence couldn't write the recipe: \(reason)"
             }
             progress?(.finished(2))
         } else {
+            if !complete, video.transcript != nil { aiNote = AppleIntelligence.status.explanation }
             progress?(.skipped(2))
         }
         let image = await thumbnail
@@ -70,6 +74,7 @@ public enum YouTubeImporter {
             message = video.transcript == nil
                 ? "This video's description doesn't include a recipe, and it has no captions to read. Add the ingredients and steps below."
                 : "This video's description doesn't include a full recipe. Check the ingredients and steps below against the video."
+            if let aiNote { message = (message ?? "") + " " + aiNote }
         }
         return ImportResult(
             recipe: recipe, imageData: image, isComplete: complete,

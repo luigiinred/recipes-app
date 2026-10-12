@@ -45,6 +45,7 @@ enum SampleData {
         servings: 6, prepMinutes: 15, cookMinutes: 60,
         ingredients: ["500g black beans, dried", "4 cans diced tomatoes", "1 can corn", "4 bell peppers", "1 onion",
                       "2 cloves garlic", "5 tbsp tomato paste", "3 tbsp canola oil", "Vegetable broth", "Salt"],
+        ingredientSections: [IngredientSection(title: "Beans", start: 0), IngredientSection(title: "Chili", start: 1)],
         steps: ["Soak the beans overnight in plenty of water.",
                 "Drain the beans, cover with fresh water and simmer for 45 minutes.",
                 "Fry the onion, garlic and peppers in the oil, then stir in the tomato paste.",

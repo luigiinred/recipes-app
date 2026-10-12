@@ -43,6 +43,54 @@ struct Export: ParsableCommand {
     }
 }
 
+struct Sections: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Group a recipe's ingredients into sections (Dough, Sauce...) with the on-device model.")
+    @OptionGroup var library: LibraryOptions
+    @Argument(help: "Recipe id, id prefix, or title.") var recipe: String
+    @Flag(name: .long, help: "Save the grouping to the recipe.") var save = false
+
+    func run() async throws {
+        var found = try library.store.find(recipe)
+        switch await IngredientGrouper.group(title: found.title, ingredients: found.ingredients, steps: found.steps) {
+        case .grouped(let ingredients, let sections):
+            found.ingredients = ingredients
+            found.ingredientSections = sections
+            print(found.markdown.components(separatedBy: "## Steps").first ?? "")
+            if save { _ = try library.store.save(found); print("Saved.") }
+        case .unchanged: print("These ingredients belong together; no sections added.")
+        case .unavailable(let status): throw ValidationError(status.explanation)
+        case .failed(let reason): throw ValidationError(reason)
+        }
+    }
+}
+
+struct AICheck: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "ai-check",
+        abstract: "Report whether Apple Intelligence is ready and try the recipe-writing model on sample captions."
+    )
+
+    func run() async throws {
+        let status = AppleIntelligence.status
+        print("Apple Intelligence: \(status.isAvailable ? "available" : "not available") - \(status.explanation)")
+        guard status.isAvailable else { return }
+        let short = "Today we're making a simple tomato pasta. Boil two hundred grams of spaghetti in salted water. Meanwhile warm two tablespoons of olive oil, add two cloves of minced garlic and a can of crushed tomatoes and simmer for ten minutes. Toss the pasta with the sauce and finish with a handful of basil."
+        let long = String(repeating: short + " ", count: 120)
+        for (name, text) in [("short captions", short), ("very long captions", long)] {
+            let started = Date()
+            switch await TranscriptRecipeExtractor.run(title: "Tomato Pasta", transcript: text) {
+            case .extracted(let recipe):
+                print("\(name): ok in \(String(format: "%.1f", Date().timeIntervalSince(started)))s - \(recipe.ingredients.count) ingredients, \(recipe.steps.count) steps")
+                if name == "short captions" { recipe.ingredients.forEach { print("  \($0)") } }
+            case .unavailable(let status):
+                print("\(name): unavailable - \(status.explanation)")
+            case .failed(let reason):
+                print("\(name): failed - \(reason)")
+            }
+        }
+    }
+}
+
 struct Scan: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Read a recipe from a photo or PDF using text recognition.")
     @OptionGroup var library: LibraryOptions
