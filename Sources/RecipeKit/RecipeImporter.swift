@@ -1,7 +1,36 @@
 import Foundation
 
+public struct ImportResult: Sendable {
+    public var recipe: Recipe
+    public var imageData: Data?
+    public var isComplete: Bool
+    /// Raw text (description or captions) to show when the recipe needs review.
+    public var sourceText: String?
+    public var sourceTitle: String
+    public var message: String?
+
+    public init(recipe: Recipe, imageData: Data? = nil, isComplete: Bool = true, sourceText: String? = nil, sourceTitle: String = "Scanned text", message: String? = nil) {
+        self.recipe = recipe
+        self.imageData = imageData
+        self.isComplete = isComplete
+        self.sourceText = sourceText
+        self.sourceTitle = sourceTitle
+        self.message = message
+    }
+}
+
 public enum RecipeImporter {
+    public static func importResult(from url: URL) async throws -> ImportResult {
+        if YouTubeImporter.videoID(from: url) != nil { return try await YouTubeImporter.importResult(from: url) }
+        let recipe = try await webRecipe(from: url)
+        return ImportResult(recipe: recipe, imageData: await RecipeImageProcessing.download(recipe.imageURL, relativeTo: url))
+    }
+
     public static func recipe(from url: URL) async throws -> Recipe {
+        try await importResult(from: url).recipe
+    }
+
+    static func webRecipe(from url: URL) async throws -> Recipe {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -20,9 +49,32 @@ public enum RecipeImporter {
             guard let data = block.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data),
                   let object = findRecipe(in: json) else { continue }
-            if let recipe = makeRecipe(from: object, sourceURL: sourceURL) { return recipe }
+            if var recipe = makeRecipe(from: object, sourceURL: sourceURL) {
+                if recipe.imageURL == nil { recipe.imageURL = openGraphImage(in: html, base: sourceURL) }
+                return recipe
+            }
         }
         throw RecipeError.invalid("No recipe found on that page.")
+    }
+
+    static func openGraphImage(in html: String, base: URL?) -> String? {
+        let metaTag = try! NSRegularExpression(pattern: #"<meta\b[^>]*>"#, options: .caseInsensitive)
+        for match in metaTag.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let range = Range(match.range, in: html) else { continue }
+            let tag = String(html[range])
+            guard tag.range(of: #"(property|name)\s*=\s*["']og:image(:secure_url)?["']"#, options: [.regularExpression, .caseInsensitive]) != nil,
+                  let contentRange = tag.range(of: #"content\s*=\s*["']([^"']+)["']"#, options: [.regularExpression, .caseInsensitive]),
+                  let valueRange = tag[contentRange].range(of: #"(?<=["'])[^"']+"#, options: .regularExpression) else { continue }
+            return clean(String(tag[contentRange][valueRange]))
+        }
+        return nil
+    }
+
+    private static func imageString(_ value: Any?) -> String? {
+        if let string = value as? String { return string }
+        if let array = value as? [Any] { return array.lazy.compactMap { imageString($0) }.first }
+        if let object = value as? [String: Any] { return imageString(object["url"] ?? object["contentUrl"]) }
+        return nil
     }
 
     static func jsonLDBlocks(in html: String) -> [String] {
@@ -70,7 +122,8 @@ public enum RecipeImporter {
             ingredients: ingredients,
             steps: instructions(object["recipeInstructions"]),
             tags: Array(tags.prefix(8)),
-            sourceURL: sourceURL?.absoluteString
+            sourceURL: sourceURL?.absoluteString,
+            imageURL: imageString(object["image"])
         )
     }
 

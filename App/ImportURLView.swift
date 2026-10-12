@@ -3,7 +3,10 @@ import SwiftUI
 
 struct ImportURLView: View {
     @Environment(\.dismiss) private var dismiss
-    let onImport: (Recipe) -> Void
+    let onReview: (ImportResult) -> Void
+    var onSaved: (Recipe) -> Void = { _ in }
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
 
     @State private var address = ""
     @State private var isLoading = false
@@ -21,24 +24,24 @@ struct ImportURLView: View {
                         #endif
                         .onSubmit(importRecipe)
                 } footer: {
-                    Text("Works with recipe pages that publish structured recipe data, which most do.")
+                    Text("Paste a recipe page or a YouTube video. Pages need recipe data (most have it). Videos need the recipe in the description or captions.")
                 }
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Import from Web")
+            .navigationTitle("Import from Web or YouTube")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { CancelButton() }
                 ToolbarItem(placement: .confirmationAction) {
                     if isLoading {
                         ProgressView().controlSize(.small)
                     } else {
-                        Button("Import", action: importRecipe).disabled(address.isEmpty)
+                        ConfirmButton(title: "Import", isDisabled: address.isEmpty, action: importRecipe)
                     }
                 }
             }
@@ -60,9 +63,14 @@ struct ImportURLView: View {
         errorMessage = nil
         Task {
             do {
-                let recipe = try await RecipeImporter.recipe(from: url)
-                onImport(recipe)
-                dismiss()
+                let result = try await RecipeImporter.importResult(from: url)
+                if !reviewImports, result.isComplete, let saved = await library.add(result) {
+                    dismiss()
+                    onSaved(saved)
+                } else {
+                    dismiss()
+                    onReview(result)
+                }
             } catch {
                 errorMessage = error.localizedDescription
                 isLoading = false

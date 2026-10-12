@@ -18,34 +18,15 @@ public enum RecipeError: LocalizedError, Equatable {
 }
 
 public struct RecipeStore: Sendable {
-    public let directory: URL
+    public var directory: URL { documents.directory }
+    private let documents: DocumentStore<Recipe>
 
     public init(directory: URL) {
-        self.directory = directory
+        documents = DocumentStore(directory: directory)
     }
 
     public func list() throws -> [Recipe] {
-        try ensureDirectory()
-        let urls = try FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil, options: []
-        )
-        var recipes: [Recipe] = []
-        let decoder = RecipeCoding.makeDecoder()
-        for url in urls {
-            let name = url.lastPathComponent
-            if name.hasPrefix("."), name.hasSuffix(".icloud") {
-                let real = String(name.dropFirst().dropLast(".icloud".count))
-                try? FileManager.default.startDownloadingUbiquitousItem(
-                    at: directory.appendingPathComponent(real)
-                )
-                continue
-            }
-            guard url.pathExtension == "json",
-                  let data = try? coordinatedRead(url),
-                  let recipe = try? decoder.decode(Recipe.self, from: data) else { continue }
-            recipes.append(recipe)
-        }
-        return recipes.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        try documents.list().sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
     @discardableResult
@@ -54,21 +35,16 @@ public struct RecipeStore: Sendable {
         recipe.title = recipe.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !recipe.title.isEmpty else { throw RecipeError.invalid("A recipe needs a title.") }
         recipe.updatedAt = Date()
-        try ensureDirectory()
-        let data = try RecipeCoding.makeEncoder().encode(recipe)
-        try coordinatedWrite(data, to: fileURL(for: recipe.id))
+        try documents.save(recipe)
         return recipe
     }
 
     public func delete(_ recipe: Recipe) throws {
-        let url = fileURL(for: recipe.id)
-        var coordinationError: NSError?
-        var result: Result<Void, Error> = .success(())
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError, byAccessor: { (url: URL) in
-            result = Result { try FileManager.default.removeItem(at: url) }
-        })
-        if let coordinationError { throw coordinationError }
-        try result.get()
+        try documents.delete(recipe)
+    }
+
+    public func fileURL(for id: UUID) -> URL {
+        documents.fileURL(for: id)
     }
 
     public func find(_ query: String) throws -> Recipe {
@@ -90,33 +66,5 @@ public struct RecipeStore: Sendable {
         default:
             throw RecipeError.ambiguous(query, candidates.map { "\($0.id.uuidString.prefix(8).lowercased())  \($0.title)" })
         }
-    }
-
-    public func fileURL(for id: UUID) -> URL {
-        directory.appendingPathComponent("\(id.uuidString.lowercased()).json")
-    }
-
-    private func ensureDirectory() throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    }
-
-    private func coordinatedRead(_ url: URL) throws -> Data {
-        var coordinationError: NSError?
-        var result: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError, byAccessor: { (url: URL) in
-            result = Result { try Data(contentsOf: url) }
-        })
-        if let coordinationError { throw coordinationError }
-        return try result.get()
-    }
-
-    private func coordinatedWrite(_ data: Data, to url: URL) throws {
-        var coordinationError: NSError?
-        var result: Result<Void, Error> = .success(())
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError, byAccessor: { (url: URL) in
-            result = Result { try data.write(to: url, options: .atomic) }
-        })
-        if let coordinationError { throw coordinationError }
-        try result.get()
     }
 }
