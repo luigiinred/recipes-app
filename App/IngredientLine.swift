@@ -9,6 +9,12 @@ struct IngredientLine: View {
         Text(Self.styled(text))
     }
 
+    /// "2 tbsp olive oil" without the preparation, for chips.
+    static func chipText(_ text: String) -> String {
+        let ingredient = Ingredient(parsing: text)
+        return ingredient.amount.isEmpty ? ingredient.name : ingredient.amount + " " + ingredient.name
+    }
+
     static func styled(_ text: String) -> AttributedString {
         let ingredient = Ingredient(parsing: text)
         var result = AttributedString()

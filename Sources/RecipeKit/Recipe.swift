@@ -1,5 +1,16 @@
 import Foundation
 
+/// A heading in the ingredient list: it applies from the ingredient at `start` up to the next section.
+public struct IngredientSection: Codable, Hashable, Sendable {
+    public var title: String
+    public var start: Int
+
+    public init(title: String, start: Int) {
+        self.title = title
+        self.start = start
+    }
+}
+
 public struct Recipe: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var title: String
@@ -8,6 +19,8 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
     public var prepMinutes: Int?
     public var cookMinutes: Int?
     public var ingredients: [String]
+    /// Optional headings such as "For the sauce"; `ingredients` stays one flat list.
+    public var ingredientSections: [IngredientSection]
     public var steps: [String]
     /// Seconds into the source video where each step starts; parallel to `steps`.
     public var stepTimestamps: [Int?]
@@ -35,6 +48,7 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         prepMinutes: Int? = nil,
         cookMinutes: Int? = nil,
         ingredients: [String] = [],
+        ingredientSections: [IngredientSection] = [],
         steps: [String] = [],
         stepTimestamps: [Int?] = [],
         stepImages: [UUID?] = [],
@@ -56,6 +70,7 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         self.prepMinutes = prepMinutes
         self.cookMinutes = cookMinutes
         self.ingredients = ingredients
+        self.ingredientSections = ingredientSections
         self.steps = steps
         self.stepTimestamps = stepTimestamps
         self.stepImages = stepImages
@@ -81,6 +96,7 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         prepMinutes = try c.decodeIfPresent(Int.self, forKey: .prepMinutes)
         cookMinutes = try c.decodeIfPresent(Int.self, forKey: .cookMinutes)
         ingredients = try c.decodeIfPresent([String].self, forKey: .ingredients) ?? []
+        ingredientSections = try c.decodeIfPresent([IngredientSection].self, forKey: .ingredientSections) ?? []
         steps = try c.decodeIfPresent([String].self, forKey: .steps) ?? []
         stepTimestamps = try c.decodeIfPresent([Int?].self, forKey: .stepTimestamps) ?? []
         stepImages = try c.decodeIfPresent([UUID?].self, forKey: .stepImages) ?? []
@@ -98,6 +114,21 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
 
     public func timestamp(forStep index: Int) -> Int? {
         stepTimestamps.indices.contains(index) ? stepTimestamps[index] : nil
+    }
+
+    /// The ingredients in display order, each group with its heading (nil before the first heading).
+    public var ingredientGroups: [(title: String?, items: [(index: Int, text: String)])] {
+        let starts = ingredientSections.sorted { $0.start < $1.start }
+        var groups: [(title: String?, items: [(index: Int, text: String)])] = []
+        var boundaries = starts.map(\.start)
+        if boundaries.first != 0 { boundaries.insert(0, at: 0) }
+        for (position, begin) in boundaries.enumerated() {
+            let end = position + 1 < boundaries.count ? boundaries[position + 1] : ingredients.count
+            guard begin < end, begin >= 0, end <= ingredients.count else { continue }
+            let title = starts.last { $0.start == begin }?.title
+            groups.append((title, (begin..<end).map { ($0, ingredients[$0]) }))
+        }
+        return groups
     }
 
     public func stepImage(forStep index: Int) -> UUID? {
@@ -123,7 +154,12 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         if !facts.isEmpty { lines += ["", facts.joined(separator: " · ")] }
         if !tags.isEmpty { lines += ["", "Tags: " + tags.joined(separator: ", ")] }
         if !ingredients.isEmpty {
-            lines += ["", "## Ingredients", ""] + ingredients.map { "- \($0)" }
+            lines += ["", "## Ingredients"]
+            for group in ingredientGroups {
+                lines += [""]
+                if let title = group.title { lines += ["### \(title)", ""] }
+                lines += group.items.map { "- \($0.text)" }
+            }
         }
         if !steps.isEmpty {
             lines += ["", "## Steps", ""] + steps.enumerated().map { index, step in

@@ -28,6 +28,8 @@ struct RecipeEditorView: View {
     @State private var prep: String
     @State private var cook: String
     @State private var ingredients: [EditableIngredient]
+    @State private var isGrouping = false
+    @State private var groupingMessage: String?
     @State private var steps: [EditableLine]
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
@@ -57,7 +59,7 @@ struct RecipeEditorView: View {
         _servings = State(initialValue: recipe.servings.map(String.init) ?? "")
         _prep = State(initialValue: recipe.prepMinutes.map(String.init) ?? "")
         _cook = State(initialValue: recipe.cookMinutes.map(String.init) ?? "")
-        _ingredients = State(initialValue: recipe.ingredients.map { EditableIngredient(parsing: $0) })
+        _ingredients = State(initialValue: Self.rows(for: recipe))
         _steps = State(initialValue: recipe.steps.enumerated().map { index, text in
             var line = EditableLine(text: text, time: recipe.timestamp(forStep: index).map(Recipe.clock) ?? "")
             line.imageID = recipe.stepImage(forStep: index)
@@ -99,7 +101,7 @@ struct RecipeEditorView: View {
                     LabeledContent("Prep minutes") { TextField("", text: $prep).multilineTextAlignment(.trailing) }
                     LabeledContent("Cook minutes") { TextField("", text: $cook).multilineTextAlignment(.trailing) }
                 }
-                Section("Ingredients") {
+                Section {
                     ForEach($ingredients) { $line in
                         ingredientRow(line: $line)
                     }
@@ -110,6 +112,26 @@ struct RecipeEditorView: View {
                         let line = EditableIngredient()
                         focused = line.id
                         ingredients.append(line)
+                    }
+                    addButton("Add Section") {
+                        let line = EditableIngredient(heading: "")
+                        focused = line.id
+                        ingredients.append(line)
+                    }
+                    Button { Task { await groupIngredients() } } label: {
+                        Label(isGrouping ? "Grouping…" : "Group with Apple Intelligence", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isGrouping || !AppleIntelligence.status.isAvailable || realIngredients.count < 4)
+                } header: {
+                    Text("Ingredients")
+                } footer: {
+                    if let groupingMessage {
+                        Text(groupingMessage)
+                    } else if !AppleIntelligence.status.isAvailable {
+                        Text("Grouping needs Apple Intelligence. " + AppleIntelligence.status.explanation)
+                    } else {
+                        Text("Sections such as “Dough” and “Sauce” make a long list easier to scan. Drag a heading to move it.")
                     }
                 }
                 Section("Steps") {
@@ -198,7 +220,62 @@ struct RecipeEditorView: View {
         URL(string: source).flatMap(YouTubeImporter.videoID(from:)) != nil
     }
 
+    private var realIngredients: [String] {
+        ingredients.filter { !$0.isHeading }.map(\.text).filter { !$0.isEmpty }
+    }
+
+    /// The editor's rows: each section heading, then its ingredients.
+    static func rows(for recipe: Recipe) -> [EditableIngredient] {
+        recipe.ingredientGroups.flatMap { group -> [EditableIngredient] in
+            let heading = group.title.map { [EditableIngredient(heading: $0)] } ?? []
+            return heading + group.items.map { EditableIngredient(parsing: $0.text) }
+        }
+    }
+
+    private func groupIngredients() async {
+        isGrouping = true
+        groupingMessage = nil
+        defer { isGrouping = false }
+        let outcome = await IngredientGrouper.group(
+            title: title, ingredients: realIngredients, steps: steps.map(\.text).filter { !$0.isEmpty }
+        )
+        withAnimation(.snappy) {
+            switch outcome {
+            case .grouped(let list, let sections):
+                ingredients = Self.rows(for: Recipe(title: title, ingredients: list, ingredientSections: sections))
+                groupingMessage = "Grouped into \(sections.count) sections. Drag ingredients between sections to fix any mix-ups."
+            case .unchanged:
+                groupingMessage = "These ingredients all belong together, so no sections were added."
+            case .unavailable(let status):
+                groupingMessage = status.explanation
+            case .failed(let reason):
+                groupingMessage = "Couldn't group the ingredients: \(reason)"
+            }
+        }
+    }
+
     private func ingredientRow(line: Binding<EditableIngredient>) -> some View {
+        if line.wrappedValue.isHeading { return AnyView(headingRow(line: line)) }
+        return AnyView(plainIngredientRow(line: line))
+    }
+
+    private func headingRow(line: Binding<EditableIngredient>) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "text.alignleft").foregroundStyle(Theme.accent).accessibilityHidden(true)
+            TextField("Section name", text: line.item)
+                .font(.headline)
+                .focused($focused, equals: line.wrappedValue.id)
+            #if os(macOS)
+            Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Remove")
+            #endif
+        }
+        .contextMenu { Button("Delete Section", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } }
+    }
+
+    private func plainIngredientRow(line: Binding<EditableIngredient>) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             TextField("Qty", text: line.quantity)
                 .multilineTextAlignment(.trailing)
@@ -342,7 +419,17 @@ struct RecipeEditorView: View {
         recipe.servings = Int(servings)
         recipe.prepMinutes = Int(prep)
         recipe.cookMinutes = Int(cook)
-        recipe.ingredients = ingredients.map(\.text).filter { !$0.isEmpty }
+        var texts: [String] = []
+        var sections: [IngredientSection] = []
+        for row in ingredients {
+            if row.isHeading {
+                sections.append(IngredientSection(title: row.item, start: texts.count))
+            } else if !row.text.isEmpty {
+                texts.append(row.text)
+            }
+        }
+        recipe.ingredients = texts
+        recipe.ingredientSections = RecipeStandards.standardSections(sections, ingredientCount: texts.count)
         let kept = keptSteps()
         recipe.steps = kept.map(\.text)
         recipe.stepTimestamps = kept.contains { $0.seconds != nil } ? kept.map(\.seconds) : []
@@ -384,8 +471,15 @@ struct EditableIngredient: Identifiable, Hashable {
     var quantity = ""
     var unit: IngredientUnit?
     var item = ""
+    /// A section heading (its title is in `item`) rather than an ingredient.
+    var isHeading = false
 
     init() {}
+
+    init(heading: String) {
+        item = heading
+        isHeading = true
+    }
 
     init(parsing text: String) {
         let parsed = Ingredient(parsing: text)
