@@ -18,6 +18,9 @@ struct RecipesApp: App {
                 .environmentObject(router)
                 .tint(Theme.accent)
                 .task { await library.run() }
+                .onOpenURL { url in
+                    if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
+                }
         }
         #if os(macOS)
         Settings {
@@ -27,8 +30,4 @@ struct RecipesApp: App {
         }
         #endif
     }
-}
-
-enum Theme {
-    static let accent = Color(red: 0.86, green: 0.28, blue: 0.22)
 }

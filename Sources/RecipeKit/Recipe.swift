@@ -11,12 +11,19 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
     public var steps: [String]
     /// Seconds into the source video where each step starts; parallel to `steps`.
     public var stepTimestamps: [Int?]
+    /// Photo for each step, parallel to `steps`; the files live in the library's step image store.
+    public var stepImages: [UUID?]
     public var tags: [String]
     public var sourceURL: String?
     public var imageURL: String?
     public var notes: String
     public var isFavorite: Bool
+    /// One to five stars, or nil when unrated.
+    public var rating: Int?
+    /// In the planner's Up Next queue; cleared when the recipe is planned or cooked.
     public var wantToCook: Bool
+    /// When the recipe joined the queue, so the queue stays in the order things were added.
+    public var queuedAt: Date?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -30,12 +37,15 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         ingredients: [String] = [],
         steps: [String] = [],
         stepTimestamps: [Int?] = [],
+        stepImages: [UUID?] = [],
         tags: [String] = [],
         sourceURL: String? = nil,
         imageURL: String? = nil,
         notes: String = "",
         isFavorite: Bool = false,
+        rating: Int? = nil,
         wantToCook: Bool = false,
+        queuedAt: Date? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -48,12 +58,15 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         self.ingredients = ingredients
         self.steps = steps
         self.stepTimestamps = stepTimestamps
+        self.stepImages = stepImages
         self.tags = tags
         self.sourceURL = sourceURL
         self.imageURL = imageURL
         self.notes = notes
         self.isFavorite = isFavorite
+        self.rating = rating
         self.wantToCook = wantToCook
+        self.queuedAt = queuedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -70,18 +83,25 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         ingredients = try c.decodeIfPresent([String].self, forKey: .ingredients) ?? []
         steps = try c.decodeIfPresent([String].self, forKey: .steps) ?? []
         stepTimestamps = try c.decodeIfPresent([Int?].self, forKey: .stepTimestamps) ?? []
+        stepImages = try c.decodeIfPresent([UUID?].self, forKey: .stepImages) ?? []
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL)
         imageURL = try c.decodeIfPresent(String.self, forKey: .imageURL)
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        rating = try c.decodeIfPresent(Int.self, forKey: .rating)
         wantToCook = try c.decodeIfPresent(Bool.self, forKey: .wantToCook) ?? false
+        queuedAt = try c.decodeIfPresent(Date.self, forKey: .queuedAt)
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? now
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? now
     }
 
     public func timestamp(forStep index: Int) -> Int? {
         stepTimestamps.indices.contains(index) ? stepTimestamps[index] : nil
+    }
+
+    public func stepImage(forStep index: Int) -> UUID? {
+        stepImages.indices.contains(index) ? stepImages[index] : nil
     }
 
     public var youTubeVideoID: String? {

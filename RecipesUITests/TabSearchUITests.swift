@@ -23,7 +23,7 @@ final class TabSearchUITests: XCTestCase {
         app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.searchFields.firstMatch.exists, "the recipes tab should not show a search bar at the top")
 
         let searchTab = app.tabBars.buttons["Search"].firstMatch

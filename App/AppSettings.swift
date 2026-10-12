@@ -11,6 +11,7 @@ enum AppSettings {
         static let keepAwake = "keepAwakeWhileCooking"
         static let listStyle = "recipeListStyle"
         static let reminders = "syncGroceriesWithReminders"
+        static let ratingStyle = "ratingStyle"
     }
 
     enum WeekStart: String, CaseIterable {

@@ -9,6 +9,7 @@ struct ScanDraft: Identifiable {
     var textTitle = "Scanned text"
     var notice: String?
     var imageData: Data?
+    var stepImages: [Data?] = []
 }
 
 enum RecipeListStyle: String, CaseIterable {
@@ -22,12 +23,102 @@ struct RecipeListView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
-    let showsCollectionMenu: Bool
     var styleOverride: RecipeListStyle?
+    /// On iPhone a category is a folder with subcategories to open. The iPad sidebar shows the tree instead.
+    var showsFolders = true
 
     @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
     @State private var search = ""
     @State private var editing: Recipe?
+
+    private var style: RecipeListStyle { styleOverride ?? storedStyle }
+
+    var body: some View {
+        recipeList
+            .macSearchable(text: $search, prompt: "Search recipes")
+            .navigationTitle(collection.title)
+            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }))
+            .sheet(item: $editing) { recipe in
+                RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
+            }
+    }
+
+    /// A category on iPhone and iPad is a folder: its subcategories, then the recipes filed directly in it.
+    private var items: [Recipe] {
+        #if os(iOS)
+        if showsFolders, case .category(let path) = collection {
+            return library.recipes.filter { recipe in
+                recipe.tags.contains { CategoryTree.components($0).count == CategoryTree.components(path).count && CategoryTree.tag($0, isIn: path) }
+            }.filter { $0.matches(search) }
+        }
+        #endif
+        return collection.filter(library.recipes).filter { $0.matches(search) }
+    }
+
+    #if os(iOS)
+    private var subcategories: [CategoryNode] {
+        guard showsFolders, case .category(let path) = collection, search.isEmpty else { return [] }
+        return CategoryTree.node(at: path, in: library.categoryTree)?.children ?? []
+    }
+    #endif
+
+    private var recipeList: some View {
+        let items = items
+        return List(selection: $selection) {
+            #if os(iOS)
+            if !subcategories.isEmpty {
+                Section("Categories") {
+                    ForEach(subcategories) { CategoryRow(node: $0) }
+                }
+            }
+            #endif
+            Section {
+                ForEach(items) { recipe in
+                    Group {
+                        switch style {
+                        case .cards: RecipeCard(recipe: recipe)
+                        case .list: RecipeRow(recipe: recipe)
+                        }
+                    }
+                    .tag(recipe.id)
+                    .listRowSeparator(style == .cards ? .hidden : .automatic)
+                    .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
+                    .contextMenu {
+                        RecipeQuickActions(recipe: recipe)
+                        Button("Edit", systemImage: "pencil") { editing = recipe }
+                    }
+                }
+            } header: {
+                #if os(iOS)
+                if !subcategories.isEmpty, !items.isEmpty { Text("Recipes") }
+                #endif
+            }
+        }
+        .listStyle(.plain)
+        .overlay {
+            if library.recipes.isEmpty {
+                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
+                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+            } else if items.isEmpty, search.isEmpty {
+                #if os(iOS)
+                if subcategories.isEmpty { ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet.")) }
+                #else
+                ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet."))
+                #endif
+            } else if items.isEmpty {
+                ContentUnavailableView.search(text: search)
+            }
+        }
+    }
+}
+
+/// Everything for adding recipes: the toolbar, the new/import/scan flows, and their sheets.
+private struct RecipeActionsModifier: ViewModifier {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Binding var selection: Recipe.ID?
+    var listStyle: Binding<RecipeListStyle>?
+    var showsSettings = false
+
     @State private var showingNew = false
     @State private var showingImport = false
     @State private var showingFileImporter = false
@@ -37,33 +128,30 @@ struct RecipeListView: View {
     @State private var scanError: String?
     @State private var showingSettings = false
 
-    private var style: RecipeListStyle { styleOverride ?? storedStyle }
-
-    var body: some View {
+    func body(content: Content) -> some View {
         content
         .overlay {
             if isScanning {
                 ProgressView("Reading recipe…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
-        .macSearchable(text: $search, prompt: "Search recipes")
-        .navigationTitle(collection.title)
         .toolbar {
-            if showsCollectionMenu {
-                ToolbarItem(placement: .navigation) { CollectionMenu(collection: $collection) }
-            }
             #if os(iOS)
-            ToolbarItem(placement: .navigation) {
-                Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+            if showsSettings {
+                ToolbarItem(placement: .navigation) {
+                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                }
             }
             #endif
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    storedStyle = style == .cards ? .list : .cards
-                } label: {
-                    Label(style == .cards ? "Show as List" : "Show as Cards", systemImage: style == .cards ? "list.bullet" : "square.grid.2x2")
+            if let listStyle {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        listStyle.wrappedValue = listStyle.wrappedValue == .cards ? .list : .cards
+                    } label: {
+                        Label(listStyle.wrappedValue == .cards ? "Show as List" : "Show as Cards", systemImage: listStyle.wrappedValue == .cards ? "list.bullet" : "square.grid.2x2")
+                    }
+                    .help(listStyle.wrappedValue == .cards ? "Show as a compact list" : "Show as photo cards")
                 }
-                .help(style == .cards ? "Show as a compact list" : "Show as photo cards")
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -80,8 +168,8 @@ struct RecipeListView: View {
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingNew) {
-            RecipeEditorView(recipe: Recipe(title: "")) { saved, image in
-                Task { await library.save(saved, image: image) }
+            RecipeEditorView(recipe: Recipe(title: "")) { saved, image, steps in
+                Task { await library.save(saved, image: image, steps: steps) }
                 selection = saved.id
             }
         }
@@ -90,18 +178,15 @@ struct RecipeListView: View {
                 onReview: { result in
                     draft = ScanDraft(
                         recipe: result.recipe, text: result.sourceText, textTitle: result.sourceTitle,
-                        notice: result.message, imageData: result.imageData
+                        notice: result.message, imageData: result.imageData, stepImages: result.stepImageData
                     )
                 },
                 onSaved: { selection = $0.id }
             )
         }
-        .sheet(item: $editing) { recipe in
-            RecipeEditorView(recipe: recipe) { saved, image in Task { await library.save(saved, image: image) } }
-        }
         .sheet(item: $draft) { draft in
-            RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice, initialImage: draft.imageData) { saved, image in
-                Task { await library.save(saved, image: image) }
+            RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice, initialImage: draft.imageData, initialStepImages: draft.stepImages) { saved, image, steps in
+                Task { await library.save(saved, image: image, steps: steps) }
                 selection = saved.id
             }
         }
@@ -132,67 +217,6 @@ struct RecipeListView: View {
         }
     }
 
-    private var pages: [RecipeCollection] {
-        var result: [RecipeCollection] = [.all, .wantToCook, .favorites, .recent, .uncategorized]
-        result += library.categoryTree.map { .category($0.path) }
-        if !result.contains(collection) { result.append(collection) }
-        return result
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        #if os(iOS)
-        VStack(spacing: 0) {
-            CollectionStrip(selection: $collection, pages: pages)
-            TabView(selection: $collection) {
-                ForEach(pages, id: \.self) { page in
-                    recipeList(for: page).tag(page)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-        }
-        #else
-        recipeList(for: collection)
-        #endif
-    }
-
-    private func recipeList(for page: RecipeCollection) -> some View {
-        let items = page.filter(library.recipes).filter { $0.matches(search) }
-        return List(selection: $selection) {
-            ForEach(items) { recipe in
-                Group {
-                    switch style {
-                    case .cards: RecipeCard(recipe: recipe)
-                    case .list: RecipeRow(recipe: recipe)
-                    }
-                }
-                .tag(recipe.id)
-                .listRowSeparator(style == .cards ? .hidden : .automatic)
-                .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
-                .contextMenu {
-                    Button(recipe.isFavorite ? "Remove Favorite" : "Favorite", systemImage: "heart") {
-                        Task { await library.setFavorite(recipe, !recipe.isFavorite) }
-                    }
-                    Button(recipe.wantToCook ? "Remove from Want to Cook" : "Want to Cook", systemImage: "arrow.right.circle") {
-                        Task { await library.setWantToCook(recipe, !recipe.wantToCook) }
-                    }
-                    Button("Edit", systemImage: "pencil") { editing = recipe }
-                }
-            }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
-            } else if items.isEmpty, search.isEmpty {
-                ContentUnavailableView(page.title, systemImage: page.symbol, description: Text("No recipes here yet."))
-            } else if items.isEmpty {
-                ContentUnavailableView.search(text: search)
-            }
-        }
-    }
-
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
         isScanning = true
         Task {
@@ -212,74 +236,74 @@ struct RecipeListView: View {
     }
 }
 
-struct CollectionMenu: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @Binding var collection: RecipeCollection
-
-    var body: some View {
-        Menu {
-            choice(.all, title: RecipeCollection.all.title)
-            ForEach(RecipeCollection.smart, id: \.self) { choice($0, title: $0.title) }
-            if !library.categoryTree.isEmpty {
-                Divider()
-                ForEach(library.categoryTree) { category($0) }
-            }
-        } label: { Label("Collections", systemImage: "line.3.horizontal.decrease.circle") }
-    }
-
-    private func choice(_ value: RecipeCollection, title: String) -> some View {
-        Button { collection = value } label: {
-            if collection == value {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Label(title, systemImage: value.symbol)
-            }
-        }
-    }
-
-    private func category(_ node: CategoryNode) -> AnyView {
-        if node.children.isEmpty { return AnyView(choice(.category(node.path), title: node.name)) }
-        return AnyView(
-            Menu {
-                choice(.category(node.path), title: "All \(node.name)")
-                Divider()
-                ForEach(node.children) { category($0) }
-            } label: { Label(node.name, systemImage: "tag") }
-        )
+extension View {
+    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, showsSettings: Bool = false) -> some View {
+        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, showsSettings: showsSettings))
     }
 }
 
-struct CollectionStrip: View {
-    @Binding var selection: RecipeCollection
-    let pages: [RecipeCollection]
+#if os(iOS)
+enum RecipesRoute: Hashable {
+    case collection(RecipeCollection)
+    case recipe(UUID)
+}
+
+struct CategoryRow: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let node: CategoryNode
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(pages, id: \.self) { page in
-                        let selected = page == selection
-                        Button {
-                            withAnimation(.snappy) { selection = page }
+        NavigationLink(value: RecipesRoute.collection(.category(node.path))) {
+            LabeledContent {
+                Text("\(RecipeCollection.category(node.path).filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
+            } label: {
+                Label(node.name, systemImage: node.children.isEmpty ? "tag" : "folder")
+            }
+        }
+    }
+}
+
+/// The top of the Recipes tab: the built-in collections, then categories to drill into.
+struct RecipesHomeView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @Binding var selection: Recipe.ID?
+
+    private var collections: [RecipeCollection] {
+        let liked: RecipeCollection = (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .stars ? .topRated : .favorites
+        return [.all, .recent, liked, .uncategorized].filter { $0 == .all || $0 == .recent || $0 == liked || !$0.filter(library.recipes).isEmpty }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(collections, id: \.self) { collection in
+                    NavigationLink(value: RecipesRoute.collection(collection)) {
+                        LabeledContent {
+                            Text("\(collection.filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
                         } label: {
-                            Label(page.title, systemImage: page.symbol)
-                                .font(.subheadline.weight(.medium))
-                                .padding(.horizontal, 14).padding(.vertical, 8)
-                                .glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.35)).interactive() : .regular.interactive(), in: Capsule())
+                            Label(collection.title, systemImage: collection.symbol)
                         }
-                        .buttonStyle(.plain)
-                        .id(page)
-                        .accessibilityAddTraits(selected ? .isSelected : [])
                     }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 8)
             }
-            .onChange(of: selection) { _, new in
-                withAnimation(.snappy) { proxy.scrollTo(new, anchor: .center) }
+            if !library.categoryTree.isEmpty {
+                Section("Categories") {
+                    ForEach(library.categoryTree) { CategoryRow(node: $0) }
+                }
             }
         }
+        .overlay {
+            if library.recipes.isEmpty {
+                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
+                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+            }
+        }
+        .navigationTitle("Recipes")
+        .recipeActions(selection: $selection, listStyle: nil, showsSettings: true)
     }
 }
+#endif
 
 extension View {
     func macSearchable(text: Binding<String>, prompt: String) -> some View {
@@ -301,12 +325,24 @@ extension View {
 }
 
 struct RecipeBadges: View {
+    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     let recipe: Recipe
 
     var body: some View {
         HStack(spacing: 6) {
-            if recipe.isFavorite { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Theme.accent) }
-            if recipe.wantToCook { Image(systemName: "arrow.right.circle.fill").font(.caption).foregroundStyle(.secondary) }
+            if (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites {
+                if recipe.isFavorite { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Theme.accent) }
+            } else if let rating = recipe.rating {
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                    Text("\(rating)").monospacedDigit()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            }
+            if recipe.wantToCook {
+                Image(systemName: "text.line.first.and.arrowtriangle.forward").font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }

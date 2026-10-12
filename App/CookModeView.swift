@@ -100,6 +100,10 @@ struct CookModeView: View {
             if steps.isEmpty {
                 ContentUnavailableView("No steps", systemImage: "list.number")
             } else {
+                if let videoID = recipe.youTubeVideoID {
+                    CookVideo(recipe: recipe, videoID: videoID, step: index).id(recipe.id)
+                    Divider()
+                }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         Text("STEP \(index + 1) OF \(steps.count)")
@@ -108,6 +112,7 @@ struct CookModeView: View {
                             .font(.system(size: 34, weight: .regular, design: .serif))
                             .lineSpacing(8)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
                         durationButtons(for: steps[index], recipe: recipe, step: index)
                     }
                     .padding(28)
@@ -160,6 +165,25 @@ struct CookModeView: View {
 
     private func move(_ recipe: Recipe, to index: Int, count: Int) {
         session.stepIndex[recipe.id] = min(max(index, 0), count - 1)
+    }
+}
+
+/// The recipe's video, pinned above the steps. Once it is open it jumps to each step's moment as you move through them.
+struct CookVideo: View {
+    let recipe: Recipe
+    let videoID: String
+    let step: Int
+    @StateObject private var player = YouTubePlayerController()
+
+    var body: some View {
+        YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, startAt: recipe.timestamp(forStep: step) ?? 0)
+            .frame(maxWidth: 560)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .onChange(of: step) { _, new in
+                if player.isShown, let seconds = recipe.timestamp(forStep: new) { player.play(from: seconds) }
+            }
     }
 }
 
@@ -274,7 +298,7 @@ struct IngredientChecklist: View {
                 HStack(spacing: 12) {
                     Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
-                    Text(text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
+                    IngredientLine(text: text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
                     Spacer()
                 }
                 .contentShape(Rectangle())

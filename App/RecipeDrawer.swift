@@ -17,11 +17,11 @@ enum DrawerSort: String, CaseIterable {
 enum DrawerFilter: String, CaseIterable {
     case all, favorites, wantToCook
 
-    var title: String {
+    func title(for style: RatingStyle) -> String {
         switch self {
         case .all: "All"
-        case .favorites: "Favorites"
-        case .wantToCook: "Want to Cook"
+        case .favorites: style == .stars ? "Top Rated" : "Favorites"
+        case .wantToCook: "Up Next"
         }
     }
 }
@@ -38,14 +38,16 @@ struct RecipeDrawer: View {
     @State private var search = ""
     @State private var sort = DrawerSort.title
     @State private var filter = DrawerFilter.all
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @State private var removeTargeted = false
 
     private var recipes: [Recipe] {
         var list = library.recipes.filter { $0.matches(search) }
         switch filter {
         case .all: break
-        case .favorites: list = list.filter(\.isFavorite)
-        case .wantToCook: list = list.filter(\.wantToCook)
+        case .favorites:
+            list = (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .stars ? RecipeCollection.topRated.filter(list) : list.filter(\.isFavorite)
+        case .wantToCook: list = RecipeCollection.wantToCook.filter(list)
         }
         switch sort {
         case .title: return list
@@ -77,7 +79,7 @@ struct RecipeDrawer: View {
                     }
                 }
                 Picker("Filter", selection: $filter) {
-                    ForEach(DrawerFilter.allCases, id: \.self) { Text($0.title).tag($0) }
+                    ForEach(DrawerFilter.allCases, id: \.self) { Text($0.title(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

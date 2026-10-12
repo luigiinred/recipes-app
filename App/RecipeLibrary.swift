@@ -9,6 +9,11 @@ enum ImageChange {
     case remove
 }
 
+struct StepImageChanges {
+    var added: [UUID: Data] = [:]
+    var removed: [UUID] = []
+}
+
 @MainActor
 final class RecipeLibrary: ObservableObject {
     @Published private(set) var recipes: [Recipe] = []
@@ -16,6 +21,7 @@ final class RecipeLibrary: ObservableObject {
     @Published private(set) var groceries: [GroceryItem] = []
     @Published private(set) var feeds: [Feed] = []
     @Published private(set) var imageStamps: [UUID: Date] = [:]
+    @Published private(set) var stepImageStamps: [UUID: Date] = [:]
     @Published private(set) var isICloud = false
     @Published private(set) var remindersStatus = RemindersStatus.unavailable
     @Published private(set) var errorMessage: String?
@@ -25,12 +31,13 @@ final class RecipeLibrary: ObservableObject {
     private var remindersChanged = false
     private static let remindersKey = "syncGroceriesWithReminders"
     private var thumbnails: [UUID: (stamp: Date, image: CGImage)] = [:]
+    private var stepThumbnails: [UUID: (stamp: Date, image: CGImage)] = [:]
 
     init() {}
 
     init(
         recipes: [Recipe], mealPlan: [MealPlanEntry] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [],
-        images: [UUID: Data] = [:], isICloud: Bool = true, remindersStatus: RemindersStatus = .unavailable
+        images: [UUID: Data] = [:], stepImages: [UUID: Data] = [:], isICloud: Bool = true, remindersStatus: RemindersStatus = .unavailable
     ) {
         self.remindersStatus = remindersStatus
         self.recipes = recipes
@@ -42,6 +49,11 @@ final class RecipeLibrary: ObservableObject {
             guard let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: Self.thumbnailSize) else { continue }
             thumbnails[id] = (.distantPast, image)
             imageStamps[id] = .distantPast
+        }
+        for (id, data) in stepImages {
+            guard let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: Self.thumbnailSize) else { continue }
+            stepThumbnails[id] = (.distantPast, image)
+            stepImageStamps[id] = .distantPast
         }
     }
 
@@ -72,6 +84,21 @@ final class RecipeLibrary: ObservableObject {
             library.images.data(for: id).flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: Self.thumbnailSize) }
         }.value
         if let image { thumbnails[id] = (stamp, image) }
+        return image
+    }
+
+    func cachedStepImage(for id: UUID) -> CGImage? {
+        guard let cached = stepThumbnails[id], cached.stamp == stepImageStamps[id] else { return nil }
+        return cached.image
+    }
+
+    func loadStepImage(for id: UUID) async -> CGImage? {
+        guard let library, let stamp = stepImageStamps[id] else { return cachedStepImage(for: id) }
+        if let cached = cachedStepImage(for: id) { return cached }
+        let image = await Task.detached {
+            library.stepImages.data(for: id).flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: Self.thumbnailSize) }
+        }.value
+        if let image { stepThumbnails[id] = (stamp, image) }
         return image
     }
 
@@ -133,10 +160,10 @@ final class RecipeLibrary: ObservableObject {
     func reload() async {
         guard let library else { return }
         let result = await Task.detached {
-            Result { try (library.recipes.list(), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps()) }
+            Result { try (library.recipes.list(), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps()) }
         }.value
         switch result {
-        case .success(let (recipes, plan, groceries, feeds, stamps)):
+        case .success(let (recipes, plan, groceries, feeds, stamps, stepStamps)):
             if recipes != self.recipes {
                 self.recipes = recipes
                 if reminders != nil { Self.index(recipes) }
@@ -146,6 +173,7 @@ final class RecipeLibrary: ObservableObject {
             let sortedFeeds = feeds.sorted { $0.createdAt < $1.createdAt }
             if sortedFeeds != self.feeds { self.feeds = sortedFeeds }
             if stamps != imageStamps { imageStamps = stamps }
+            if stepStamps != stepImageStamps { stepImageStamps = stepStamps }
             errorMessage = nil
         case .failure(let error):
             errorMessage = error.localizedDescription
@@ -153,15 +181,19 @@ final class RecipeLibrary: ObservableObject {
     }
 
     private static func index(_ recipes: [Recipe]) {
+        #if !SHARE_EXTENSION
         let entities = recipes.map(RecipeEntity.init)
         Task.detached {
             try? await CSSearchableIndex.default().indexAppEntities(entities)
         }
+        #endif
     }
 
-    func save(_ recipe: Recipe, image: ImageChange = .unchanged) async {
+    func save(_ recipe: Recipe, image: ImageChange = .unchanged, steps: StepImageChanges = StepImageChanges()) async {
         await perform { library in
+            for (id, data) in steps.added { try library.stepImages.save(data, for: id) }
             try library.recipes.save(recipe)
+            for id in steps.removed { try library.stepImages.delete(for: id) }
             switch image {
             case .unchanged: break
             case .set(let data): try library.images.save(data, for: recipe.id)
@@ -201,9 +233,16 @@ final class RecipeLibrary: ObservableObject {
         await save(changed)
     }
 
-    func setWantToCook(_ recipe: Recipe, _ value: Bool) async {
+    func setRating(_ recipe: Recipe, _ value: Int?) async {
+        var changed = recipe
+        changed.rating = value
+        await save(changed)
+    }
+
+    func setQueued(_ recipe: Recipe, _ value: Bool) async {
         var changed = recipe
         changed.wantToCook = value
+        changed.queuedAt = value ? Date() : nil
         await save(changed)
     }
 
@@ -217,7 +256,14 @@ final class RecipeLibrary: ObservableObject {
 
     func plan(_ recipe: Recipe, on day: Date, meal: Meal) async {
         let entry = MealPlanEntry(recipeID: recipe.id, title: recipe.title, day: DayKey.string(from: day), meal: meal)
-        await perform { try $0.mealPlan.save(entry) }
+        var dequeued = recipe
+        dequeued.wantToCook = false
+        dequeued.queuedAt = nil
+        let wasQueued = recipe.wantToCook
+        await perform { library in
+            try library.mealPlan.save(entry)
+            if wasQueued { try library.recipes.save(dequeued) }
+        }
     }
 
     func update(_ entry: MealPlanEntry) async {
@@ -271,6 +317,24 @@ final class RecipeLibrary: ObservableObject {
     func clearCompleted() async {
         let done = groceries.filter(\.isChecked)
         await perform { library in for item in done { try library.groceries.delete(item) } }
+    }
+
+    /// Saves fixed sample content, replacing earlier copies of it.
+    func addSamples(
+        recipes: [Recipe], images: [UUID: Data], stepImages: [UUID: Data], plan: [MealPlanEntry], groceries: [GroceryItem]
+    ) async {
+        await perform { library in
+            for recipe in recipes { try library.recipes.save(recipe) }
+            for (id, data) in images { try library.images.save(data, for: id) }
+            for (id, data) in stepImages { try library.stepImages.save(data, for: id) }
+            for entry in plan { try library.mealPlan.save(entry) }
+            for item in groceries { try library.groceries.save(item) }
+        }
+    }
+
+    func exportJSON() async throws -> Data {
+        guard let library else { throw RecipeError.invalid("The library isn't ready yet.") }
+        return try await Task.detached { try library.export().jsonData() }.value
     }
 
     private func perform(_ work: @escaping @Sendable (Library) throws -> some Any) async {

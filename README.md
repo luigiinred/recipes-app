@@ -4,20 +4,27 @@ A recipe manager for iPhone, iPad, and Mac, synced through iCloud Drive, with a 
 
 ## Features
 
-- **Recipes** with photos, shown as a compact list (default) or photo cards. One tap toggles between them. On iPhone, swipe between collections (All, Want to Cook, Favorites, Recent, Uncategorized, and your categories).
-- **Organizing**: favorites, want to cook, and nested categories (`Dinner/Pasta`).
+- **Recipes** with photos, shown as a compact list (default) or photo cards. One tap toggles between them. On iPhone the Recipes tab opens on a home list (All Recipes, Most Recent, Favorites or Top Rated) and your categories; tap a category to see its subcategories and recipes, and keep drilling (`Dessert` → `Cookies`). On iPad and Mac it is a three-column split: collections and the category tree, the recipes in the one you pick, and the recipe.
+- **Organizing**: favorites or one-to-five star ratings (chosen in Settings; Top Rated lists 4 and 5 stars), the Up Next queue, and nested categories (`Dinner/Pasta`).
 - **Import** from any recipe web page (schema.org data), from **YouTube** videos, from a scanned book page (camera or photo/PDF), or by typing it in. Every import opens a review step for the title and categories, including from the Share sheet.
-- **YouTube**: the recipe is read from the description. When the description has none, the video's captions are used, structured by the on-device language model where available. Each step gets a timestamp, and the video plays inline on the recipe page. Tap a step's time to jump there.
+- **YouTube**: the video stays pinned above the recipe while you scroll, and cook mode shows it too, jumping to each step's moment as you move through the steps. The recipe is read from the description. When the description has none, the video's captions are used, structured by the on-device language model where available. Each step gets a timestamp, and the video plays inline on the recipe page. Tap a step's time to jump there.
 - **Photos**: imported with the recipe, picked from your library, or created with Image Playground. The recipe's title, summary, main ingredients, cooking method, and serving notes seed the picture.
 - **Cook mode**: large step-by-step text, keeps the screen awake, several recipes at once, timers detected from the step text.
-- **Calendar**: an agenda under a week/month strip with dots, and a weekly planner. On Mac and iPad a left-hand drawer lists every recipe (search, filter, sort); drag recipes into meal slots, move meals between slots, and drag a meal back onto the drawer to remove it. On iPhone, + opens a search sheet that stays half open so you can tap a recipe or drag it into a slot.
+- **Planner** (the calendar tab): an **Up Next** queue of recipes you mean to cook soon (a recipe leaves the queue when you plan it on a day), then an agenda under a week/month strip with dots, and a weekly view. On Mac and iPad a left-hand drawer lists every recipe (search, filter, sort); drag recipes into meal slots, move meals between slots, and drag a meal back onto the drawer to remove it. On iPhone, + opens a search sheet that stays half open so you can tap a recipe or drag it into a slot.
 - **Groceries** syncs both ways with a "Groceries" list in the Reminders app.
 - **Siri and Shortcuts** (App Intents): save a recipe from a link (for example one sent to you in Messages), find a recipe, start cooking, and add a recipe's ingredients to groceries. Recipes are indexed for Spotlight.
 - **Search** lives in the tab bar on iPhone: a separate button that grows into a full search bar and tucks the tabs away.
-- **Settings** (gear on iPhone, ⌘, on Mac): which meal new calendar entries default to (or automatic by time of day), meals shown in the planner, week start, list style, review-before-saving imports, Reminders sync, and keeping the screen awake while cooking.
+- **Settings** (gear on iPhone, ⌘, on Mac): which meal new calendar entries default to (or automatic by time of day), meals shown in the planner, week start, list style, review-before-saving imports, Reminders sync, and keeping the screen awake while cooking. Settings also has **Export all data as JSON**: one file with every recipe, photo (base64), planned meal, grocery item, and feed.
+- **Ingredients** show the amount in bold and the preparation in grey italics (`**2 tbsp** butter *softened*`).
+- **Developer Tools** (Settings): add built-in sample recipes, a sample week plan and groceries, or import a batch of real recipes (AllRecipes, Tasty, Serious Eats, BBC Good Food, Food Network, YouTube) to try every importer.
+- The share extension opens the same editor as the app and, once saved, offers **Open in Recipes** (`recipes://recipe/<id>`).
 - **Printing** and sharing.
 - Layouts respond to width (ingredients and steps sit side by side when there's room), including iPad multitasking, landscape, and wide dual-screen canvases.
 - Feeds (subscribing to recipe blogs) are built but hidden behind `AppFeatures.feeds`.
+
+## Recipe format
+
+Recipes are saved in one standard form, whether they come from the editor, an import, the on-device model, or an agent using the CLI. Ingredients are `quantity unit item` (`1 1/2 cups flour`, `2 cloves garlic, minced`), and the editor edits them as separate quantity, unit (a preset list), and item fields. Steps are short imperative sentences without numbering. Tags stay generic: main ingredient, vegetarian/vegan, and course (never ingredient lists or site keywords). `recipes schema` prints the full rules, which are also given to the on-device model; saving normalizes anything that doesn't follow them. Steps can have a photo each (picked in the editor, or taken from a web page's step images).
 
 ## Layout
 
@@ -30,6 +37,7 @@ A recipe manager for iPhone, iPad, and Mac, synced through iCloud Drive, with a 
   ```
   Documents/Recipes/<uuid>.json   Documents/Images/<uuid>.jpg
   Documents/Calendar/<uuid>.json  Documents/Groceries/<uuid>.json  Documents/Feeds/<uuid>.json
+  Documents/StepImages/<uuid>.jpg
   ```
 
 ## Build
@@ -71,11 +79,12 @@ recipes import https://example.com/recipe # web page or YouTube video; saves the
 recipes transcript https://youtu.be/ID    # captions, when the description has no recipe
 recipes timestamps "Shakshuka"            # find where each step is spoken in the video
 recipes image "Soup" photo.jpg            # file or URL
-recipes mark "Soup" --favorite true --want-to-cook true
+recipes mark "Soup" --favorite true --rating 4 --want-to-cook true   # want-to-cook = Up Next queue
 recipes scan page.jpg [--save]            # text recognition on a photo or PDF
 recipes plan [add|remove|list] ...        # meal calendar
 recipes groceries [add|add-recipe|check|remove|clear|list] ...   # the app mirrors these into Reminders
 recipes feeds [add|remove|entries|list] ...
+recipes export [-o all.json]              # everything as one JSON document
 recipes delete <id>
 recipes schema                            # example JSON
 recipes path                              # library folder
