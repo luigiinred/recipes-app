@@ -15,7 +15,8 @@ final class ShareViewController: PlatformViewController {
     private func makeView() -> ShareView {
         ShareView(
             loadURL: { [weak self] in await self?.sharedURL() },
-            finish: { [weak self] in self?.extensionContext?.completeRequest(returningItems: nil) }
+            finish: { [weak self] in self?.extensionContext?.completeRequest(returningItems: nil) },
+            cancel: { [weak self] in self?.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled)) }
         )
     }
 
@@ -49,7 +50,7 @@ final class ShareViewController: PlatformViewController {
     #else
     override func loadView() {
         view = NSHostingView(rootView: makeView())
-        preferredContentSize = NSSize(width: 360, height: 220)
+        preferredContentSize = NSSize(width: 440, height: 440)
     }
     #endif
 }

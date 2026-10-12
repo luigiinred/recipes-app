@@ -11,19 +11,20 @@ struct RecipesCLI: AsyncParsableCommand {
         The library is the iCloud Drive folder the Recipes app syncs between Mac and iPhone. \
         Override it with --dir or RECIPES_DIR. Run `recipes schema` for the JSON format.
         """,
-        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Delete.self, Path.self, Schema.self]
+        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Transcript.self, Timestamps.self, Image.self, PlanCommand.self, GroceriesCommand.self, FeedsCommand.self, Scan.self, Mark.self, Delete.self, Path.self, Schema.self]
     )
 }
 
 struct LibraryOptions: ParsableArguments {
-    @Option(name: .long, help: "Recipe folder to use instead of the iCloud library.")
+    @Option(name: .long, help: "Library folder to use instead of the iCloud library.")
     var dir: String?
 
     var resolved: RecipeLocation.Resolved {
         RecipeLocation.resolveForCLI(override: dir, environment: ProcessInfo.processInfo.environment)
     }
 
-    var store: RecipeStore { RecipeStore(directory: resolved.directory) }
+    var library: Library { resolved.library }
+    var store: RecipeStore { library.recipes }
 }
 
 func printJSON<T: Encodable>(_ value: T) throws {
@@ -50,10 +51,20 @@ struct List: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List all recipes.")
     @OptionGroup var library: LibraryOptions
     @Option(name: .long, help: "Only recipes with this tag.") var tag: String?
+    @Option(name: .long, help: "One of: recent, want-to-cook, favorites, uncategorized.") var collection: String?
     @Flag(name: .long, help: "Output full recipes as JSON.") var json = false
 
     func run() throws {
         var recipes = try library.store.list()
+        if let collection {
+            switch collection {
+            case "recent": recipes = RecipeCollection.recent.filter(recipes)
+            case "want-to-cook": recipes = RecipeCollection.wantToCook.filter(recipes)
+            case "favorites": recipes = RecipeCollection.favorites.filter(recipes)
+            case "uncategorized": recipes = RecipeCollection.uncategorized.filter(recipes)
+            default: throw ValidationError("Unknown collection \"\(collection)\".")
+            }
+        }
         if let tag { recipes = recipes.filter { $0.tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame } } }
         if json { try printJSON(recipes) } else { printTable(recipes) }
     }
@@ -102,6 +113,7 @@ struct Add: ParsableCommand {
     @Option(name: .long, help: "Repeat for each tag.") var tag: [String] = []
     @Option(name: .long) var source: String?
     @Option(name: .long) var notes: String?
+    @Option(name: .long, help: "Photo: image file path.") var image: String?
     @Flag(name: .long, help: "Output the saved recipes as JSON.") var json = false
 
     func run() throws {
@@ -125,6 +137,12 @@ struct Add: ParsableCommand {
             )]
         }
         let saved = try recipes.map { try store.save($0) }
+        if let image {
+            guard saved.count == 1 else { throw ValidationError("--image works with a single recipe.") }
+            let raw = try Data(contentsOf: URL(fileURLWithPath: (image as NSString).expandingTildeInPath))
+            guard let jpeg = RecipeImageProcessing.jpegData(from: raw) else { throw ValidationError("That isn't a readable image.") }
+            try library.library.images.save(jpeg, for: saved[0].id)
+        }
         if json {
             try printJSON(saved)
         } else {
@@ -137,24 +155,51 @@ struct Add: ParsableCommand {
         let location = library.resolved
         guard !location.isICloud, library.dir == nil, ProcessInfo.processInfo.environment["RECIPES_DIR"] == nil else { return }
         FileHandle.standardError.write(Data(
-            "note: iCloud library not found; saved to \(location.directory.path). Open the Recipes app once to enable sync.\n".utf8
+            "note: iCloud library not found; saved to \(location.root.path). Open the Recipes app once to enable sync.\n".utf8
         ))
     }
 }
 
 struct Import: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Import a recipe from a web page that publishes schema.org recipe data.")
+    static let configuration = CommandConfiguration(
+        abstract: "Import a recipe from a web page or a YouTube video.",
+        discussion: "Web pages need schema.org recipe data. YouTube videos need the recipe in the description, or captions the on-device model can read."
+    )
     @OptionGroup var library: LibraryOptions
-    @Argument(help: "Recipe page URL.") var url: String
+    @Argument(help: "Recipe page or YouTube URL.") var url: String
     @Flag(name: .long, help: "Output the saved recipe as JSON.") var json = false
 
     func run() async throws {
         guard let parsed = URL(string: url), parsed.scheme?.hasPrefix("http") == true else {
             throw ValidationError("Not a web URL: \(url)")
         }
-        let recipe = try await RecipeImporter.recipe(from: parsed)
-        let saved = try library.store.save(recipe)
+        let result = try await RecipeImporter.importResult(from: parsed)
+        let saved = try library.library.add(result)
         if json { try printJSON(saved) } else { print("Saved \(shortID(saved))  \(saved.title)") }
+        if let message = result.message {
+            FileHandle.standardError.write(Data("warning: \(message)\n".utf8))
+        }
+    }
+}
+
+struct Image: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Set a recipe's photo from an image file or URL.")
+    @OptionGroup var library: LibraryOptions
+    @Argument(help: "Recipe id, id prefix, or title.") var recipe: String
+    @Argument(help: "Image file path or http(s) URL.") var source: String
+
+    func run() async throws {
+        let found = try library.store.find(recipe)
+        let raw: Data
+        if source.hasPrefix("http") {
+            guard let data = await RecipeImageProcessing.download(source) else { throw ValidationError("Couldn't download that image.") }
+            raw = data
+        } else {
+            raw = try Data(contentsOf: URL(fileURLWithPath: (source as NSString).expandingTildeInPath))
+        }
+        guard let jpeg = RecipeImageProcessing.jpegData(from: raw) else { throw ValidationError("That isn't a readable image.") }
+        try library.library.images.save(jpeg, for: found.id)
+        print("Set photo for \(found.title)")
     }
 }
 
@@ -164,19 +209,18 @@ struct Delete: ParsableCommand {
     @Argument(help: "Recipe id, id prefix, or title.") var recipe: String
 
     func run() throws {
-        let store = library.store
-        let found = try store.find(recipe)
-        try store.delete(found)
+        let found = try library.store.find(recipe)
+        try library.library.deleteRecipe(found)
         print("Deleted \(shortID(found))  \(found.title)")
     }
 }
 
 struct Path: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Print the recipe folder.")
+    static let configuration = CommandConfiguration(abstract: "Print the library folder (recipes, calendar, and groceries live inside it).")
     @OptionGroup var library: LibraryOptions
 
     func run() {
-        print(library.resolved.directory.path)
+        print(library.resolved.root.path)
     }
 }
 
