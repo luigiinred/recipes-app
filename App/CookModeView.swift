@@ -112,6 +112,7 @@ struct CookModeView: View {
                             .font(.system(size: 34, weight: .regular, design: .serif))
                             .lineSpacing(8)
                             .fixedSize(horizontal: false, vertical: true)
+                        CookStepIngredients(recipe: recipe, step: index)
                         if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
                         durationButtons(for: steps[index], recipe: recipe, step: index)
                     }
@@ -291,21 +292,48 @@ struct IngredientChecklist: View {
     @State private var checked: Set<Int> = []
 
     var body: some View {
-        List(Array(recipe.ingredients.enumerated()), id: \.offset) { index, text in
-            Button {
-                if !checked.insert(index).inserted { checked.remove(index) }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
-                    IngredientLine(text: text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
-                    Spacer()
+        List {
+            ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
+                TitledSection(title: group.title) {
+                    ForEach(group.items, id: \.index) { index, text in
+                        Button {
+                            if !checked.insert(index).inserted { checked.remove(index) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
+                                IngredientLine(text: text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
         }
         .listStyle(.plain)
+    }
+}
+
+/// What this step needs, in cook mode's big type, so you can read it without going back to the list.
+struct CookStepIngredients: View {
+    let recipe: Recipe
+    let step: Int
+
+    var body: some View {
+        let used = IngredientMatcher.indices(in: recipe.steps[step], ingredients: recipe.ingredients)
+        if !used.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("FOR THIS STEP").font(.caption.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary)
+                ForEach(used, id: \.self) { index in
+                    IngredientLine(text: recipe.ingredients[index]).font(.system(.title3, design: .serif))
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+        }
     }
 }
 

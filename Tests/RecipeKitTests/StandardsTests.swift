@@ -189,3 +189,76 @@ final class RatingAndQueueTests: XCTestCase {
         XCTAssertTrue(recipe.wantToCook)
     }
 }
+
+final class IngredientSectionTests: XCTestCase {
+    func testStepsFindTheirIngredients() {
+        let chili = [
+            "500 g black beans, dried", "4 cans diced tomatoes", "1 can corn", "4 bell peppers", "1 onion", "2 cloves garlic",
+            "5 tbsp tomato paste", "3 tbsp canola oil", "Vegetable broth", "Salt",
+        ]
+        let find = { (step: String) in IngredientMatcher.indices(in: step, ingredients: chili) }
+        XCTAssertEqual(find("Soak the beans overnight in plenty of water."), [0])
+        XCTAssertEqual(find("Fry the onion, garlic and peppers in the oil, then stir in the tomato paste."), [3, 4, 5, 6, 7])
+        XCTAssertEqual(find("Add everything to the pot with the tomatoes, corn and broth and simmer for 15 minutes."), [1, 2, 8])
+        XCTAssertEqual(find("Serve hot."), [])
+    }
+
+    func testSharedWordsDoNotLinkTheWrongIngredient() {
+        let list = ["2 red bell peppers", "1 tsp black pepper", "1 tbsp olive oil", "1 tbsp canola oil", "1 tomato paste"]
+        XCTAssertEqual(IngredientMatcher.indices(in: "Slice the bell peppers.", ingredients: list), [0])
+        XCTAssertEqual(IngredientMatcher.indices(in: "Season with black pepper.", ingredients: list), [1])
+    }
+
+    func testGroupingReordersAndNumbersSections() throws {
+        let list = ["2 potatoes", "1 tsp cinnamon", "2 tbsp oil", "2 tbsp sugar", "1 tsp salt"]
+        let result = try XCTUnwrap(IngredientGrouper.apply([
+            IngredientGrouper.Group(title: "Cinnamon sugar:", members: [3, 1]),
+            IngredientGrouper.Group(title: "Chips", members: [0, 2, 4]),
+        ], to: list))
+        XCTAssertEqual(result.ingredients, ["1 tsp cinnamon", "2 tbsp sugar", "2 potatoes", "2 tbsp oil", "1 tsp salt"])
+        XCTAssertEqual(result.sections, [IngredientSection(title: "Cinnamon sugar", start: 0), IngredientSection(title: "Chips", start: 2)])
+    }
+
+    func testGroupingKeepsUnclaimedIngredientsAndIgnoresSingleGroups() throws {
+        let list = ["a", "b", "c", "d"]
+        let result = try XCTUnwrap(IngredientGrouper.apply([IngredientGrouper.Group(title: "Main", members: [0, 1, 9])], to: list))
+        XCTAssertEqual(result.sections.map(\.title), ["Main", "Other"])
+        XCTAssertEqual(result.ingredients, list)
+        XCTAssertNil(IngredientGrouper.apply([IngredientGrouper.Group(title: "All", members: [0, 1, 2, 3])], to: list))
+    }
+
+    func testSectionsSurviveStandardizingAndShowInMarkdown() {
+        let recipe = Recipe(
+            title: "Chips", ingredients: ["2 potatoes", " ", "1 tsp cinnamon", "2 tbsp sugar"],
+            ingredientSections: [IngredientSection(title: "Chips", start: 0), IngredientSection(title: "Cinnamon sugar:", start: 2), IngredientSection(title: " ", start: 3)]
+        ).standardized()
+        XCTAssertEqual(recipe.ingredients, ["2 potatoes", "1 tsp cinnamon", "2 tbsp sugar"])
+        XCTAssertEqual(recipe.ingredientSections, [IngredientSection(title: "Chips", start: 0), IngredientSection(title: "Cinnamon sugar", start: 1)])
+        XCTAssertEqual(recipe.ingredientGroups.map { $0.items.count }, [1, 2])
+        XCTAssertTrue(recipe.markdown.contains("### Cinnamon sugar"))
+        XCTAssertEqual(recipe.standardized(), recipe)
+    }
+
+    func testIngredientsBeforeTheFirstHeadingFormAnUntitledGroup() {
+        let recipe = Recipe(title: "R", ingredients: ["1 egg", "1 cup flour", "1 cup milk"], ingredientSections: [IngredientSection(title: "Batter", start: 1)])
+        XCTAssertEqual(recipe.ingredientGroups.map { $0.title }, [nil, "Batter"])
+    }
+
+    func testTextParserTurnsSubheadingsIntoSections() {
+        let recipe = RecipeTextParser.parse("""
+        Halloween Chips
+        Ingredients
+        For the chips:
+        2 potatoes
+        2 tbsp olive oil
+        Cinnamon sugar:
+        2 tbsp sugar
+        1 tsp cinnamon
+        Method
+        1. Bake.
+        """)
+        XCTAssertEqual(recipe.ingredients.count, 4)
+        XCTAssertEqual(recipe.ingredientSections.map(\.title), ["For the chips", "Cinnamon sugar"])
+        XCTAssertEqual(recipe.ingredientSections.map(\.start), [0, 2])
+    }
+}

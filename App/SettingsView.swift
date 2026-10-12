@@ -1,3 +1,4 @@
+import ImagePlayground
 import RecipeKit
 import SwiftUI
 
@@ -5,6 +6,8 @@ struct SettingsView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
     var inSheet = true
+    /// Fixed Apple Intelligence state for previews and snapshots, so they don't depend on the machine.
+    var intelligenceOverride: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue
     @AppStorage(AppSettings.Key.hiddenMeals) private var hiddenMeals = ""
@@ -13,6 +16,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
     @AppStorage(AppSettings.Key.keepAwake) private var keepAwake = true
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
+    @Environment(\.supportsImagePlayground) private var supportsImagePlayground
 
     @State private var exportDocument: LibraryExportDocument?
     @State private var isExportPresented = false
@@ -65,6 +69,7 @@ struct SettingsView: View {
                 Section("Cooking") {
                     Toggle("Keep the screen awake in cook mode", isOn: $keepAwake)
                 }
+                appleIntelligence
                 Section("Developer") {
                     NavigationLink { DeveloperToolsView() } label: { Label("Developer Tools", systemImage: "wrench.and.screwdriver") }
                 }
@@ -104,6 +109,31 @@ struct SettingsView: View {
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 520)
         #endif
+    }
+
+    private var appleIntelligence: some View {
+        let status = intelligenceOverride?.status ?? AppleIntelligence.status
+        return Section {
+            statusRow("Recipes from video captions", ready: status.isAvailable)
+            statusRow("Photos with Image Playground", ready: intelligenceOverride?.imagePlayground ?? supportsImagePlayground)
+        } header: {
+            Text("Apple Intelligence")
+        } footer: {
+            if status.isAvailable {
+                Text("Videos without a written recipe are turned into one on this device from their captions.")
+            } else {
+                Text(status.explanation + " Imports still work; a video without a written recipe opens as a draft with its captions beside it.")
+            }
+        }
+    }
+
+    private func statusRow(_ title: String, ready: Bool) -> some View {
+        LabeledContent {
+            Label(ready ? "Ready" : "Not available", systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
+                .foregroundStyle(ready ? Theme.accent : Color.secondary)
+        } label: {
+            Text(title)
+        }
     }
 
     private func prepareExport() async {
