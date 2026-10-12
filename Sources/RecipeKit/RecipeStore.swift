@@ -31,8 +31,7 @@ public struct RecipeStore: Sendable {
 
     @discardableResult
     public func save(_ recipe: Recipe) throws -> Recipe {
-        var recipe = recipe
-        recipe.title = recipe.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var recipe = recipe.standardized()
         guard !recipe.title.isEmpty else { throw RecipeError.invalid("A recipe needs a title.") }
         recipe.updatedAt = Date()
         try documents.save(recipe)

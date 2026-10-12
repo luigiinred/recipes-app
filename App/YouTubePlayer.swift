@@ -19,6 +19,10 @@ final class YouTubePlayerController: ObservableObject {
         isShown = true
     }
 
+    func pause() {
+        webView?.evaluateJavaScript("if (player && player.pauseVideo) { player.pauseVideo(); }")
+    }
+
     fileprivate func fail(_ message: String) { errorMessage = message }
 }
 
@@ -41,7 +45,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         webView.isOpaque = false
         #endif
         controller.webView = webView
-        webView.loadHTMLString(Self.html(videoID: videoID, start: controller.startSeconds), baseURL: URL(string: "https://www.youtube.com"))
+        webView.loadHTMLString(Self.html(videoID: videoID, start: controller.startSeconds), baseURL: URL(string: Self.origin))
         return webView
     }
 
@@ -52,6 +56,9 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
     func makeNSView(context: Context) -> WKWebView { makeWebView(context) }
     func updateNSView(_ view: WKWebView, context: Context) {}
     #endif
+
+    // YouTube rejects embeds that don't identify the host app (errors 152/153), so use the bundle ID as the origin.
+    static let origin = "https://" + (Bundle.main.bundleIdentifier ?? "com.garrabrant.recipes").lowercased()
 
     static func html(videoID: String, start: Int) -> String {
         """
@@ -64,7 +71,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         function onYouTubeIframeAPIReady() {
           player = new YT.Player('p', {
             videoId: '\(videoID)', width: '100%', height: '100%',
-            playerVars: { playsinline: 1, autoplay: 1, start: \(start), rel: 0 },
+            playerVars: { playsinline: 1, autoplay: 1, start: \(start), rel: 0, origin: '\(origin)', widget_referrer: '\(origin)' },
             events: {
               onReady: function() { window.webkit.messageHandlers.player.postMessage('ready'); },
               onError: function(e) { window.webkit.messageHandlers.player.postMessage('error:' + e.data); }
@@ -85,8 +92,9 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
             Task { @MainActor in
                 if body == "ready" {
                     controller.isReady = true
-                } else if body.hasPrefix("error") {
-                    controller.fail("This video can't be played inside the app.")
+                } else if body.hasPrefix("error:") {
+                    let code = String(body.dropFirst("error:".count))
+                    controller.fail("This video can't be played inside the app (error \(code)). Use Open in YouTube.")
                 }
             }
         }
@@ -104,6 +112,8 @@ struct YouTubeEmbed: View {
     let recipe: Recipe
     let videoID: String
     @ObservedObject var controller: YouTubePlayerController
+    /// Where the video starts when the poster is tapped.
+    var startAt = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -131,7 +141,7 @@ struct YouTubeEmbed: View {
     }
 
     private var poster: some View {
-        Button { controller.play() } label: {
+        Button { controller.play(from: startAt) } label: {
             ZStack {
                 if library.hasImage(recipe.id) {
                     RecipeImageView(recipe: recipe)

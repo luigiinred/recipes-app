@@ -35,7 +35,7 @@ final class YouTubeTests: XCTestCase {
         XCTAssertEqual(recipe.ingredients, ["2 tbsp olive oil", "1 onion", "1 can crushed tomatoes", "4 eggs"])
         XCTAssertEqual(recipe.steps.count, 3)
         XCTAssertEqual(recipe.summary, "My favorite breakfast, ready in 20 minutes!")
-        XCTAssertEqual(recipe.tags, ["YouTube"])
+        XCTAssertEqual(recipe.tags, ["YouTube", "Eggs", "Vegetarian"])
         XCTAssertEqual(recipe.sourceURL, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     }
 

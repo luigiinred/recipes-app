@@ -12,6 +12,15 @@ enum SampleData {
 
     private static let created = Date(timeIntervalSince1970: 1_790_000_000)
 
+    static let stepImageIDs = [
+        UUID(uuidString: "40000000-0000-0000-0000-000000000001")!, UUID(uuidString: "40000000-0000-0000-0000-000000000002")!,
+    ]
+
+    static let stepImages: [UUID: Data] = [
+        stepImageIDs[0]: SampleImages.jpeg(food: (0.86, 0.45, 0.14), plate: (0.95, 0.93, 0.88), seed: 11),
+        stepImageIDs[1]: SampleImages.jpeg(food: (0.80, 0.22, 0.12), plate: (0.96, 0.95, 0.92), seed: 12),
+    ]
+
     static let shakshuka = Recipe(
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
         title: "Shakshuka",
@@ -24,7 +33,8 @@ enum SampleData {
                 "Pour in the tomatoes, season well, and simmer for 10 minutes until thickened.",
                 "Make four wells in the sauce and crack in the eggs. Cover and cook for 6 minutes until the whites are set.",
                 "Scatter with parsley and serve straight from the pan."],
-        tags: ["Breakfast", "Eggs"], sourceURL: "https://example.com/shakshuka", isFavorite: true,
+        stepImages: [stepImageIDs[0], nil, nil, stepImageIDs[1], nil],
+        tags: ["Breakfast", "Eggs"], sourceURL: "https://example.com/shakshuka", isFavorite: true, rating: 4,
         createdAt: created.addingTimeInterval(500), updatedAt: created
     )
 
@@ -61,7 +71,7 @@ enum SampleData {
         servings: 4, prepMinutes: 10, cookMinutes: 15,
         ingredients: ["1 cup ricotta", "3 eggs", "1/2 cup flour", "1 lemon, zested", "Butter, for the pan"],
         steps: ["Whisk the ricotta, eggs and lemon zest.", "Fold in the flour.", "Cook on a buttered pan for 3 minutes per side."],
-        tags: ["Breakfast"], isFavorite: true,
+        tags: ["Breakfast"], isFavorite: true, rating: 5,
         createdAt: created.addingTimeInterval(200), updatedAt: created
     )
 
@@ -190,7 +200,7 @@ enum SampleData {
     }()
 
     static func library() -> RecipeLibrary {
-        RecipeLibrary(recipes: recipes, mealPlan: mealPlan, groceries: groceries, feeds: feeds, images: images,
+        RecipeLibrary(recipes: recipes, mealPlan: mealPlan, groceries: groceries, feeds: feeds, images: images, stepImages: stepImages,
                       remindersStatus: .synced(now))
     }
 

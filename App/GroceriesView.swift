@@ -16,14 +16,14 @@ struct GroceriesView: View {
     var body: some View {
         List {
             if layout != .completed {
-                Section(embedded ? "To Buy" : "") {
+                section(embedded ? "To Buy" : nil) {
                     TextField("Add item", text: $newItem)
                         .onSubmit(addItem)
                     ForEach(toBuy) { row($0) }
                 }
             }
             if layout != .toBuy, !completed.isEmpty || layout == .completed {
-                Section(layout == .combined || embedded ? "Completed" : "") {
+                section(layout == .combined || embedded ? "Completed" : nil) {
                     ForEach(completed) { row($0) }
                 }
             }
@@ -37,10 +37,16 @@ struct GroceriesView: View {
                                        description: Text("Add ingredients from any recipe."))
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if layout != .completed, !embedded { RemindersStatusBar() }
-        }
         .modifier(GroceriesChrome(embedded: embedded, title: layout == .completed ? "Completed" : "Groceries", showsClear: layout != .toBuy))
+    }
+
+    @ViewBuilder
+    private func section(_ title: String?, @ViewBuilder content: () -> some View) -> some View {
+        if let title {
+            Section(title) { content() }
+        } else {
+            Section { content() }
+        }
     }
 
     private func sorted(_ items: [GroceryItem]) -> [GroceryItem] {
@@ -161,64 +167,6 @@ struct ClearCompletedButton: ToolbarContent {
                 Task { await library.clearCompleted() }
             }
             .disabled(!library.groceries.contains(where: \.isChecked))
-        }
-    }
-}
-
-struct RemindersStatusBar: View {
-    @EnvironmentObject private var library: RecipeLibrary
-
-    var body: some View {
-        if library.remindersStatus != .unavailable {
-            HStack(spacing: 10) {
-                Image(systemName: icon).foregroundStyle(tint)
-                Text(message).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
-                Spacer(minLength: 0)
-                if let action {
-                    Button(action.title) { Task { await library.setRemindersEnabled(action.enable) } }
-                        .font(.footnote.weight(.semibold))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(.bar)
-        }
-    }
-
-    private var icon: String {
-        switch library.remindersStatus {
-        case .synced, .syncing: "checklist.checked"
-        case .failed, .denied: "exclamationmark.triangle.fill"
-        default: "checklist"
-        }
-    }
-
-    private var tint: Color {
-        switch library.remindersStatus {
-        case .failed, .denied: .orange
-        case .synced: Theme.accent
-        default: .secondary
-        }
-    }
-
-    private var message: String {
-        switch library.remindersStatus {
-        case .unavailable: ""
-        case .off: "Not syncing with the Reminders app."
-        case .needsAccess: "Allow access to sync this list with Reminders."
-        case .denied: "Reminders access is off. Allow it in Settings to sync."
-        case .syncing: "Syncing with Reminders…"
-        case .synced: "Synced with the “Groceries” list in Reminders."
-        case .failed(let reason): "Couldn't sync with Reminders: \(reason)"
-        }
-    }
-
-    private var action: (title: String, enable: Bool)? {
-        switch library.remindersStatus {
-        case .off: ("Turn On", true)
-        case .synced, .syncing: ("Turn Off", false)
-        default: nil
         }
     }
 }
