@@ -10,7 +10,9 @@ struct RecipeEditorView: View {
     let scannedTextTitle: String
     let notice: String?
     let initialImage: Data?
-    let onSave: (Recipe, ImageChange) -> Void
+    let onSave: (Recipe, ImageChange, StepImageChanges) -> Void
+    /// Set where the editor isn't in a sheet it can dismiss, such as the share extension.
+    var onCancel: (() -> Void)?
 
     @EnvironmentObject private var library: RecipeLibrary
     @State private var pickedItem: PhotosPickerItem?
@@ -18,12 +20,14 @@ struct RecipeEditorView: View {
 
     @State private var isFavorite: Bool
     @State private var wantToCook: Bool
+    @State private var rating: Int?
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @State private var title: String
     @State private var summary: String
     @State private var servings: String
     @State private var prep: String
     @State private var cook: String
-    @State private var ingredients: [EditableLine]
+    @State private var ingredients: [EditableIngredient]
     @State private var steps: [EditableLine]
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
@@ -34,9 +38,10 @@ struct RecipeEditorView: View {
 
     init(
         recipe: Recipe, scannedText: String? = nil, scannedTextTitle: String = "Scanned text", notice: String? = nil,
-        initialImage: Data? = nil,
-        onSave: @escaping (Recipe, ImageChange) -> Void
+        initialImage: Data? = nil, initialStepImages: [Data?] = [], onCancel: (() -> Void)? = nil,
+        onSave: @escaping (Recipe, ImageChange, StepImageChanges) -> Void
     ) {
+        self.onCancel = onCancel
         original = recipe
         self.scannedText = scannedText
         self.scannedTextTitle = scannedTextTitle
@@ -46,14 +51,21 @@ struct RecipeEditorView: View {
         _imageChange = State(initialValue: initialImage.map(ImageChange.set) ?? .unchanged)
         _isFavorite = State(initialValue: recipe.isFavorite)
         _wantToCook = State(initialValue: recipe.wantToCook)
+        _rating = State(initialValue: recipe.rating)
         _title = State(initialValue: recipe.title)
         _summary = State(initialValue: recipe.summary)
         _servings = State(initialValue: recipe.servings.map(String.init) ?? "")
         _prep = State(initialValue: recipe.prepMinutes.map(String.init) ?? "")
         _cook = State(initialValue: recipe.cookMinutes.map(String.init) ?? "")
-        _ingredients = State(initialValue: recipe.ingredients.map { EditableLine(text: $0) })
+        _ingredients = State(initialValue: recipe.ingredients.map { EditableIngredient(parsing: $0) })
         _steps = State(initialValue: recipe.steps.enumerated().map { index, text in
-            EditableLine(text: text, time: recipe.timestamp(forStep: index).map(Recipe.clock) ?? "")
+            var line = EditableLine(text: text, time: recipe.timestamp(forStep: index).map(Recipe.clock) ?? "")
+            line.imageID = recipe.stepImage(forStep: index)
+            if initialStepImages.indices.contains(index), let data = initialStepImages[index] {
+                line.imageID = UUID()
+                line.newImage = data
+            }
+            return line
         })
         _tags = State(initialValue: recipe.tags.joined(separator: ", "))
         _source = State(initialValue: recipe.sourceURL ?? "")
@@ -87,23 +99,18 @@ struct RecipeEditorView: View {
                     LabeledContent("Prep minutes") { TextField("", text: $prep).multilineTextAlignment(.trailing) }
                     LabeledContent("Cook minutes") { TextField("", text: $cook).multilineTextAlignment(.trailing) }
                 }
-                Section {
-                    Toggle(isOn: $isFavorite) { Label("Favorite", systemImage: "heart") }
-                    Toggle(isOn: $wantToCook) { Label("Want to Cook", systemImage: "arrow.right.circle") }
-                    TextField("Categories (comma separated)", text: $tags)
-                } header: {
-                    Text("Organize")
-                } footer: {
-                    Text("Use a slash to nest a category, like Dinner/Pasta.")
-                }
                 Section("Ingredients") {
                     ForEach($ingredients) { $line in
-                        row(line: $line, placeholder: "Ingredient", remove: { ingredients.removeAll { $0.id == line.id } })
+                        ingredientRow(line: $line)
                     }
                     .onDelete { ingredients.remove(atOffsets: $0) }
                     .onMove { ingredients.move(fromOffsets: $0, toOffset: $1) }
                     .alwaysReorderable()
-                    addButton("Add Ingredient") { ingredients.append(newLine()) }
+                    addButton("Add Ingredient") {
+                        let line = EditableIngredient()
+                        focused = line.id
+                        ingredients.append(line)
+                    }
                 }
                 Section("Steps") {
                     ForEach($steps) { $line in
@@ -116,6 +123,30 @@ struct RecipeEditorView: View {
                     addButton("Add Step") { steps.append(newLine()) }
                 }
                 Section {
+                    if (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .favorites {
+                        Toggle(isOn: $isFavorite) { Label("Favorite", systemImage: "heart") }
+                    } else {
+                        LabeledContent { StarRatingView(rating: rating) { rating = $0 } } label: { Label("Rating", systemImage: "star") }
+                    }
+                    Toggle(isOn: $wantToCook) { Label("Up Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
+                    TextField("Categories (comma separated)", text: $tags)
+                    Menu {
+                        ForEach(RecipeTags.groups) { group in
+                            Section(group.title) {
+                                ForEach(group.tags, id: \.self) { tag in
+                                    Button { toggleTag(tag) } label: {
+                                        if hasTag(tag) { Label(tag, systemImage: "checkmark") } else { Text(tag) }
+                                    }
+                                }
+                            }
+                        }
+                    } label: { Label("Common Categories", systemImage: "tag") }
+                } header: {
+                    Text("Organize")
+                } footer: {
+                    Text("Keep categories generic: the main ingredient, vegetarian or vegan, and the course. Use a slash to nest one, like Dinner/Pasta.")
+                }
+                Section {
                     TextField("Source URL", text: $source)
                     TextField("Notes", text: $notes, axis: .vertical)
                 }
@@ -125,7 +156,13 @@ struct RecipeEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { CancelButton() }
+                ToolbarItem(placement: .cancellationAction) {
+                    if let onCancel {
+                        Button(action: onCancel) { Label("Cancel", systemImage: "xmark") }.labelStyle(.iconOnly)
+                    } else {
+                        CancelButton()
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     ConfirmButton(title: "Save", isDisabled: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { save() }
                 }
@@ -161,6 +198,41 @@ struct RecipeEditorView: View {
         URL(string: source).flatMap(YouTubeImporter.videoID(from:)) != nil
     }
 
+    private func ingredientRow(line: Binding<EditableIngredient>) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            TextField("Qty", text: line.quantity)
+                .multilineTextAlignment(.trailing)
+                #if os(iOS)
+                .keyboardType(.numbersAndPunctuation)
+                #endif
+                .frame(width: 46)
+            UnitMenu(unit: line.unit)
+            TextField("Ingredient", text: line.item, axis: .vertical)
+                .focused($focused, equals: line.wrappedValue.id)
+            #if os(macOS)
+            Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Remove")
+            #endif
+        }
+        .contextMenu { Button("Delete", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } }
+    }
+
+    private func hasTag(_ tag: String) -> Bool {
+        tagList.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
+    }
+
+    private func toggleTag(_ tag: String) {
+        var list = tagList
+        if let index = list.firstIndex(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) { list.remove(at: index) } else { list.append(tag) }
+        tags = list.joined(separator: ", ")
+    }
+
+    private var tagList: [String] {
+        tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
     private func row(
         line: Binding<EditableLine>, placeholder: String, number: Int? = nil, showsTime: Bool = false, remove: @escaping () -> Void
     ) -> some View {
@@ -174,6 +246,7 @@ struct RecipeEditorView: View {
             }
             TextField(placeholder, text: line.text, axis: .vertical)
                 .focused($focused, equals: line.wrappedValue.id)
+            if number != nil { StepPhotoButton(line: line) }
             if showsTime {
                 TextField("m:ss", text: line.time)
                     .multilineTextAlignment(.trailing)
@@ -189,7 +262,15 @@ struct RecipeEditorView: View {
                 .accessibilityLabel("Remove")
             #endif
         }
-        .contextMenu { Button("Delete", role: .destructive, action: remove) }
+        .contextMenu {
+            if line.wrappedValue.imageID != nil {
+                Button("Remove Photo", systemImage: "photo.badge.minus") {
+                    line.wrappedValue.imageID = nil
+                    line.wrappedValue.newImage = nil
+                }
+            }
+            Button("Delete", role: .destructive, action: remove)
+        }
     }
 
     private var photoSection: some View {
@@ -247,14 +328,10 @@ struct RecipeEditorView: View {
         }
     }
 
-    private func cleaned(_ lines: [EditableLine]) -> [String] {
-        lines.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-    }
-
-    private func keptSteps() -> [(text: String, seconds: Int?)] {
+    private func keptSteps() -> [(text: String, seconds: Int?, line: EditableLine)] {
         steps.compactMap { line in
             let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.isEmpty ? nil : (text, Recipe.seconds(fromClock: line.time))
+            return text.isEmpty ? nil : (text, Recipe.seconds(fromClock: line.time), line)
         }
     }
 
@@ -265,21 +342,31 @@ struct RecipeEditorView: View {
         recipe.servings = Int(servings)
         recipe.prepMinutes = Int(prep)
         recipe.cookMinutes = Int(cook)
-        recipe.ingredients = cleaned(ingredients)
+        recipe.ingredients = ingredients.map(\.text).filter { !$0.isEmpty }
         let kept = keptSteps()
         recipe.steps = kept.map(\.text)
         recipe.stepTimestamps = kept.contains { $0.seconds != nil } ? kept.map(\.seconds) : []
+        recipe.stepImages = kept.contains { $0.line.imageID != nil } ? kept.map(\.line.imageID) : []
         recipe.tags = tags.split(separator: ",").map { CategoryTree.normalized(String($0)) }.filter { !$0.isEmpty }
         let trimmedSource = source.trimmingCharacters(in: .whitespaces)
         recipe.sourceURL = trimmedSource.isEmpty ? nil : trimmedSource
         recipe.notes = notes
         recipe.isFavorite = isFavorite
+        recipe.rating = rating
         recipe.wantToCook = wantToCook
+        recipe.queuedAt = wantToCook ? (original.wantToCook ? original.queuedAt : Date()) : nil
         return recipe
     }
 
     private func save() {
-        onSave(assembled(), imageChange)
+        let recipe = assembled()
+        var changes = StepImageChanges()
+        for case let (_, _, line) in keptSteps() {
+            if let id = line.imageID, let data = line.newImage { changes.added[id] = data }
+        }
+        let kept = Set(recipe.stepImages.compactMap { $0 })
+        changes.removed = original.stepImages.compactMap { $0 }.filter { !kept.contains($0) }
+        onSave(recipe, imageChange, changes)
         dismiss()
     }
 }
@@ -288,6 +375,93 @@ struct EditableLine: Identifiable, Hashable {
     let id = UUID()
     var text: String
     var time = ""
+    var imageID: UUID?
+    var newImage: Data?
+}
+
+struct EditableIngredient: Identifiable, Hashable {
+    let id = UUID()
+    var quantity = ""
+    var unit: IngredientUnit?
+    var item = ""
+
+    init() {}
+
+    init(parsing text: String) {
+        let parsed = Ingredient(parsing: text)
+        quantity = parsed.quantity
+        unit = parsed.unit
+        item = parsed.item
+    }
+
+    /// Pasting a whole line such as "2 cups flour" into the item field still splits it into parts.
+    var text: String {
+        if quantity.trimmingCharacters(in: .whitespaces).isEmpty, unit == nil { return Ingredient(parsing: item).text }
+        return Ingredient(quantity: quantity, unit: unit, item: item).text
+    }
+}
+
+struct UnitMenu: View {
+    @Binding var unit: IngredientUnit?
+
+    var body: some View {
+        Menu {
+            Picker("Unit", selection: $unit) {
+                Text("No unit").tag(IngredientUnit?.none)
+                ForEach(IngredientUnit.Group.allCases, id: \.self) { group in
+                    Section(group.rawValue) {
+                        ForEach(IngredientUnit.units(in: group)) { Text($0.title).tag(Optional($0)) }
+                    }
+                }
+            }
+        } label: {
+            Text(unit?.abbreviation ?? "unit")
+                .foregroundStyle(unit == nil ? Color.secondary : Theme.accent)
+                .frame(minWidth: 54)
+        }
+        #if os(macOS)
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        #endif
+        .accessibilityLabel("Unit")
+    }
+}
+
+struct StepPhotoButton: View {
+    @Binding var line: EditableLine
+    @State private var picked: PhotosPickerItem?
+
+    var body: some View {
+        PhotosPicker(selection: $picked, matching: .images) {
+            thumbnail
+                .frame(width: 36, height: 36)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(line.imageID == nil ? "Add step photo" : "Change step photo")
+        .onChange(of: picked) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let jpeg = RecipeImageProcessing.jpegData(from: data, maxPixelSize: 1200) {
+                    line.imageID = UUID()
+                    line.newImage = jpeg
+                }
+                picked = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let data = line.newImage, let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: 120) {
+            Image(decorative: image, scale: 1).resizable().scaledToFill()
+        } else if let id = line.imageID {
+            StepImageView(id: id).scaledToFill()
+        } else {
+            Image(systemName: "photo.badge.plus").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
 }
 
 extension DynamicViewContent {

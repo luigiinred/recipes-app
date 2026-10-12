@@ -41,15 +41,30 @@ public enum YouTubeImporter {
         return nil
     }
 
-    public static func importResult(from url: URL) async throws -> ImportResult {
+    public static func importResult(from url: URL, progress: ImportProgress? = nil) async throws -> ImportResult {
         guard let id = videoID(from: url) else { throw RecipeError.invalid("That isn't a YouTube video link.") }
+        progress?(.plan(["Finding the video and captions", "Reading the recipe", "Writing it up with the on-device model", "Downloading the photo"]))
+        TranscriptRecipeExtractor.prewarm()
+        progress?(.began(0))
         let video = try await fetchVideo(id: id)
+        progress?(.finished(0))
+        progress?(.began(3))
+        async let thumbnail = RecipeImageProcessing.download(video.thumbnailURL)
+
+        progress?(.began(1))
         var (recipe, complete) = build(from: video, extracted: nil)
-        if !complete, let transcript = video.transcript,
-           let extracted = await TranscriptRecipeExtractor.extract(title: video.title, transcript: transcript) {
-            (recipe, complete) = build(from: video, extracted: extracted)
+        progress?(.finished(1))
+        if !complete, let transcript = video.transcript, TranscriptRecipeExtractor.isAvailable {
+            progress?(.began(2))
+            if let extracted = await TranscriptRecipeExtractor.extract(title: video.title, transcript: transcript) {
+                (recipe, complete) = build(from: video, extracted: extracted)
+            }
+            progress?(.finished(2))
+        } else {
+            progress?(.skipped(2))
         }
-        let image = await RecipeImageProcessing.download(video.thumbnailURL)
+        let image = await thumbnail
+        progress?(.finished(3))
         var message: String?
         if !complete {
             message = video.transcript == nil
@@ -67,10 +82,9 @@ public enum YouTubeImporter {
         let cleaned = cleanDescription(video.description)
         let parsed = RecipeTextParser.parse("Title\n" + cleaned, requiresHeadings: true)
         var recipe = parsed
-        recipe.title = video.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        recipe.title = RecipeStandards.importedTitle(video.title)
         recipe.sourceURL = video.watchURL
         recipe.imageURL = video.thumbnailURL
-        recipe.tags = ["YouTube"]
 
         if let extracted {
             if recipe.ingredients.count < 2 { recipe.ingredients = extracted.ingredients }
@@ -78,6 +92,7 @@ public enum YouTubeImporter {
             if recipe.servings == nil { recipe.servings = extracted.servings }
             if recipe.summary.isEmpty { recipe.summary = extracted.summary }
         }
+        recipe.tags = ["YouTube"] + RecipeTags.suggest(for: recipe)
         if recipe.summary.count > 300 { recipe.summary = String(recipe.summary.prefix(297)) + "…" }
         if recipe.summary.isEmpty, !video.channel.isEmpty { recipe.summary = "From \(video.channel) on YouTube." }
 
@@ -142,7 +157,11 @@ public enum YouTubeImporter {
 
     /// Timed captions of a video, preferring a human-written English track over auto-generated ones.
     public static func fetchCaptions(id: String) async -> [CaptionSegment] {
-        for client in [Client.android, .ios] {
+        await fetchCaptions(id: id, clients: [.android, .ios])
+    }
+
+    private static func fetchCaptions(id: String, clients: [Client]) async -> [CaptionSegment] {
+        for client in clients {
             guard let json = try? await player(id: id, client: client) else { continue }
             let segments = await captions(from: captionTracks(json), userAgent: client.userAgent)
             if !segments.isEmpty { return segments }
@@ -165,7 +184,7 @@ public enum YouTubeImporter {
         let thumbnail = (thumbnails?.last?["url"] as? String) ?? "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"
 
         var segments = await captions(from: captionTracks(json), userAgent: Client.android.userAgent)
-        if segments.isEmpty { segments = await fetchCaptions(id: id) }
+        if segments.isEmpty { segments = await fetchCaptions(id: id, clients: [.ios]) }
 
         return YouTubeVideo(
             id: id, title: title, channel: details["author"] as? String ?? "",

@@ -41,14 +41,6 @@ public struct GroceryItem: Codable, Identifiable, Hashable, Sendable {
 }
 
 public enum IngredientParser {
-    private static let units: Set<String> = [
-        "g", "kg", "mg", "ml", "l", "dl", "cl", "oz", "lb", "lbs", "cup", "cups", "tsp", "tbsp",
-        "teaspoon", "teaspoons", "tablespoon", "tablespoons", "can", "cans", "clove", "cloves", "pinch",
-        "bunch", "bunches", "slice", "slices", "stick", "sticks", "package", "packages", "pkg", "jar", "jars",
-        "head", "heads", "sprig", "sprigs", "handful", "dash", "pound", "pounds", "ounce", "ounces",
-        "gram", "grams", "kilogram", "kilograms", "liter", "liters", "litre", "litres", "quart", "quarts",
-        "pint", "pints", "gallon", "gallons", "stalk", "stalks",
-    ]
     private static let vulgarFractions = Set("¼½¾⅓⅔⅛⅜⅝⅞")
 
     public static func split(_ text: String) -> (quantity: String, name: String) {
@@ -57,7 +49,7 @@ public enum IngredientParser {
         var index = 0
         while index < tokens.count, isNumeric(tokens[index]) { index += 1 }
         guard index > 0 else { return ("", trimmed) }
-        if index < tokens.count, units.contains(tokens[index].lowercased().trimmingCharacters(in: .punctuationCharacters)) {
+        if index < tokens.count, IngredientUnit(alias: tokens[index]) != nil {
             index += 1
         }
         let quantity = tokens[..<index].joined(separator: " ")

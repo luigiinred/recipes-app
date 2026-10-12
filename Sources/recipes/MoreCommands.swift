@@ -3,18 +3,43 @@ import Foundation
 import RecipeKit
 
 struct Mark: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Mark a recipe as favorite and/or want-to-cook.")
+    static let configuration = CommandConfiguration(abstract: "Mark a recipe as favorite, rate it, or add it to the Up Next queue.")
     @OptionGroup var library: LibraryOptions
     @Argument(help: "Recipe id, id prefix, or title.") var recipe: String
     @Option(name: .long, help: "true or false.") var favorite: Bool?
-    @Option(name: .long, help: "true or false.") var wantToCook: Bool?
+    @Option(name: .long, help: "true or false: in the Up Next queue.") var wantToCook: Bool?
+    @Option(name: .long, help: "Stars from 1 to 5, or 0 to clear.") var rating: Int?
 
     func run() throws {
         var found = try library.store.find(recipe)
         if let favorite { found.isFavorite = favorite }
-        if let wantToCook { found.wantToCook = wantToCook }
+        if let wantToCook {
+            if wantToCook, !found.wantToCook { found.queuedAt = Date() }
+            found.wantToCook = wantToCook
+        }
+        if let rating {
+            guard (0...5).contains(rating) else { throw ValidationError("The rating must be 0 to 5.") }
+            found.rating = rating == 0 ? nil : rating
+        }
         let saved = try library.store.save(found)
-        print("\(saved.title): favorite=\(saved.isFavorite) want-to-cook=\(saved.wantToCook)")
+        print("\(saved.title): favorite=\(saved.isFavorite) rating=\(saved.rating.map(String.init) ?? "none") up-next=\(saved.wantToCook)")
+    }
+}
+
+struct Export: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Export every recipe, photo, meal, grocery item, and feed as one JSON document.")
+    @OptionGroup var library: LibraryOptions
+    @Option(name: .shortAndLong, help: "Write to this file instead of standard output.") var output: String?
+
+    func run() throws {
+        let data = try library.library.export().jsonData()
+        guard let output else {
+            print(String(decoding: data, as: UTF8.self))
+            return
+        }
+        let url = URL(fileURLWithPath: (output as NSString).expandingTildeInPath)
+        try data.write(to: url, options: .atomic)
+        print("Exported to \(url.path)")
     }
 }
 
