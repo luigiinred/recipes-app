@@ -11,7 +11,7 @@ struct RecipesCLI: AsyncParsableCommand {
         The library is the iCloud Drive folder the Recipes app syncs between Mac and iPhone. \
         Override it with --dir or RECIPES_DIR. Run `recipes schema` for the JSON format.
         """,
-        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Transcript.self, Timestamps.self, Image.self, PlanCommand.self, GroceriesCommand.self, FeedsCommand.self, Scan.self, Mark.self, Delete.self, Path.self, Schema.self]
+        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Transcript.self, Timestamps.self, Image.self, PlanCommand.self, GroceriesCommand.self, FeedsCommand.self, Scan.self, Mark.self, Delete.self, Export.self, Path.self, Schema.self]
     )
 }
 
@@ -51,7 +51,7 @@ struct List: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List all recipes.")
     @OptionGroup var library: LibraryOptions
     @Option(name: .long, help: "Only recipes with this tag.") var tag: String?
-    @Option(name: .long, help: "One of: recent, want-to-cook, favorites, uncategorized.") var collection: String?
+    @Option(name: .long, help: "One of: recent, up-next, favorites, top-rated, uncategorized.") var collection: String?
     @Flag(name: .long, help: "Output full recipes as JSON.") var json = false
 
     func run() throws {
@@ -59,7 +59,8 @@ struct List: ParsableCommand {
         if let collection {
             switch collection {
             case "recent": recipes = RecipeCollection.recent.filter(recipes)
-            case "want-to-cook": recipes = RecipeCollection.wantToCook.filter(recipes)
+            case "want-to-cook", "up-next": recipes = RecipeCollection.wantToCook.filter(recipes)
+            case "top-rated": recipes = RecipeCollection.topRated.filter(recipes)
             case "favorites": recipes = RecipeCollection.favorites.filter(recipes)
             case "uncategorized": recipes = RecipeCollection.uncategorized.filter(recipes)
             default: throw ValidationError("Unknown collection \"\(collection)\".")
@@ -225,7 +226,10 @@ struct Path: ParsableCommand {
 }
 
 struct Schema: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Print an example recipe in the JSON format `add --from` accepts.")
+    static let configuration = CommandConfiguration(
+        abstract: "Print an example recipe in the JSON format `add --from` accepts, and the format rules.",
+        discussion: RecipeStandards.rules
+    )
 
     func run() throws {
         let example = Recipe(
@@ -236,10 +240,11 @@ struct Schema: ParsableCommand {
             cookMinutes: 15,
             ingredients: ["1 1/2 cups flour", "1 cup milk", "1 egg"],
             steps: ["Whisk everything together.", "Cook on a hot griddle until golden."],
-            tags: ["breakfast"],
+            tags: ["Vegetarian", "Breakfast"],
             sourceURL: "https://example.com/pancakes",
             notes: "Only title is required; every other field is optional."
         )
         try printJSON(example)
+        print("\n" + RecipeStandards.rules)
     }
 }

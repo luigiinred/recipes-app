@@ -9,14 +9,14 @@ struct OrganizingSnapshotTests {
     @Test("compact list with small photos on the left (the default)")
     func compactList() {
         assertPageSnapshots(of: RecipeListView(
-            collection: .constant(.all), selection: .constant(nil), showsCollectionMenu: true, styleOverride: .list
+            collection: .constant(.all), selection: .constant(nil), styleOverride: .list
         ))
     }
 
     @Test("photo cards")
     func photoCards() {
         assertPageSnapshots(of: RecipeListView(
-            collection: .constant(.all), selection: .constant(nil), showsCollectionMenu: true, styleOverride: .cards
+            collection: .constant(.all), selection: .constant(nil), styleOverride: .cards
         ))
     }
 
@@ -27,7 +27,7 @@ struct OrganizingSnapshotTests {
 
     @Test("editor: categories, favorite, want to cook")
     func editor() {
-        assertPageSnapshots(of: RecipeEditorView(recipe: SampleData.chili) { _, _ in }, inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: RecipeEditorView(recipe: SampleData.chili) { _, _, _ in }, inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
     #if os(macOS)
@@ -41,6 +41,6 @@ struct OrganizingSnapshotTests {
     #endif
 
     private static func list(_ collection: RecipeCollection) -> some View {
-        RecipeListView(collection: .constant(collection), selection: .constant(nil), showsCollectionMenu: true)
+        RecipeListView(collection: .constant(collection), selection: .constant(nil))
     }
 }

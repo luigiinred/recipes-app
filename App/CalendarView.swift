@@ -39,6 +39,8 @@ struct CalendarView: View {
         VStack(spacing: 0) {
             CalendarHeader(range: $range, selected: $selectedDay, counts: counts, today: today)
             Divider()
+            UpNextBar(open: open)
+            Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(days, id: \.self) { day in
@@ -65,7 +67,7 @@ struct CalendarView: View {
                 withAnimation { scrollID = calendar.startOfDay(for: day) }
             }
         }
-        .navigationTitle("Calendar")
+        .navigationTitle("Planner")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

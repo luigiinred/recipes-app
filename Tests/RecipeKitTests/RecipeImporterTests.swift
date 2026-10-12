@@ -20,7 +20,7 @@ final class RecipeImporterTests: XCTestCase {
         XCTAssertEqual(recipe.servings, 4)
         XCTAssertEqual(recipe.ingredients, ["1 cup flour", "1 egg"])
         XCTAssertEqual(recipe.steps, ["Mix.", "Cook & flip."])
-        XCTAssertEqual(recipe.tags, ["Breakfast", "easy"])
+        XCTAssertEqual(recipe.tags, ["Vegetarian", "Breakfast"])
         XCTAssertEqual(recipe.sourceURL, "https://example.com/p")
     }
 

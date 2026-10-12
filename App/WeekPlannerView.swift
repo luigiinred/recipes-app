@@ -41,6 +41,10 @@ struct WeekPlannerView: View {
         VStack(spacing: 0) {
             weekBar
             Divider()
+            if isCompact {
+                UpNextBar(open: open)
+                Divider()
+            }
             GeometryReader { geometry in
                 ScrollView(.vertical) {
                     if geometry.size.width >= 620 { grid(width: geometry.size.width) } else { stack }

@@ -47,6 +47,24 @@ enum SnapshotEnvironment {
     }
 
 
+    /// iPad 11-inch portrait: 834×1194pt @2x, regular in both directions.
+    static let iPad = Device(prefix: "iPad") { style in
+        ViewImageConfig(
+            safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
+            size: CGSize(width: 834, height: 1194),
+            traits: traits(idiom: .pad, scale: 2, horizontal: .regular, style: style)
+        )
+    }
+
+    /// iPad 11-inch landscape.
+    static let iPadLandscape = Device(prefix: "iPadLandscape") { style in
+        ViewImageConfig(
+            safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
+            size: CGSize(width: 1194, height: 834),
+            traits: traits(idiom: .pad, scale: 2, horizontal: .regular, style: style)
+        )
+    }
+
     private static func traits(
         idiom: UIUserInterfaceIdiom, scale: CGFloat, horizontal: UIUserInterfaceSizeClass,
         vertical: UIUserInterfaceSizeClass = .regular, style: UIUserInterfaceStyle
@@ -86,6 +104,8 @@ enum SnapshotCoverage {
     case screen
     /// A screen whose layout changes with width: adds landscape, an unfolded/iPad-sized canvas, and a narrow Mac window.
     case adaptive
+    /// An iPad in portrait and landscape, where the split view puts a sidebar next to the detail.
+    case iPad
 }
 
 /// Snapshots `page` on the canvases its coverage calls for, with sample data in the environment, with sample data in the environment. Files are `<test>.light.png`,
@@ -121,6 +141,7 @@ func assertPageSnapshots<Page: View>(
     switch coverage {
     case .sheet: canvases = [(SnapshotEnvironment.iPhone, [.light])]
     case .screen: canvases = [(SnapshotEnvironment.iPhone, [.light, .dark])]
+    case .iPad: canvases = [(SnapshotEnvironment.iPad, [.light]), (SnapshotEnvironment.iPadLandscape, [.light])]
     case .adaptive:
         canvases = [
             (SnapshotEnvironment.iPhone, [.light, .dark]),

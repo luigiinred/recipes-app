@@ -16,6 +16,13 @@ struct RecipeScreenSnapshotTests {
         assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.videoRecipe), coverage: .adaptive)
     }
 
+    @Test("recipe reader with star ratings and step photos")
+    func detailStars() {
+        SampleData.defaults.set(RatingStyle.stars.rawValue, forKey: AppSettings.Key.ratingStyle)
+        defer { SampleData.defaults.removeObject(forKey: AppSettings.Key.ratingStyle) }
+        assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.shakshuka))
+    }
+
     @Test("recipe reader without a photo")
     func detailWithoutPhoto() {
         assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.soup))

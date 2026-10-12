@@ -35,6 +35,9 @@ targets:
         NSRemindersUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
         NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts.
         CFBundleIconName: AppIcon
+        CFBundleURLTypes:
+          - CFBundleURLName: com.garrabrant.recipes
+            CFBundleURLSchemes: [recipes]
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         ITSAppUsesNonExemptEncryption: false
@@ -60,7 +63,21 @@ targets:
   ShareExtension:
     type: app-extension
     supportedDestinations: [iOS, macOS]
-    sources: [ShareExtension]
+    sources:
+      - ShareExtension
+      - App/ImportProgressView.swift
+      - App/RecipeEditorView.swift
+      - App/RecipeActions.swift
+      - App/RecipeLibrary.swift
+      - App/RemindersSync.swift
+      - App/RecipeImageGenerator.swift
+      - App/RecipeImageView.swift
+      - App/StepImageView.swift
+      - App/ToolbarButtons.swift
+      - App/AppSettings.swift
+      - App/Theme.swift
+      - App/RecipeLink.swift
+      - App/PlannerDrag.swift
     dependencies:
       - package: RecipeKit
         product: RecipeKit
@@ -80,6 +97,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.garrabrant.recipes.share
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SHARE_EXTENSION"
         CODE_SIGN_ENTITLEMENTS[sdk=macosx*]: App/Recipes-macOS.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: App/Recipes-iOS.entitlements
         CODE_SIGN_STYLE: Automatic

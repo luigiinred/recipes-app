@@ -17,39 +17,35 @@ struct RecipeDetailView: View {
     @StateObject private var player = YouTubePlayerController()
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
-    @State private var scrollRequest = 0
     @State private var generatingImage = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
 
     var body: some View {
-        ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                hero.id("hero")
-                header
-                TwoPaneLayout {
-                    ingredients
-                    steps
-                }
-                if !recipe.notes.isEmpty {
-                    section("Notes") { Text(recipe.notes).foregroundStyle(.secondary) }
-                }
-                if let source = recipe.sourceURL, let url = URL(string: source) {
-                    Link(destination: url) { Label(url.host ?? source, systemImage: "link") }
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: 900, alignment: .leading)
-            .frame(maxWidth: .infinity)
-            .textSelection(.enabled)
+        VStack(spacing: 0) {
+        if let videoID = recipe.youTubeVideoID {
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player)
+                .frame(maxWidth: 640)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(.bar)
         }
-        .onChange(of: scrollRequest) { _, _ in
-            withAnimation { proxy.scrollTo("hero", anchor: .top) }
+        GeometryReader { geometry in
+            if geometry.size.width >= 760 {
+                twoColumns(width: geometry.size.width)
+            } else {
+                oneColumn
+            }
         }
         }
         .background(.background)
+        .onChange(of: cook.isPresented) { _, presented in
+            if presented { player.pause() }
+        }
         .navigationTitle(recipe.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -59,14 +55,16 @@ struct RecipeDetailView: View {
                 ToolbarItem { Button("Save Recipe", systemImage: "plus.circle.fill", action: previewSave) }
             } else {
                 ToolbarItemGroup {
-                    Button {
-                        Task { await library.setFavorite(recipe, !recipe.isFavorite) }
-                    } label: {
-                        Label("Favorite", systemImage: recipe.isFavorite ? "heart.fill" : "heart")
+                    if ratingStyle == .favorites {
+                        Button {
+                            Task { await library.setFavorite(recipe, !recipe.isFavorite) }
+                        } label: {
+                            Label("Favorite", systemImage: recipe.isFavorite ? "heart.fill" : "heart")
+                        }
                     }
                     Menu {
-                        Button(recipe.wantToCook ? "Remove from Want to Cook" : "Want to Cook", systemImage: "arrow.right.circle") {
-                            Task { await library.setWantToCook(recipe, !recipe.wantToCook) }
+                        Button(recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next", systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward") {
+                            Task { await library.setQueued(recipe, !recipe.wantToCook) }
                         }
                         if supportsImagePlayground {
                             Button(library.hasImage(recipe.id) ? "Create a New Photo…" : "Create a Photo…", systemImage: "apple.image.playground") {
@@ -91,7 +89,7 @@ struct RecipeDetailView: View {
             }
         }
         .sheet(isPresented: $editing) {
-            RecipeEditorView(recipe: recipe) { saved, image in Task { await library.save(saved, image: image) } }
+            RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {
             Button("OK") { timestampMessage = nil }
@@ -115,10 +113,65 @@ struct RecipeDetailView: View {
         }
     }
 
+    private var oneColumn: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                hero
+                header
+                TwoPaneLayout {
+                    ingredients
+                    steps
+                }
+                footer
+            }
+            .padding(24)
+            .frame(maxWidth: 900, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .textSelection(.enabled)
+        }
+    }
+
+    /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
+    private func twoColumns(width: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    header
+                    steps
+                    footer
+                }
+                .padding(24)
+                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: .infinity)
+            }
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    hero
+                    ingredients
+                }
+                .padding(24)
+            }
+            .frame(width: min(420, max(320, width * 0.36)))
+            .background(.quaternary.opacity(0.25))
+        }
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        if !recipe.notes.isEmpty {
+            section("Notes") { Text(recipe.notes).foregroundStyle(.secondary) }
+        }
+        if let source = recipe.sourceURL, let url = URL(string: source) {
+            Link(destination: url) { Label(url.host ?? source, systemImage: "link") }
+        }
+    }
+
     @ViewBuilder
     private var hero: some View {
-        if let videoID = recipe.youTubeVideoID {
-            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player)
+        if recipe.youTubeVideoID != nil {
+            EmptyView()
         } else if previewSave != nil, let data = previewImage, let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: RecipeLibrary.thumbnailSize) {
             Image(decorative: image, scale: 1).resizable().scaledToFill()
                 .aspectRatio(2, contentMode: .fit)
@@ -145,17 +198,22 @@ struct RecipeDetailView: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            if ratingStyle == .stars, previewSave == nil {
+                StarRatingView(rating: recipe.rating) { value in Task { await library.setRating(recipe, value) } }
+            }
             if previewSave == nil {
-            HStack(spacing: 20) {
+            HStack(spacing: 10) {
                 Button { cook.start(recipe) } label: { Label("Cook", systemImage: "flame") }
+                    .buttonStyle(.glassProminent)
                     .disabled(recipe.steps.isEmpty)
                 Button { addingToGroceries = true } label: { Label("Groceries", systemImage: "checklist") }
+                    .buttonStyle(.glass)
                     .disabled(recipe.ingredients.isEmpty)
-                Button { addingToCalendar = true } label: { Label("Calendar", systemImage: "calendar.badge.plus") }
+                Button { addingToCalendar = true } label: { Label("Plan", systemImage: "calendar.badge.plus") }
+                    .buttonStyle(.glass)
             }
-            .buttonStyle(.plain)
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Theme.accent)
+            .tint(Theme.accent)
             }
             if !recipe.tags.isEmpty {
                 HStack {
@@ -180,7 +238,7 @@ struct RecipeDetailView: View {
                             .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
                             .onTapGesture { toggle(&checkedIngredients, index) }
                             .accessibilityAddTraits(.isButton)
-                        Text(text)
+                        IngredientLine(text: text)
                             .strikethrough(checkedIngredients.contains(index))
                             .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
                             .multilineTextAlignment(.leading)
@@ -194,6 +252,7 @@ struct RecipeDetailView: View {
         section("Steps") {
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, text in
+                    VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("\(index + 1)")
                             .font(.headline)
@@ -210,7 +269,6 @@ struct RecipeDetailView: View {
                         if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
                             Button {
                                 player.play(from: seconds)
-                                scrollRequest += 1
                             } label: {
                                 Label(Recipe.clock(seconds), systemImage: "play.fill")
                                     .font(.caption.weight(.semibold).monospacedDigit())
@@ -221,6 +279,10 @@ struct RecipeDetailView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Play from \(Recipe.clock(seconds))")
                         }
+                    }
+                    if let imageID = recipe.stepImage(forStep: index) {
+                        StepImageView(id: imageID).padding(.leading, 38)
+                    }
                     }
                 }
             }
@@ -267,7 +329,7 @@ struct AddToCalendarSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add to Calendar")
+            .navigationTitle("Add to Planner")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

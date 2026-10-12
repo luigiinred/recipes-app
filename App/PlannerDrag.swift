@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 enum CalendarMode: String, CaseIterable {
     case agenda, planner
 
-    var title: String { self == .agenda ? "Agenda" : "Planner" }
+    var title: String { self == .agenda ? "Agenda" : "Week" }
     var symbol: String { self == .agenda ? "list.bullet.below.rectangle" : "rectangle.split.3x1" }
 }
 

@@ -23,8 +23,8 @@ final class SidebarNavigationUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 15), "recipe list should show the recipe")
 
-        app.staticTexts["Calendar"].firstMatch.click()
-        XCTAssertTrue(app.buttons["Add recipe on this day"].firstMatch.waitForExistence(timeout: 10), "Calendar page should show day rows")
+        app.staticTexts["Planner"].firstMatch.click()
+        XCTAssertTrue(app.buttons["Add recipe on this day"].firstMatch.waitForExistence(timeout: 10), "Planner page should show day rows")
 
         app.staticTexts["Groceries"].firstMatch.click()
         XCTAssertTrue(app.textFields["Add item"].firstMatch.waitForExistence(timeout: 10), "Groceries page should show the add field")
