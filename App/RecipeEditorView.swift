@@ -34,7 +34,7 @@ struct RecipeEditorView: View {
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
-    @State private var tags: String
+    @State private var tags: [String]
     @State private var source: String
     @State private var notes: String
 
@@ -69,7 +69,7 @@ struct RecipeEditorView: View {
             }
             return line
         })
-        _tags = State(initialValue: recipe.tags.joined(separator: ", "))
+        _tags = State(initialValue: recipe.tags)
         _source = State(initialValue: recipe.sourceURL ?? "")
         _notes = State(initialValue: recipe.notes)
     }
@@ -151,20 +151,11 @@ struct RecipeEditorView: View {
                         LabeledContent { StarRatingView(rating: rating) { rating = $0 } } label: { Label("Rating", systemImage: "star") }
                     }
                     Toggle(isOn: $wantToCook) { Label("Up Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
-                    TextField("Categories (comma separated)", text: $tags)
-                    Menu {
-                        ForEach(RecipeTags.groups) { group in
-                            Section(group.title) {
-                                ForEach(group.tags, id: \.self) { tag in
-                                    Button { toggleTag(tag) } label: {
-                                        if hasTag(tag) { Label(tag, systemImage: "checkmark") } else { Text(tag) }
-                                    }
-                                }
-                            }
-                        }
-                    } label: { Label("Common Categories", systemImage: "tag") }
+                }
+                Section {
+                    TagEditor(tags: $tags)
                 } header: {
-                    Text("Organize")
+                    Text("Categories")
                 } footer: {
                     Text("Keep categories generic: the main ingredient, vegetarian or vegan, and the course. Use a slash to nest one, like Dinner/Pasta.")
                 }
@@ -296,20 +287,6 @@ struct RecipeEditorView: View {
         .contextMenu { Button("Delete", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } }
     }
 
-    private func hasTag(_ tag: String) -> Bool {
-        tagList.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
-    }
-
-    private func toggleTag(_ tag: String) {
-        var list = tagList
-        if let index = list.firstIndex(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) { list.remove(at: index) } else { list.append(tag) }
-        tags = list.joined(separator: ", ")
-    }
-
-    private var tagList: [String] {
-        tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    }
-
     private func row(
         line: Binding<EditableLine>, placeholder: String, number: Int? = nil, showsTime: Bool = false, remove: @escaping () -> Void
     ) -> some View {
@@ -434,7 +411,7 @@ struct RecipeEditorView: View {
         recipe.steps = kept.map(\.text)
         recipe.stepTimestamps = kept.contains { $0.seconds != nil } ? kept.map(\.seconds) : []
         recipe.stepImages = kept.contains { $0.line.imageID != nil } ? kept.map(\.line.imageID) : []
-        recipe.tags = tags.split(separator: ",").map { CategoryTree.normalized(String($0)) }.filter { !$0.isEmpty }
+        recipe.tags = tags
         let trimmedSource = source.trimmingCharacters(in: .whitespaces)
         recipe.sourceURL = trimmedSource.isEmpty ? nil : trimmedSource
         recipe.notes = notes
