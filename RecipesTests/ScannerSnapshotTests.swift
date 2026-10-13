@@ -10,7 +10,7 @@ struct ScannerSnapshotTests {
     func review() {
         let text = SampleData.scannedText
         assertPageSnapshots(
-            of: RecipeEditorView(recipe: RecipeTextParser.parse(text), scannedText: text) { _, _ in },
+            of: RecipeEditorView(recipe: RecipeTextParser.parse(text), scannedText: text) { _, _, _ in },
             inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet
         )
     }
@@ -21,7 +21,7 @@ struct ScannerSnapshotTests {
             of: RecipeEditorView(
                 recipe: SampleData.youtubeDraft, scannedText: SampleData.transcript, scannedTextTitle: "Video captions",
                 notice: SampleData.youtubeNotice, initialImage: SampleData.images[SampleData.pancakes.id]
-            ) { _, _ in },
+            ) { _, _, _ in },
             inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet
         )
     }

@@ -42,6 +42,12 @@ struct CookModeView: View {
                                                description: Text("Add a recipe to start cooking."))
                     }
                 }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let recipe, let videoID = recipe.youTubeVideoID {
+                        CookVideo(recipe: recipe, videoID: videoID, step: stepIndex(recipe), width: phone ? 168 : 260)
+                            .id(recipe.id)
+                    }
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if let recipe { controls(recipe, wide: wide, short: short) }
                 }
@@ -149,6 +155,8 @@ struct CookModeView: View {
                         timers.start(label: "\(recipe.title) · step \(index + 1)", seconds: seconds)
                         return .handled
                     })
+                CookStepIngredients(recipe: recipe, step: index)
+                if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
             }
             .padding(.horizontal, Self.margin)
             .padding(.top, 12)
@@ -247,6 +255,28 @@ private struct StepDots: View {
     }
 }
 
+/// The recipe's video as a small player in the corner. Once it is open it jumps to each step's moment as you move through them.
+struct CookVideo: View {
+    let recipe: Recipe
+    let videoID: String
+    let step: Int
+    let width: CGFloat
+    @StateObject private var player = YouTubePlayerController()
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, startAt: recipe.timestamp(forStep: step) ?? 0, isCompact: true)
+                .frame(width: width)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
+        .onChange(of: step) { _, new in
+            if player.isShown, let seconds = recipe.timestamp(forStep: new) { player.play(from: seconds) }
+        }
+    }
+}
+
 struct TimerStrip: View {
     @EnvironmentObject private var timers: TimerCenter
     @Environment(\.referenceDate) private var referenceDate
@@ -341,21 +371,48 @@ struct IngredientChecklist: View {
     @State private var checked: Set<Int> = []
 
     var body: some View {
-        List(Array(recipe.ingredients.enumerated()), id: \.offset) { index, text in
-            Button {
-                if !checked.insert(index).inserted { checked.remove(index) }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
-                    Text(text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
-                    Spacer()
+        List {
+            ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
+                TitledSection(title: group.title) {
+                    ForEach(group.items, id: \.index) { index, text in
+                        Button {
+                            if !checked.insert(index).inserted { checked.remove(index) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
+                                IngredientLine(text: text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
         }
         .listStyle(.plain)
+    }
+}
+
+/// What this step needs, in cook mode's big type, so you can read it without going back to the list.
+struct CookStepIngredients: View {
+    let recipe: Recipe
+    let step: Int
+
+    var body: some View {
+        let used = IngredientMatcher.indices(in: recipe.steps[step], ingredients: recipe.ingredients)
+        if !used.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("FOR THIS STEP").font(.caption.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary)
+                ForEach(used, id: \.self) { index in
+                    IngredientLine(text: recipe.ingredients[index]).font(.system(.title3, design: .serif))
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+        }
     }
 }
 

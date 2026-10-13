@@ -1,3 +1,4 @@
+import ImagePlayground
 import RecipeKit
 import SwiftUI
 
@@ -5,6 +6,8 @@ struct SettingsView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
     var inSheet = true
+    /// Fixed Apple Intelligence state for previews and snapshots, so they don't depend on the machine.
+    var intelligenceOverride: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue
     @AppStorage(AppSettings.Key.hiddenMeals) private var hiddenMeals = ""
@@ -12,6 +15,13 @@ struct SettingsView: View {
     @AppStorage(AppSettings.Key.listStyle) private var listStyle = RecipeListStyle.list
     @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
     @AppStorage(AppSettings.Key.keepAwake) private var keepAwake = true
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
+    @Environment(\.supportsImagePlayground) private var supportsImagePlayground
+
+    @State private var exportDocument: LibraryExportDocument?
+    @State private var isExportPresented = false
+    @State private var isExporting = false
+    @State private var exportError: String?
 
     var body: some View {
         NavigationStack {
@@ -24,20 +34,27 @@ struct SettingsView: View {
                         ForEach(AppSettings.WeekStart.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
                     }
                 } header: {
-                    Text("Calendar")
+                    Text("Planner")
                 } footer: {
-                    Text("Automatic files a recipe under breakfast, lunch, a snack, or dinner based on the time of day. You can still change the meal whenever you add one.")
+                    Text("Automatic files a recipe under breakfast, lunch, a snack, or dinner based on the time of day. You can still change the meal whenever you add one. Recipes in Up Next leave the queue when you plan them.")
                 }
                 Section("Meals in the planner") {
                     ForEach(Meal.allCases, id: \.self) { meal in
                         Toggle(isOn: shown(meal)) { Label(meal.title, systemImage: meal.symbol) }
                     }
                 }
-                Section("Recipes") {
+                Section {
                     Picker("Recipe list", selection: $listStyle) {
                         ForEach(RecipeListStyle.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
                     }
+                    Picker("Mark recipes with", selection: $ratingStyle) {
+                        ForEach(RatingStyle.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                    }
                     Toggle("Review imports before saving", isOn: $reviewImports)
+                } header: {
+                    Text("Recipes")
+                } footer: {
+                    Text("Favorites are a heart on the recipes you love. Star ratings give each recipe one to five stars, and Top Rated lists the 4 and 5 star ones. Switching never deletes either.")
                 }
                 Section {
                     Toggle("Sync with Reminders", isOn: Binding(
@@ -52,8 +69,35 @@ struct SettingsView: View {
                 Section("Cooking") {
                     Toggle("Keep the screen awake in cook mode", isOn: $keepAwake)
                 }
+                appleIntelligence
+                Section("Developer") {
+                    NavigationLink { DeveloperToolsView() } label: { Label("Developer Tools", systemImage: "wrench.and.screwdriver") }
+                }
+                Section {
+                    Button { Task { await prepareExport() } } label: {
+                        Label("Export all data as JSON", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isExporting)
+                } header: {
+                    Text("Your data")
+                } footer: {
+                    Text("Saves every recipe, photo, planned meal, and grocery item to one JSON file that you own. Photos are included as base64.")
+                }
             }
             .formStyle(.grouped)
+            .fileExporter(
+                isPresented: $isExportPresented,
+                document: exportDocument,
+                contentType: .json,
+                defaultFilename: LibraryExportDocument.defaultFilename()
+            ) { result in
+                if case .failure(let error) = result { exportError = error.localizedDescription }
+            }
+            .alert("Couldn't export", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(exportError ?? "")
+            }
             .navigationTitle("Settings")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -65,6 +109,42 @@ struct SettingsView: View {
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 520)
         #endif
+    }
+
+    private var appleIntelligence: some View {
+        let status = intelligenceOverride?.status ?? AppleIntelligence.status
+        return Section {
+            statusRow("Recipes from video captions", ready: status.isAvailable)
+            statusRow("Photos with Image Playground", ready: intelligenceOverride?.imagePlayground ?? supportsImagePlayground)
+        } header: {
+            Text("Apple Intelligence")
+        } footer: {
+            if status.isAvailable {
+                Text("Videos without a written recipe are turned into one on this device from their captions.")
+            } else {
+                Text(status.explanation + " Imports still work; a video without a written recipe opens as a draft with its captions beside it.")
+            }
+        }
+    }
+
+    private func statusRow(_ title: String, ready: Bool) -> some View {
+        LabeledContent {
+            Label(ready ? "Ready" : "Not available", systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
+                .foregroundStyle(ready ? Theme.accent : Color.secondary)
+        } label: {
+            Text(title)
+        }
+    }
+
+    private func prepareExport() async {
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            exportDocument = LibraryExportDocument(data: try await library.exportJSON())
+            isExportPresented = true
+        } catch {
+            exportError = error.localizedDescription
+        }
     }
 
     private func shown(_ meal: Meal) -> Binding<Bool> {

@@ -19,22 +19,21 @@ struct CalendarHeader: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 10) {
-                Text(title).font(.system(.title3, design: .serif, weight: .semibold))
-                Spacer()
-                Picker("Range", selection: $range) {
-                    ForEach(CalendarRange.allCases, id: \.self) { Text($0.title).tag($0) }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    titleText
+                    Spacer()
+                    rangePicker
+                    stepButtons
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 150)
-                HStack(spacing: 2) {
-                    Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(width: 30, height: 30) }
-                    Button { selected = calendar.startOfDay(for: today) } label: { Image(systemName: "circle.fill").font(.system(size: 6)).frame(width: 24, height: 30) }
-                    Button { shift(1) } label: { Image(systemName: "chevron.right").frame(width: 30, height: 30) }
+                VStack(alignment: .leading, spacing: 6) {
+                    titleText
+                    HStack(spacing: 10) {
+                        rangePicker
+                        Spacer()
+                        stepButtons
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.accent)
             }
             HStack(spacing: 0) {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
@@ -52,6 +51,32 @@ struct CalendarHeader: View {
         .gesture(DragGesture(minimumDistance: 30).onEnded { value in
             if abs(value.translation.width) > abs(value.translation.height) { shift(value.translation.width < 0 ? 1 : -1) }
         })
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.system(.title3, design: .serif, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var rangePicker: some View {
+        Picker("Range", selection: $range) {
+            ForEach(CalendarRange.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 150)
+    }
+
+    private var stepButtons: some View {
+        HStack(spacing: 2) {
+            Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(width: 30, height: 30) }
+            Button { selected = calendar.startOfDay(for: today) } label: { Image(systemName: "circle.fill").font(.system(size: 6)).frame(width: 24, height: 30) }
+            Button { shift(1) } label: { Image(systemName: "chevron.right").frame(width: 30, height: 30) }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.accent)
     }
 
     private var title: String {

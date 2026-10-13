@@ -1,7 +1,7 @@
 import RecipeKit
 import SwiftUI
 
-/// Chips for the current categories, a field that adds one on Return or comma, and your most-used existing ones to tap.
+/// Chips for the current categories, a field that adds one on Return or comma, and common or most-used ones to tap.
 struct TagEditor: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Binding var tags: [String]
@@ -58,14 +58,16 @@ struct TagEditor: View {
 
     private var suggestions: [String] {
         let counts = library.recipes.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        let used = counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map(\.key)
         let query = draft.trimmingCharacters(in: .whitespaces)
-        return counts
-            .filter { tag, _ in
-                !contains(tag) && (query.isEmpty || CategoryTree.displayName(tag).localizedCaseInsensitiveContains(query))
+        var seen = Set<String>()
+        return (RecipeTags.vocabulary + used)
+            .filter { tag in
+                !contains(tag) && seen.insert(tag.lowercased()).inserted
+                    && (query.isEmpty || CategoryTree.displayName(tag).localizedCaseInsensitiveContains(query))
             }
-            .sorted { ($1.value, $0.key) < ($0.value, $1.key) }
-            .prefix(8)
-            .map(\.key)
+            .prefix(10)
+            .map { $0 }
     }
 
     private func contains(_ tag: String) -> Bool {

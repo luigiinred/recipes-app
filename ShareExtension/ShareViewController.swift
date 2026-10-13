@@ -16,7 +16,8 @@ final class ShareViewController: PlatformViewController {
         ShareView(
             loadURL: { [weak self] in await self?.sharedURL() },
             finish: { [weak self] in self?.extensionContext?.completeRequest(returningItems: nil) },
-            cancel: { [weak self] in self?.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled)) }
+            cancel: { [weak self] in self?.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled)) },
+            openApp: { [weak self] url in self?.open(url) }
         )
     }
 
@@ -36,6 +37,23 @@ final class ShareViewController: PlatformViewController {
         return nil
     }
 
+    /// Opens the app, then closes the share sheet.
+    private func open(_ url: URL) {
+        #if os(iOS)
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let application = current as? UIApplication {
+                application.open(url, options: [:], completionHandler: nil)
+                break
+            }
+            responder = current.next
+        }
+        #else
+        NSWorkspace.shared.open(url)
+        #endif
+        extensionContext?.completeRequest(returningItems: nil)
+    }
+
     #if os(iOS)
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -50,7 +68,7 @@ final class ShareViewController: PlatformViewController {
     #else
     override func loadView() {
         view = NSHostingView(rootView: makeView())
-        preferredContentSize = NSSize(width: 440, height: 440)
+        preferredContentSize = NSSize(width: 520, height: 680)
     }
     #endif
 }

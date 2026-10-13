@@ -49,6 +49,17 @@ public enum CategoryTree {
     }
 
     /// True when `tag` is `category` or sits anywhere beneath it.
+    public static func node(at path: String, in nodes: [CategoryNode]) -> CategoryNode? {
+        var level = nodes
+        var found: CategoryNode?
+        for part in components(path) {
+            guard let match = level.first(where: { $0.name.caseInsensitiveCompare(part) == .orderedSame }) else { return nil }
+            found = match
+            level = match.children
+        }
+        return found
+    }
+
     public static func tag(_ tag: String, isIn category: String) -> Bool {
         let tagParts = components(tag), categoryParts = components(category)
         guard !categoryParts.isEmpty, tagParts.count >= categoryParts.count else { return false }

@@ -3,15 +3,18 @@ import Foundation
 public struct ImportResult: Sendable {
     public var recipe: Recipe
     public var imageData: Data?
+    /// Photo for each step, parallel to `recipe.steps`; empty when the source has none.
+    public var stepImageData: [Data?]
     public var isComplete: Bool
     /// Raw text (description or captions) to show when the recipe needs review.
     public var sourceText: String?
     public var sourceTitle: String
     public var message: String?
 
-    public init(recipe: Recipe, imageData: Data? = nil, isComplete: Bool = true, sourceText: String? = nil, sourceTitle: String = "Scanned text", message: String? = nil) {
+    public init(recipe: Recipe, imageData: Data? = nil, stepImageData: [Data?] = [], isComplete: Bool = true, sourceText: String? = nil, sourceTitle: String = "Scanned text", message: String? = nil) {
         self.recipe = recipe
         self.imageData = imageData
+        self.stepImageData = stepImageData
         self.isComplete = isComplete
         self.sourceText = sourceText
         self.sourceTitle = sourceTitle
@@ -20,10 +23,21 @@ public struct ImportResult: Sendable {
 }
 
 public enum RecipeImporter {
-    public static func importResult(from url: URL) async throws -> ImportResult {
-        if YouTubeImporter.videoID(from: url) != nil { return try await YouTubeImporter.importResult(from: url) }
-        let recipe = try await webRecipe(from: url)
-        return ImportResult(recipe: recipe, imageData: await RecipeImageProcessing.download(recipe.imageURL, relativeTo: url))
+    public static func importResult(from url: URL, progress: ImportProgress? = nil) async throws -> ImportResult {
+        if YouTubeImporter.videoID(from: url) != nil { return try await YouTubeImporter.importResult(from: url, progress: progress) }
+        progress?(.plan(["Fetching the page", "Reading the recipe", "Downloading photos"]))
+        progress?(.began(0))
+        let html = try await fetchHTML(from: url)
+        progress?(.finished(0))
+        progress?(.began(1))
+        let recipe = try recipe(fromHTML: html, sourceURL: url)
+        progress?(.finished(1))
+        progress?(.began(2))
+        async let cover = RecipeImageProcessing.download(recipe.imageURL, relativeTo: url)
+        async let stepPhotos = downloadStepImages(stepImageURLs(fromHTML: html), relativeTo: url)
+        let result = ImportResult(recipe: recipe, imageData: await cover, stepImageData: await stepPhotos)
+        progress?(.finished(2))
+        return result
     }
 
     public static func recipe(from url: URL) async throws -> Recipe {
@@ -31,6 +45,10 @@ public enum RecipeImporter {
     }
 
     static func webRecipe(from url: URL) async throws -> Recipe {
+        try recipe(fromHTML: try await fetchHTML(from: url), sourceURL: url)
+    }
+
+    private static func fetchHTML(from url: URL) async throws -> String {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -41,7 +59,31 @@ public enum RecipeImporter {
             throw RecipeError.invalid("The page returned HTTP \(http.statusCode).")
         }
         let html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
-        return try recipe(fromHTML: html, sourceURL: url)
+        return html
+    }
+
+    /// The photo link for each instruction step, parallel to the recipe's steps.
+    static func stepImageURLs(fromHTML html: String) -> [String?] {
+        for block in jsonLDBlocks(in: html) {
+            guard let data = block.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data),
+                  let object = findRecipe(in: json) else { continue }
+            let links = instructionSteps(object["recipeInstructions"]).map(\.image)
+            return links.contains { $0 != nil } ? links : []
+        }
+        return []
+    }
+
+    private static func downloadStepImages(_ links: [String?], relativeTo base: URL) async -> [Data?] {
+        guard links.contains(where: { $0 != nil }) else { return [] }
+        return await withTaskGroup(of: (Int, Data?).self) { group in
+            for (index, link) in links.enumerated().prefix(40) {
+                group.addTask { (index, await RecipeImageProcessing.download(link, relativeTo: base)) }
+            }
+            var result = [Data?](repeating: nil, count: links.count)
+            for await (index, data) in group { result[index] = data }
+            return result
+        }
     }
 
     public static func recipe(fromHTML html: String, sourceURL: URL?) throws -> Recipe {
@@ -105,12 +147,12 @@ public enum RecipeImporter {
     }
 
     private static func makeRecipe(from object: [String: Any], sourceURL: URL?) -> Recipe? {
-        guard let title = text(object["name"]), !title.isEmpty else { return nil }
+        guard let rawTitle = text(object["name"]), !rawTitle.isEmpty else { return nil }
+        let title = RecipeStandards.importedTitle(rawTitle)
         let ingredients = strings(object["recipeIngredient"] ?? object["ingredients"])
-        var tags: [String] = []
-        for tag in strings(object["recipeCategory"]) where !tag.isEmpty && !tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-            tags.append(tag)
-        }
+        let keywords = (text(object["keywords"]) ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let categories = strings(object["recipeCategory"])
+        let tags = RecipeTags.suggest(title: title, ingredients: ingredients, sourceTerms: categories + keywords)
         return Recipe(
             title: title,
             summary: text(object["description"]) ?? "",
@@ -119,20 +161,24 @@ public enum RecipeImporter {
             cookMinutes: minutes(from: object["cookTime"]),
             ingredients: ingredients,
             steps: instructions(object["recipeInstructions"]),
-            tags: Array(tags.prefix(3)),
+            tags: tags,
             sourceURL: sourceURL?.absoluteString,
             imageURL: imageString(object["image"])
         )
     }
 
     private static func instructions(_ value: Any?) -> [String] {
+        instructionSteps(value).map(\.text)
+    }
+
+    private static func instructionSteps(_ value: Any?) -> [(text: String, image: String?)] {
         if let string = value as? String {
-            return string.split(whereSeparator: \.isNewline).map { clean(String($0)) }.filter { !$0.isEmpty }
+            return string.split(whereSeparator: \.isNewline).map { clean(String($0)) }.filter { !$0.isEmpty }.map { ($0, nil) }
         }
-        if let array = value as? [Any] { return array.flatMap { instructions($0) } }
+        if let array = value as? [Any] { return array.flatMap { instructionSteps($0) } }
         if let object = value as? [String: Any] {
-            if let nested = object["itemListElement"] { return instructions(nested) }
-            if let step = text(object["text"]) ?? text(object["name"]) { return [step] }
+            if let nested = object["itemListElement"] { return instructionSteps(nested) }
+            if let step = text(object["text"]) ?? text(object["name"]) { return [(step, imageString(object["image"]))] }
         }
         return []
     }

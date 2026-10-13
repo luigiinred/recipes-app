@@ -12,6 +12,24 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
     }
 
+    @Test("iPad: Recipes sidebar with nothing selected")
+    func iPadRecipesHome() {
+        assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .iPad)
+    }
+
+    @Test("iPad: a category picked in the sidebar, its recipes, and a recipe beside them")
+    func iPadRecipeSelected() {
+        assertPageSnapshots(
+            of: RootView(tab: .recipes, recipeSelection: SampleData.chili.id, recipesCollection: .category("Dinner")),
+            inNavigationStack: false, coverage: .iPad
+        )
+    }
+
+    @Test("iPad: Planner with the month, Up Next and the agenda in the sidebar")
+    func iPadPlanner() {
+        assertPageSnapshots(of: RootView(tab: .calendar), inNavigationStack: false, coverage: .iPad)
+    }
+
     @Test("Search tab, with results")
     func searchTab() {
         assertPageSnapshots(of: RootView(tab: .search, searchQuery: "tomato"), inNavigationStack: false)

@@ -10,11 +10,22 @@ struct ImportURLView: View {
 
     @State private var address = ""
     @State private var isLoading = false
+    @StateObject private var progress = ImportProgressModel()
     @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                if isLoading {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(address).font(.footnote).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                            ImportProgressView(model: progress)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .transition(.opacity)
+                } else {
                 Section {
                     TextField("https://", text: $address)
                         #if os(iOS)
@@ -29,8 +40,10 @@ struct ImportURLView: View {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red)
                 }
+                }
             }
             .formStyle(.grouped)
+            .animation(.snappy, value: isLoading)
             .navigationTitle("Import from Web or YouTube")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -38,16 +51,12 @@ struct ImportURLView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { CancelButton() }
                 ToolbarItem(placement: .confirmationAction) {
-                    if isLoading {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        ConfirmButton(title: "Import", isDisabled: address.isEmpty, action: importRecipe)
-                    }
+                    ConfirmButton(title: "Import", isDisabled: address.isEmpty || isLoading, action: importRecipe)
                 }
             }
         }
         #if os(macOS)
-        .frame(minWidth: 460, minHeight: 220)
+        .frame(minWidth: 460, minHeight: 260)
         #endif
     }
 
@@ -61,9 +70,10 @@ struct ImportURLView: View {
         }
         isLoading = true
         errorMessage = nil
+        progress.reset()
         Task {
             do {
-                let result = try await RecipeImporter.importResult(from: url)
+                let result = try await RecipeImporter.importResult(from: url, progress: progress.report)
                 if !reviewImports, result.isComplete, let saved = await library.add(result) {
                     dismiss()
                     onSaved(saved)

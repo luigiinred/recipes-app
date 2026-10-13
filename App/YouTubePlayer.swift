@@ -20,6 +20,10 @@ final class YouTubePlayerController: ObservableObject {
         isShown = true
     }
 
+    func pause() {
+        webView?.evaluateJavaScript("if (player && player.pauseVideo) { player.pauseVideo(); }")
+    }
+
     fileprivate func fail(_ message: String) { errorMessage = message }
 }
 
@@ -42,7 +46,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         webView.isOpaque = false
         #endif
         controller.webView = webView
-        webView.loadHTMLString(Self.html(videoID: videoID, start: controller.startSeconds), baseURL: URL(string: "https://www.youtube.com"))
+        webView.loadHTMLString(Self.html(videoID: videoID, start: controller.startSeconds), baseURL: URL(string: Self.origin))
         return webView
     }
 
@@ -53,6 +57,9 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
     func makeNSView(context: Context) -> WKWebView { makeWebView(context) }
     func updateNSView(_ view: WKWebView, context: Context) {}
     #endif
+
+    // YouTube rejects embeds that don't identify the host app (errors 152/153), so use the bundle ID as the origin.
+    static let origin = "https://" + (Bundle.main.bundleIdentifier ?? "com.garrabrant.recipes").lowercased()
 
     static func html(videoID: String, start: Int) -> String {
         """
@@ -65,7 +72,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         function onYouTubeIframeAPIReady() {
           player = new YT.Player('p', {
             videoId: '\(videoID)', width: '100%', height: '100%',
-            playerVars: { playsinline: 1, autoplay: 1, start: \(start), rel: 0 },
+            playerVars: { playsinline: 1, autoplay: 1, start: \(start), rel: 0, origin: '\(origin)', widget_referrer: '\(origin)' },
             events: {
               onReady: function() { window.webkit.messageHandlers.player.postMessage('ready'); },
               onStateChange: function(e) { window.webkit.messageHandlers.player.postMessage('state:' + e.data); },
@@ -90,8 +97,9 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
                 } else if body.hasPrefix("state:") {
                     // 1 = playing, 3 = buffering
                     controller.isPlaying = ["1", "3"].contains(body.dropFirst("state:".count))
-                } else if body.hasPrefix("error") {
-                    controller.fail("This video can't be played inside the app.")
+                } else if body.hasPrefix("error:") {
+                    let code = String(body.dropFirst("error:".count))
+                    controller.fail("This video can't be played inside the app (error \(code)). Use Open in YouTube.")
                 }
             }
         }
@@ -109,8 +117,12 @@ struct YouTubeEmbed: View {
     let recipe: Recipe
     let videoID: String
     @ObservedObject var controller: YouTubePlayerController
+    /// Where the video starts when the poster is tapped.
+    var startAt = 0
     /// How far the page has scrolled past its resting position; the video shrinks and pins to the top while playing.
     var scrolled: CGFloat = 0
+    /// A small player without the "Open in YouTube" row.
+    var isCompact = false
     @State private var width: CGFloat = 0
 
     private static let pinMargin: CGFloat = 8
@@ -134,16 +146,16 @@ struct YouTubeEmbed: View {
             .aspectRatio(16 / 9, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 16 - 8 * progress))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : 16 - 8 * progress))
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .scaleEffect(1 - (1 - miniScale) * progress, anchor: .topTrailing)
             .offset(y: controller.isPlaying ? max(0, scrolled - Self.pinMargin) : 0)
-            .shadow(color: .black.opacity(0.3 * progress), radius: 10 * progress, y: 4 * progress)
+            .shadow(color: .black.opacity(isCompact ? 0.25 : 0.3 * progress), radius: isCompact ? 8 : 10 * progress, y: 4)
 
             if let message = controller.errorMessage {
                 Label(message, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
             }
-            if let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
+            if !isCompact, let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
                 Link(destination: url) { Label("Open in YouTube", systemImage: "arrow.up.right.square") }
                     .font(.footnote)
                     .foregroundStyle(Theme.accent)
@@ -152,7 +164,7 @@ struct YouTubeEmbed: View {
     }
 
     private var poster: some View {
-        Button { controller.play() } label: {
+        Button { controller.play(from: startAt) } label: {
             ZStack {
                 if library.hasImage(recipe.id) {
                     RecipeImageView(recipe: recipe)
@@ -160,7 +172,7 @@ struct YouTubeEmbed: View {
                     Color.black
                 }
                 Image(systemName: "play.circle.fill")
-                    .font(.system(size: 64))
+                    .font(.system(size: isCompact ? 32 : 64))
                     .foregroundStyle(.white)
                     .shadow(radius: 8)
             }

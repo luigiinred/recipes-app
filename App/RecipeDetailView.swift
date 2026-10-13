@@ -17,51 +17,29 @@ struct RecipeDetailView: View {
     @StateObject private var player = YouTubePlayerController()
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
+    @State private var generatingImage = false
     @State private var scrollRequest = 0
     @State private var scrolled: CGFloat = 0
     @State private var topInset: CGFloat = 0
-    @State private var contentWidth: CGFloat = 0
-    @State private var generatingImage = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
 
     var body: some View {
-        ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                topSection.id("hero")
-                Group {
-                    TwoPaneLayout {
-                        ingredients
-                        steps
-                    }
-                    if !recipe.notes.isEmpty {
-                        section("Notes") { Text(recipe.notes).foregroundStyle(.secondary) }
-                    }
-                    if let source = recipe.sourceURL, let url = URL(string: source) {
-                        Link(destination: url) { Label(url.host ?? source, systemImage: "link") }
-                    }
-                }
-                .padding(.horizontal, 24)
-                .frame(maxWidth: 900, alignment: .leading)
-                .frame(maxWidth: .infinity)
+        GeometryReader { geometry in
+            if geometry.size.width >= 760 {
+                twoColumns(width: geometry.size.width)
+            } else {
+                oneColumn
             }
-            .padding(.bottom, 24)
-            .textSelection(.enabled)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
-        .onScrollGeometryChange(for: CGFloat.self) { [playing = player.isPlaying] geometry in
-            playing ? max(0, geometry.contentOffset.y + geometry.contentInsets.top) : 0
-        } action: { _, value in
-            scrolled = value
-        }
-        .onChange(of: scrollRequest) { _, _ in
-            withAnimation { proxy.scrollTo("hero", anchor: .top) }
-        }
-        }
         .background(.background)
+        .onChange(of: cook.isPresented) { _, presented in
+            if presented { player.pause() }
+        }
         .navigationTitle(hasArtwork ? "" : recipe.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -71,14 +49,16 @@ struct RecipeDetailView: View {
                 ToolbarItem { Button("Save Recipe", systemImage: "plus.circle.fill", action: previewSave) }
             } else {
                 ToolbarItemGroup {
-                    Button {
-                        Task { await library.setFavorite(recipe, !recipe.isFavorite) }
-                    } label: {
-                        Label("Favorite", systemImage: recipe.isFavorite ? "heart.fill" : "heart")
+                    if ratingStyle == .favorites {
+                        Button {
+                            Task { await library.setFavorite(recipe, !recipe.isFavorite) }
+                        } label: {
+                            Label("Favorite", systemImage: recipe.isFavorite ? "heart.fill" : "heart")
+                        }
                     }
                     Menu {
-                        Button(recipe.wantToCook ? "Remove from Want to Cook" : "Want to Cook", systemImage: "arrow.right.circle") {
-                            Task { await library.setWantToCook(recipe, !recipe.wantToCook) }
+                        Button(recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next", systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward") {
+                            Task { await library.setQueued(recipe, !recipe.wantToCook) }
                         }
                         if supportsImagePlayground {
                             Button(library.hasImage(recipe.id) ? "Create a New Photo…" : "Create a Photo…", systemImage: "apple.image.playground") {
@@ -103,7 +83,7 @@ struct RecipeDetailView: View {
             }
         }
         .sheet(isPresented: $editing) {
-            RecipeEditorView(recipe: recipe) { saved, image in Task { await library.save(saved, image: image) } }
+            RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {
             Button("OK") { timestampMessage = nil }
@@ -127,107 +107,138 @@ struct RecipeDetailView: View {
         }
     }
 
+    private var oneColumn: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if recipe.youTubeVideoID != nil {
+                        video.padding([.horizontal, .top], 24)
+                    } else if hasArtwork {
+                        compactHero.padding(.top, -topInset)
+                    }
+                    VStack(alignment: .leading, spacing: 24) {
+                        header(showsTitle: !hasArtwork)
+                        TwoPaneLayout {
+                            ingredients
+                            steps
+                        }
+                        footer
+                    }
+                    .padding(24)
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                }
+                .textSelection(.enabled)
+            }
+            .trackingVideoScroll($scrolled, active: player.isPlaying)
+            .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
+        }
+    }
+
+    /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
+    private func twoColumns(width: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        if recipe.youTubeVideoID != nil { video }
+                        header(showsTitle: true)
+                        steps
+                        footer
+                    }
+                    .padding(24)
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                }
+                .trackingVideoScroll($scrolled, active: player.isPlaying)
+                .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
+            }
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if hasArtwork {
+                        Color.clear
+                            .frame(height: 280 + topInset)
+                            .frame(maxWidth: .infinity)
+                            .overlay { artwork }
+                            .clipped()
+                            .padding(.top, -topInset)
+                            .padding(.horizontal, -24)
+                    }
+                    ingredients
+                }
+                .padding(24)
+            }
+            .frame(width: min(420, max(320, width * 0.36)))
+            .background(.quaternary.opacity(0.25))
+        }
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        if !recipe.notes.isEmpty {
+            section("Notes") { Text(recipe.notes).foregroundStyle(.secondary) }
+        }
+        if let source = recipe.sourceURL, let url = URL(string: source) {
+            Link(destination: url) { Label(url.host ?? source, systemImage: "link") }
+        }
+    }
+
+    @ViewBuilder
+    private var video: some View {
+        if let videoID = recipe.youTubeVideoID {
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled)
+                .zIndex(1)
+                .id("video")
+        }
+    }
+
     private var hasArtwork: Bool {
         guard recipe.youTubeVideoID == nil else { return false }
         return previewSave != nil ? previewImage != nil : library.hasImage(recipe.id)
     }
 
-    private var artworkImage: CGImage? {
-        if previewSave != nil {
-            return previewImage.flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: RecipeLibrary.thumbnailSize) }
-        }
-        return library.cachedThumbnail(for: recipe.id)
-    }
-
     @ViewBuilder
     private var artwork: some View {
-        if previewSave != nil, let image = artworkImage {
+        if previewSave != nil, let data = previewImage,
+           let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: RecipeLibrary.thumbnailSize) {
             Image(decorative: image, scale: 1).resizable().scaledToFill()
         } else {
             RecipeImageView(recipe: recipe)
         }
     }
 
-    private var panelColor: Color {
-        (artworkImage.flatMap(AverageColor.of) ?? Theme.accent).mix(with: .black, by: 0.35)
-    }
-
-    @ViewBuilder
-    private var topSection: some View {
-        if let videoID = recipe.youTubeVideoID {
-            VStack(alignment: .leading, spacing: 24) {
-                YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled)
-                    .zIndex(1)
-                titleBlock(onImage: false)
-            }
-            .padding(24)
-            .frame(maxWidth: 900, alignment: .leading)
-            .frame(maxWidth: .infinity)
-        } else if hasArtwork {
-            Group {
-                if contentWidth >= 700 { splitHero } else { compactHero }
-            }
-            .padding(.top, -topInset)
-        } else {
-            titleBlock(onImage: false)
-                .padding(24)
-                .frame(maxWidth: 900, alignment: .leading)
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var splitHero: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                titleBlock(onImage: true)
-            }
-            .padding(.top, topInset + 16).padding([.horizontal, .bottom], 24)
-            .frame(width: contentWidth * 0.44)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .background(LinearGradient(colors: [panelColor, panelColor.mix(with: .black, by: 0.3)], startPoint: .top, endPoint: .bottom))
-            .environment(\.colorScheme, .dark)
-            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay { artwork }
-                .clipped()
-        }
-        .frame(height: max(440, topInset + 400))
-    }
-
     private var compactHero: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Color.clear
-                .frame(height: 320 + topInset)
-                .frame(maxWidth: .infinity)
-                .overlay { artwork }
-                .clipped()
-                .overlay(alignment: .bottomLeading) {
-                    LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
-                        .allowsHitTesting(false)
-                }
-                .overlay(alignment: .bottomLeading) {
-                    Text(recipe.title)
-                        .font(.system(.largeTitle, design: .serif, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(20)
-                }
-            titleBlock(onImage: false, showsTitle: false).padding(.horizontal, 24)
-        }
+        Color.clear
+            .frame(height: 320 + topInset)
+            .frame(maxWidth: .infinity)
+            .overlay { artwork }
+            .clipped()
+            .overlay(alignment: .bottomLeading) {
+                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .bottomLeading) {
+                Text(recipe.title)
+                    .font(.system(.largeTitle, design: .serif, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(20)
+            }
     }
 
-    private func titleBlock(onImage: Bool, showsTitle: Bool = true) -> some View {
+    private func header(showsTitle: Bool) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             if showsTitle {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(recipe.title).font(.system(.largeTitle, design: .serif, weight: .bold))
-                    if let host = recipe.sourceURL.flatMap({ URL(string: $0)?.host }) {
-                        Text(host).font(.subheadline).foregroundStyle(.secondary)
-                    }
-                }
+                Text(recipe.title).font(.system(.largeTitle, design: .serif, weight: .bold))
             }
             statsRow
-            if previewSave == nil { actionTiles(onImage: onImage) }
+            if ratingStyle == .stars, previewSave == nil {
+                StarRatingView(rating: recipe.rating) { value in Task { await library.setRating(recipe, value) } }
+            }
+            if previewSave == nil { actionTiles }
             if !recipe.summary.isEmpty {
-                Text(recipe.summary).font(.callout).foregroundStyle(onImage ? .white.opacity(0.85) : .secondary)
+                Text(recipe.summary).font(.callout).foregroundStyle(.secondary)
             }
             if !recipe.tags.isEmpty {
                 ChipFlow(spacing: 8) {
@@ -235,13 +246,12 @@ struct RecipeDetailView: View {
                         Text(CategoryTree.displayName(tag))
                             .font(.caption.weight(.medium))
                             .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(onImage ? Color.white.opacity(0.2) : Theme.accent.opacity(0.12), in: Capsule())
-                            .foregroundStyle(onImage ? Color.white : Theme.accent)
+                            .background(Theme.accent.opacity(0.12), in: Capsule())
+                            .foregroundStyle(Theme.accent)
                     }
                 }
             }
         }
-        .foregroundStyle(onImage ? Color.white : Color.primary)
     }
 
     @ViewBuilder
@@ -256,7 +266,7 @@ struct RecipeDetailView: View {
                 ForEach(stats.indices, id: \.self) { index in
                     if index > 0 { Divider().frame(height: 34).padding(.horizontal, 14) }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(stats[index].0).font(.caption).opacity(0.7)
+                        Text(stats[index].0).font(.caption).foregroundStyle(.secondary)
                         Text(stats[index].1).font(.title3.weight(.medium))
                     }
                 }
@@ -271,27 +281,30 @@ struct RecipeDetailView: View {
         return rest == 0 ? "\(hours) hr" : "\(hours) hr \(rest) min"
     }
 
-    private func actionTiles(onImage: Bool) -> some View {
+    private var actionTiles: some View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
-                tile("Cook", systemImage: "frying.pan", onImage: onImage) { cook.start(recipe) }
+                tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
                     .disabled(recipe.steps.isEmpty)
-                tile("Groceries", systemImage: "checklist", onImage: onImage) { addingToGroceries = true }
+                tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
                     .disabled(recipe.ingredients.isEmpty)
-                tile("Calendar", systemImage: "calendar.badge.plus", onImage: onImage) { addingToCalendar = true }
+                tile("Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
             }
         }
     }
 
-    private func tile(_ title: String, systemImage: String, onImage: Bool, action: @escaping () -> Void) -> some View {
+    private func tile(_ title: String, systemImage: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: systemImage).font(.title3)
                 Text(title).font(.caption.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(onImage ? Color.white : Theme.accent)
-            .glassEffect(onImage ? .regular.interactive() : .regular.tint(Theme.accent.opacity(0.1)).interactive(), in: RoundedRectangle(cornerRadius: 18))
+            .foregroundStyle(prominent ? Color.white : Theme.accent)
+            .glassEffect(
+                prominent ? .regular.tint(Theme.accent).interactive() : .regular.tint(Theme.accent.opacity(0.1)).interactive(),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -299,21 +312,29 @@ struct RecipeDetailView: View {
     private var ingredients: some View {
         section("Ingredients") {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { index, text in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
-                        Text(text)
-                            .strikethrough(checkedIngredients.contains(index))
-                            .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
-                            .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
+                ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
+                    if let title = group.title {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.top, 6)
+                            .accessibilityAddTraits(.isHeader)
                     }
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggle(&checkedIngredients, index) }
-                    .accessibilityAddTraits(.isButton)
+                    ForEach(group.items, id: \.index) { index, text in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
+                            IngredientLine(text: text)
+                                .strikethrough(checkedIngredients.contains(index))
+                                .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                        .contentShape(Rectangle())
+                        .onTapGesture { toggle(&checkedIngredients, index) }
+                        .accessibilityAddTraits(.isButton)
+                    }
                 }
             }
         }
@@ -323,7 +344,7 @@ struct RecipeDetailView: View {
         section("Directions") {
             VStack(alignment: .leading, spacing: 22) {
                 ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, text in
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("STEP \(index + 1)")
                                 .font(.footnote.weight(.bold))
@@ -351,6 +372,8 @@ struct RecipeDetailView: View {
                             .font(.system(.body, design: .serif))
                             .foregroundStyle(doneSteps.contains(index) ? .secondary : .primary)
                             .multilineTextAlignment(.leading)
+                        StepIngredientChips(recipe: recipe, step: index)
+                        if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
                     }
                     .contentShape(Rectangle())
                     .onTapGesture { toggle(&doneSteps, index) }
@@ -399,7 +422,7 @@ struct AddToCalendarSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add to Calendar")
+            .navigationTitle("Add to Planner")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -416,5 +439,16 @@ struct AddToCalendarSheet: View {
         #if os(macOS)
         .frame(minWidth: 380, minHeight: 240)
         #endif
+    }
+}
+
+private extension View {
+    /// Reports how far a scroll view has moved past its resting position, but only while a video is playing.
+    func trackingVideoScroll(_ scrolled: Binding<CGFloat>, active: Bool) -> some View {
+        onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
+            active ? max(0, geometry.contentOffset.y + geometry.contentInsets.top) : 0
+        } action: { _, value in
+            scrolled.wrappedValue = value
+        }
     }
 }

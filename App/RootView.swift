@@ -18,8 +18,17 @@ struct RootView: View {
     @State private var query: String
     private let calendarMode: CalendarMode
     private let showsAddSheet: Bool
+    private let recipesPath: [RecipesRoute]
+    private let recipeSelection: Recipe.ID?
+    private let recipesCollection: RecipeCollection
 
-    init(tab: AppTab = .recipes, searchQuery: String = "", calendarMode: CalendarMode = .agenda, showsAddSheet: Bool = false) {
+    init(
+        tab: AppTab = .recipes, searchQuery: String = "", calendarMode: CalendarMode = .agenda, showsAddSheet: Bool = false,
+        recipesPath: [RecipesRoute] = [], recipeSelection: Recipe.ID? = nil, recipesCollection: RecipeCollection = .all
+    ) {
+        self.recipesCollection = recipesCollection
+        self.recipesPath = recipesPath
+        self.recipeSelection = recipeSelection
         _tab = State(initialValue: tab)
         _query = State(initialValue: searchQuery)
         self.calendarMode = calendarMode
@@ -28,8 +37,8 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab() }
-            Tab("Calendar", systemImage: "calendar", value: AppTab.calendar) { CalendarTab(mode: calendarMode, showsAddSheet: showsAddSheet) }
+            Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+            Tab("Planner", systemImage: "calendar", value: AppTab.calendar) { CalendarTab(mode: calendarMode, showsAddSheet: showsAddSheet) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             Tab(value: AppTab.search, role: .search) { SearchTab(query: $query) }
         }
@@ -46,7 +55,9 @@ struct SearchTab: View {
     @Binding var query: String
     @State private var path: [UUID] = []
 
-    private var results: [Recipe] { library.recipes.filter { $0.matches(query) } }
+    private var results: [Recipe] {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : library.recipes.filter { $0.matches(query) }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -74,24 +85,72 @@ struct SearchTab: View {
 struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
-    @State private var collection = RecipeCollection.all
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
+    @State private var sidebarSelection: RecipeCollection?
+
+    init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
+        _path = State(initialValue: path)
+        _selection = State(initialValue: selection)
+        _sidebarSelection = State(initialValue: collection)
+    }
 
     var body: some View {
+        Group {
+            if sizeClass == .regular { columns } else { stack }
+        }
+        .onChange(of: router.recipeID, initial: true) { _, id in
+            guard let id else { return }
+            if sizeClass == .regular {
+                sidebarSelection = .all
+                selection = id
+            } else {
+                path = [.recipe(id)]
+            }
+            router.recipeID = nil
+        }
+    }
+
+    /// iPhone: home, then folders, then a recipe, each pushed onto one stack.
+    private var stack: some View {
+        NavigationStack(path: $path) {
+            RecipesHomeView(selection: $selection)
+                .navigationDestination(for: RecipesRoute.self) { destination($0) }
+        }
+        .onChange(of: selection) { _, id in
+            guard let id else { return }
+            path.append(.recipe(id))
+            selection = nil
+        }
+    }
+
+    /// iPad: collections and categories, the recipes in the one you pick, and the recipe itself.
+    private var columns: some View {
         NavigationSplitView {
-            RecipeListView(collection: $collection, selection: $selection, showsCollectionMenu: true)
-                .onChange(of: router.recipeID, initial: true) { _, id in
-                    guard let id else { return }
-                    collection = .all
-                    selection = id
-                    router.recipeID = nil
-                }
+            RecipesSidebar(selection: $sidebarSelection)
+        } content: {
+            RecipeListView(
+                collection: Binding(get: { sidebarSelection ?? .all }, set: { sidebarSelection = $0 }),
+                selection: $selection, showsFolders: false
+            )
+            .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
         } detail: {
             if let recipe = library.recipe(id: selection) {
                 RecipeDetailView(recipe: recipe).id(recipe.id)
             } else {
                 ContentUnavailableView("Select a recipe", systemImage: "fork.knife")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: RecipesRoute) -> some View {
+        switch route {
+        case .collection(let collection):
+            RecipeListView(collection: .constant(collection), selection: $selection)
+        case .recipe(let id):
+            if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
         }
     }
 }
@@ -116,11 +175,14 @@ struct CalendarTab: View {
     var body: some View {
         if sizeClass == .regular {
             NavigationSplitView {
-                if mode == .agenda {
-                    CalendarView(open: { selection = $0 }, mode: $mode)
-                } else {
-                    RecipeDrawer(mode: optionalMode)
+                Group {
+                    if mode == .agenda {
+                        CalendarView(open: { selection = $0 }, mode: $mode)
+                    } else {
+                        RecipeDrawer(mode: optionalMode)
+                    }
                 }
+                .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 460)
             } detail: {
                 if mode == .planner {
                     WeekPlannerView(open: { selection = $0; mode = .agenda }, mode: $mode)
@@ -199,7 +261,7 @@ struct RootView: View {
         } content: {
             switch section ?? .recipes(.all) {
             case .recipes:
-                RecipeListView(collection: $collection, selection: $selection, showsCollectionMenu: false)
+                RecipeListView(collection: $collection, selection: $selection)
             case .feed(let id):
                 if let feed = library.feeds.first(where: { $0.id == id }) {
                     FeedEntriesList(feed: feed, selection: $entrySelection).id(feed.id)
@@ -246,6 +308,7 @@ struct RootView: View {
 
 struct SidebarView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @Binding var section: AppSection?
     @Binding var addingFeed: Bool
     @State private var collapsed: Set<String> = []
@@ -254,7 +317,7 @@ struct SidebarView: View {
         List(selection: $section) {
             Section {
                 row(.all)
-                ForEach(RecipeCollection.smart, id: \.self) { row($0) }
+                ForEach(RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites), id: \.self) { row($0) }
                 ForEach(library.categoryTree) { categoryRows($0) }
             } header: {
                 Text("Recipes").font(.system(.title2, design: .serif, weight: .bold)).foregroundStyle(.primary)
@@ -274,7 +337,7 @@ struct SidebarView: View {
             }
             }
             Section {
-                Label("Calendar", systemImage: "calendar").tag(AppSection.calendar)
+                Label("Planner", systemImage: "calendar").tag(AppSection.calendar)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
             }
         }
