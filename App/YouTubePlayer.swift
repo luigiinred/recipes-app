@@ -6,6 +6,7 @@ import WebKit
 final class YouTubePlayerController: ObservableObject {
     @Published private(set) var isShown = false
     @Published private(set) var errorMessage: String?
+    @Published fileprivate(set) var isPlaying = false
     private(set) var startSeconds = 0
     fileprivate weak var webView: WKWebView?
     fileprivate var isReady = false
@@ -74,6 +75,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
             playerVars: { playsinline: 1, autoplay: 1, start: \(start), rel: 0, origin: '\(origin)', widget_referrer: '\(origin)' },
             events: {
               onReady: function() { window.webkit.messageHandlers.player.postMessage('ready'); },
+              onStateChange: function(e) { window.webkit.messageHandlers.player.postMessage('state:' + e.data); },
               onError: function(e) { window.webkit.messageHandlers.player.postMessage('error:' + e.data); }
             }
           });
@@ -92,6 +94,9 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
             Task { @MainActor in
                 if body == "ready" {
                     controller.isReady = true
+                } else if body.hasPrefix("state:") {
+                    // 1 = playing, 3 = buffering
+                    controller.isPlaying = ["1", "3"].contains(body.dropFirst("state:".count))
                 } else if body.hasPrefix("error:") {
                     let code = String(body.dropFirst("error:".count))
                     controller.fail("This video can't be played inside the app (error \(code)). Use Open in YouTube.")
@@ -114,8 +119,22 @@ struct YouTubeEmbed: View {
     @ObservedObject var controller: YouTubePlayerController
     /// Where the video starts when the poster is tapped.
     var startAt = 0
+    /// How far the page has scrolled past its resting position; the video shrinks and pins to the top while playing.
+    var scrolled: CGFloat = 0
+    /// A small player without the "Open in YouTube" row.
+    var isCompact = false
+    @State private var width: CGFloat = 0
+
+    private static let pinMargin: CGFloat = 8
+    private static let shrinkDistance: CGFloat = 160
+
+    private var miniScale: CGFloat {
+        guard width > 0 else { return 1 }
+        return min(1, (width < 500 ? 168 : 280) / width)
+    }
 
     var body: some View {
+        let progress = controller.isPlaying ? min(1, max(0, scrolled / Self.shrinkDistance)) : 0
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 if controller.isShown {
@@ -127,12 +146,16 @@ struct YouTubeEmbed: View {
             .aspectRatio(16 / 9, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : 16 - 8 * progress))
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .scaleEffect(1 - (1 - miniScale) * progress, anchor: .topTrailing)
+            .offset(y: controller.isPlaying ? max(0, scrolled - Self.pinMargin) : 0)
+            .shadow(color: .black.opacity(isCompact ? 0.25 : 0.3 * progress), radius: isCompact ? 8 : 10 * progress, y: 4)
 
             if let message = controller.errorMessage {
                 Label(message, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
             }
-            if let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
+            if !isCompact, let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
                 Link(destination: url) { Label("Open in YouTube", systemImage: "arrow.up.right.square") }
                     .font(.footnote)
                     .foregroundStyle(Theme.accent)
@@ -149,7 +172,7 @@ struct YouTubeEmbed: View {
                     Color.black
                 }
                 Image(systemName: "play.circle.fill")
-                    .font(.system(size: 64))
+                    .font(.system(size: isCompact ? 32 : 64))
                     .foregroundStyle(.white)
                     .shadow(radius: 8)
             }

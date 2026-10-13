@@ -18,6 +18,9 @@ struct RecipeDetailView: View {
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
     @State private var generatingImage = false
+    @State private var scrollRequest = 0
+    @State private var scrolled: CGFloat = 0
+    @State private var topInset: CGFloat = 0
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
@@ -25,15 +28,6 @@ struct RecipeDetailView: View {
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
 
     var body: some View {
-        VStack(spacing: 0) {
-        if let videoID = recipe.youTubeVideoID {
-            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player)
-                .frame(maxWidth: 640)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(.bar)
-        }
         GeometryReader { geometry in
             if geometry.size.width >= 760 {
                 twoColumns(width: geometry.size.width)
@@ -41,12 +35,12 @@ struct RecipeDetailView: View {
                 oneColumn
             }
         }
-        }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .background(.background)
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }
         }
-        .navigationTitle(recipe.title)
+        .navigationTitle(hasArtwork ? "" : recipe.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -114,40 +108,63 @@ struct RecipeDetailView: View {
     }
 
     private var oneColumn: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                hero
-                header
-                TwoPaneLayout {
-                    ingredients
-                    steps
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if recipe.youTubeVideoID != nil {
+                        video.padding([.horizontal, .top], 24)
+                    } else if hasArtwork {
+                        compactHero.padding(.top, -topInset)
+                    }
+                    VStack(alignment: .leading, spacing: 24) {
+                        header(showsTitle: !hasArtwork)
+                        TwoPaneLayout {
+                            ingredients
+                            steps
+                        }
+                        footer
+                    }
+                    .padding(24)
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
-                footer
+                .textSelection(.enabled)
             }
-            .padding(24)
-            .frame(maxWidth: 900, alignment: .leading)
-            .frame(maxWidth: .infinity)
-            .textSelection(.enabled)
+            .trackingVideoScroll($scrolled, active: player.isPlaying)
+            .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
         }
     }
 
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
     private func twoColumns(width: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    header
-                    steps
-                    footer
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        if recipe.youTubeVideoID != nil { video }
+                        header(showsTitle: true)
+                        steps
+                        footer
+                    }
+                    .padding(24)
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(24)
-                .frame(maxWidth: 720, alignment: .leading)
-                .frame(maxWidth: .infinity)
+                .trackingVideoScroll($scrolled, active: player.isPlaying)
+                .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
             }
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    hero
+                    if hasArtwork {
+                        Color.clear
+                            .frame(height: 280 + topInset)
+                            .frame(maxWidth: .infinity)
+                            .overlay { artwork }
+                            .clipped()
+                            .padding(.top, -topInset)
+                            .padding(.horizontal, -24)
+                    }
                     ingredients
                 }
                 .padding(24)
@@ -169,54 +186,62 @@ struct RecipeDetailView: View {
     }
 
     @ViewBuilder
-    private var hero: some View {
-        if recipe.youTubeVideoID != nil {
-            EmptyView()
-        } else if previewSave != nil, let data = previewImage, let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: RecipeLibrary.thumbnailSize) {
-            Image(decorative: image, scale: 1).resizable().scaledToFill()
-                .aspectRatio(2, contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 320)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-        } else if previewSave == nil, library.hasImage(recipe.id) {
-            RecipeImageView(recipe: recipe)
-                .aspectRatio(2, contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 320)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+    private var video: some View {
+        if let videoID = recipe.youTubeVideoID {
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled)
+                .zIndex(1)
+                .id("video")
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(recipe.title).font(.system(.largeTitle, design: .serif, weight: .bold))
-            if !recipe.summary.isEmpty {
-                Text(recipe.summary).font(.title3).foregroundStyle(.secondary)
+    private var hasArtwork: Bool {
+        guard recipe.youTubeVideoID == nil else { return false }
+        return previewSave != nil ? previewImage != nil : library.hasImage(recipe.id)
+    }
+
+    @ViewBuilder
+    private var artwork: some View {
+        if previewSave != nil, let data = previewImage,
+           let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: RecipeLibrary.thumbnailSize) {
+            Image(decorative: image, scale: 1).resizable().scaledToFill()
+        } else {
+            RecipeImageView(recipe: recipe)
+        }
+    }
+
+    private var compactHero: some View {
+        Color.clear
+            .frame(height: 320 + topInset)
+            .frame(maxWidth: .infinity)
+            .overlay { artwork }
+            .clipped()
+            .overlay(alignment: .bottomLeading) {
+                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
+                    .allowsHitTesting(false)
             }
-            HStack(spacing: 16) {
-                if let servings = recipe.servings { Label("\(servings) servings", systemImage: "person.2") }
-                if let prep = recipe.prepMinutes { Label("Prep \(prep) min", systemImage: "knife") }
-                if let cook = recipe.cookMinutes { Label("Cook \(cook) min", systemImage: "flame") }
+            .overlay(alignment: .bottomLeading) {
+                Text(recipe.title)
+                    .font(.system(.largeTitle, design: .serif, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(20)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+    }
+
+    private func header(showsTitle: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if showsTitle {
+                Text(recipe.title).font(.system(.largeTitle, design: .serif, weight: .bold))
+            }
+            statsRow
             if ratingStyle == .stars, previewSave == nil {
                 StarRatingView(rating: recipe.rating) { value in Task { await library.setRating(recipe, value) } }
             }
-            if previewSave == nil {
-            HStack(spacing: 10) {
-                Button { cook.start(recipe) } label: { Label("Cook", systemImage: "flame") }
-                    .buttonStyle(.glassProminent)
-                    .disabled(recipe.steps.isEmpty)
-                Button { addingToGroceries = true } label: { Label("Groceries", systemImage: "checklist") }
-                    .buttonStyle(.glass)
-                    .disabled(recipe.ingredients.isEmpty)
-                Button { addingToCalendar = true } label: { Label("Plan", systemImage: "calendar.badge.plus") }
-                    .buttonStyle(.glass)
-            }
-            .font(.subheadline.weight(.semibold))
-            .tint(Theme.accent)
+            if previewSave == nil { actionTiles }
+            if !recipe.summary.isEmpty {
+                Text(recipe.summary).font(.callout).foregroundStyle(.secondary)
             }
             if !recipe.tags.isEmpty {
-                HStack {
+                ChipFlow(spacing: 8) {
                     ForEach(recipe.tags, id: \.self) { tag in
                         Text(CategoryTree.displayName(tag))
                             .font(.caption.weight(.medium))
@@ -229,9 +254,64 @@ struct RecipeDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private var statsRow: some View {
+        let stats: [(String, String)] = [
+            recipe.totalMinutes.map { ("Total Time", Self.duration($0)) },
+            recipe.cookMinutes.map { ("Cook Time", Self.duration($0)) },
+            recipe.servings.map { ("Servings", "\($0)") },
+        ].compactMap { $0 }
+        if !stats.isEmpty {
+            HStack(spacing: 0) {
+                ForEach(stats.indices, id: \.self) { index in
+                    if index > 0 { Divider().frame(height: 34).padding(.horizontal, 14) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(stats[index].0).font(.caption).foregroundStyle(.secondary)
+                        Text(stats[index].1).font(.title3.weight(.medium))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    static func duration(_ minutes: Int) -> String {
+        let hours = minutes / 60, rest = minutes % 60
+        if hours == 0 { return "\(rest) min" }
+        return rest == 0 ? "\(hours) hr" : "\(hours) hr \(rest) min"
+    }
+
+    private var actionTiles: some View {
+        GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 10) {
+                tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
+                    .disabled(recipe.steps.isEmpty)
+                tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
+                    .disabled(recipe.ingredients.isEmpty)
+                tile("Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
+            }
+        }
+    }
+
+    private func tile(_ title: String, systemImage: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: systemImage).font(.title3)
+                Text(title).font(.caption.weight(.medium))
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .foregroundStyle(prominent ? Color.white : Theme.accent)
+            .glassEffect(
+                prominent ? .regular.tint(Theme.accent).interactive() : .regular.tint(Theme.accent.opacity(0.1)).interactive(),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var ingredients: some View {
         section("Ingredients") {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
                     if let title = group.title {
                         Text(title)
@@ -243,13 +323,17 @@ struct RecipeDetailView: View {
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
-                                .onTapGesture { toggle(&checkedIngredients, index) }
-                                .accessibilityAddTraits(.isButton)
                             IngredientLine(text: text)
                                 .strikethrough(checkedIngredients.contains(index))
                                 .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
                                 .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
                         }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                        .contentShape(Rectangle())
+                        .onTapGesture { toggle(&checkedIngredients, index) }
+                        .accessibilityAddTraits(.isButton)
                     }
                 }
             }
@@ -257,42 +341,42 @@ struct RecipeDetailView: View {
     }
 
     private var steps: some View {
-        section("Steps") {
-            VStack(alignment: .leading, spacing: 18) {
+        section("Directions") {
+            VStack(alignment: .leading, spacing: 22) {
                 ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, text in
-                    VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text("\(index + 1)")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(doneSteps.contains(index) ? Color.secondary : Theme.accent, in: Circle())
-                            .onTapGesture { toggle(&doneSteps, index) }
-                            .accessibilityAddTraits(.isButton)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("STEP \(index + 1)")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(doneSteps.contains(index) ? Color.secondary : Theme.accent)
+                            if doneSteps.contains(index) {
+                                Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
+                                Button {
+                                    player.play(from: seconds)
+                                    scrollRequest += 1
+                                } label: {
+                                    Label(Recipe.clock(seconds), systemImage: "play.fill")
+                                        .font(.caption.weight(.semibold).monospacedDigit())
+                                        .padding(.horizontal, 9).padding(.vertical, 5)
+                                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(Theme.accent)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Play from \(Recipe.clock(seconds))")
+                            }
+                        }
                         Text(text)
                             .font(.system(.body, design: .serif))
                             .foregroundStyle(doneSteps.contains(index) ? .secondary : .primary)
                             .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
-                        if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
-                            Button {
-                                player.play(from: seconds)
-                            } label: {
-                                Label(Recipe.clock(seconds), systemImage: "play.fill")
-                                    .font(.caption.weight(.semibold).monospacedDigit())
-                                    .padding(.horizontal, 9).padding(.vertical, 5)
-                                    .background(Theme.accent.opacity(0.12), in: Capsule())
-                                    .foregroundStyle(Theme.accent)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Play from \(Recipe.clock(seconds))")
-                        }
+                        StepIngredientChips(recipe: recipe, step: index)
+                        if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
                     }
-                    StepIngredientChips(recipe: recipe, step: index).padding(.leading, 38)
-                    if let imageID = recipe.stepImage(forStep: index) {
-                        StepImageView(id: imageID).padding(.leading, 38)
-                    }
-                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { toggle(&doneSteps, index) }
                 }
             }
         }
@@ -355,5 +439,16 @@ struct AddToCalendarSheet: View {
         #if os(macOS)
         .frame(minWidth: 380, minHeight: 240)
         #endif
+    }
+}
+
+private extension View {
+    /// Reports how far a scroll view has moved past its resting position, but only while a video is playing.
+    func trackingVideoScroll(_ scrolled: Binding<CGFloat>, active: Bool) -> some View {
+        onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
+            active ? max(0, geometry.contentOffset.y + geometry.contentInsets.top) : 0
+        } action: { _, value in
+            scrolled.wrappedValue = value
+        }
     }
 }

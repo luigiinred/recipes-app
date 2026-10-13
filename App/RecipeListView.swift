@@ -365,9 +365,9 @@ struct RecipeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             RecipeImageView(recipe: recipe)
-                .aspectRatio(16 / 10, contentMode: .fit)
+                .aspectRatio(4 / 3, contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(recipe.title).font(.system(.title3, design: .serif, weight: .semibold)).lineLimit(2)
@@ -378,7 +378,7 @@ struct RecipeCard: View {
                 }
                 RecipeMeta(recipe: recipe)
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 4)
         }
     }
 }

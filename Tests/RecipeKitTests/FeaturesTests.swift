@@ -91,6 +91,10 @@ final class CategoryTreeTests: XCTestCase {
         XCTAssertEqual(tree[1].children[0].children.map(\.path), ["Dinner/Mains/Curry"])
     }
 
+    func testTagsFromCommaSeparatedInput() {
+        XCTAssertEqual(CategoryTree.tags(from: " Dinner / Pasta, ,Soup,"), ["Dinner/Pasta", "Soup"])
+    }
+
     func testCategoryFilterIncludesDescendants() {
         let pasta = Recipe(title: "Pasta", tags: ["Dinner/Pasta"])
         let soup = Recipe(title: "Soup", tags: ["Lunch"])

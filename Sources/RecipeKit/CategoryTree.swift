@@ -20,6 +20,11 @@ public enum CategoryTree {
         components(tag).joined(separator: String(separator))
     }
 
+    /// Splits comma-separated input into normalized categories.
+    public static func tags(from input: String) -> [String] {
+        input.split(separator: ",").map { normalized(String($0)) }.filter { !$0.isEmpty }
+    }
+
     public static func displayName(_ tag: String) -> String {
         components(tag).joined(separator: " › ")
     }

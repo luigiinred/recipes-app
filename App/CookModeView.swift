@@ -16,30 +16,46 @@ struct CookModeView: View {
 
     private var recipe: Recipe? { library.recipe(id: session.current) }
 
+    private static let margin: CGFloat = 20
+    private static let timerScheme = "recipes-timer"
+
     var body: some View {
-        GeometryReader { geometry in
-            let wide = geometry.size.width >= 860
-            VStack(spacing: 0) {
-                topBar(showsIngredientsButton: !wide)
-                Divider()
-                if let recipe {
-                    if wide {
-                        HStack(spacing: 0) {
-                            IngredientChecklist(recipe: recipe)
-                                .frame(width: min(340, geometry.size.width * 0.32))
-                            Divider()
-                            stepContent(recipe)
+        NavigationStack {
+            GeometryReader { geometry in
+                let wide = geometry.size.width >= 860
+                let phone = geometry.size.width < 500
+                let short = geometry.size.height < 500
+                Group {
+                    if let recipe {
+                        if wide {
+                            HStack(spacing: 0) {
+                                IngredientChecklist(recipe: recipe)
+                                    .frame(width: min(340, geometry.size.width * 0.32))
+                                Divider()
+                                stepContent(recipe, fontSize: short ? 28 : 36)
+                            }
+                        } else {
+                            stepContent(recipe, fontSize: phone ? 28 : 36)
                         }
                     } else {
-                        stepContent(recipe)
+                        ContentUnavailableView("Nothing to cook", systemImage: "flame",
+                                               description: Text("Add a recipe to start cooking."))
                     }
-                } else {
-                    ContentUnavailableView("Nothing to cook", systemImage: "flame",
-                                           description: Text("Add a recipe to start cooking."))
                 }
-                Divider()
-                TimerStrip(onAdd: { addingTimer = true })
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let recipe, let videoID = recipe.youTubeVideoID {
+                        CookVideo(recipe: recipe, videoID: videoID, step: stepIndex(recipe), width: phone ? 168 : 260)
+                            .id(recipe.id)
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let recipe { controls(recipe, wide: wide, short: short) }
+                }
+                .toolbar { toolbarContent }
             }
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         .background(.background)
         .keepsScreenAwake()
@@ -53,114 +69,141 @@ struct CookModeView: View {
         #endif
     }
 
-    private func topBar(showsIngredientsButton: Bool) -> some View {
-        HStack(spacing: 12) {
-            Button { session.isPresented = false } label: {
-                Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close Cook Mode")
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button(role: .close) { session.isPresented = false }
+                .accessibilityLabel("Close Cook Mode")
+        }
+        ToolbarItem(placement: .principal) { titleView }
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button { addingTimer = true } label: { Label("Add Timer", systemImage: "timer") }
             Menu {
-                ForEach(session.queue, id: \.self) { id in
-                    if let queued = library.recipe(id: id) {
-                        Button { session.current = id } label: {
-                            Label(queued.title, systemImage: id == session.current ? "checkmark" : "")
+                if session.queue.count > 1 {
+                    ForEach(session.queue, id: \.self) { id in
+                        if let queued = library.recipe(id: id) {
+                            Button { session.current = id } label: {
+                                Label(queued.title, systemImage: id == session.current ? "checkmark" : "")
+                            }
                         }
                     }
+                    Divider()
                 }
-                Divider()
                 Button("Add Recipe…", systemImage: "plus") { addingRecipe = true }
                 if let id = session.current {
                     Button("Remove from Cook Mode", systemImage: "minus.circle", role: .destructive) { session.remove(id) }
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(recipe?.title ?? "Cook Mode").font(.system(.headline, design: .serif)).lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            Spacer()
-            if showsIngredientsButton {
-                Button { showingIngredients = true } label: { Label("Ingredients", systemImage: "list.bullet") }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.accent)
-                    .disabled(recipe?.ingredients.isEmpty ?? true)
-            }
+            } label: { Label("More", systemImage: "ellipsis") }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
     }
 
-    private func stepContent(_ recipe: Recipe) -> some View {
+    private var titleView: some View {
+        VStack(spacing: 2) {
+            Text(recipe?.title ?? "Cook Mode").font(.headline).lineLimit(1)
+            if let recipe, recipe.steps.count > 1 {
+                StepDots(count: recipe.steps.count, index: stepIndex(recipe)) { move(recipe, to: $0, count: recipe.steps.count) }
+            }
+        }
+    }
+
+    private func stepIndex(_ recipe: Recipe) -> Int {
+        min(session.stepIndex[recipe.id] ?? 0, max(recipe.steps.count - 1, 0))
+    }
+
+    private func stepContent(_ recipe: Recipe, fontSize: CGFloat) -> some View {
         let steps = recipe.steps
-        let index = min(session.stepIndex[recipe.id] ?? 0, max(steps.count - 1, 0))
-        return VStack(spacing: 0) {
+        return Group {
             if steps.isEmpty {
                 ContentUnavailableView("No steps", systemImage: "list.number")
             } else {
-                if let videoID = recipe.youTubeVideoID {
-                    CookVideo(recipe: recipe, videoID: videoID, step: index).id(recipe.id)
-                    Divider()
-                }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        Text("STEP \(index + 1) OF \(steps.count)")
-                            .font(.subheadline.weight(.semibold)).tracking(1.5).foregroundStyle(Theme.accent)
-                        Text(steps[index])
-                            .font(.system(size: 34, weight: .regular, design: .serif))
-                            .lineSpacing(8)
-                            .fixedSize(horizontal: false, vertical: true)
-                        CookStepIngredients(recipe: recipe, step: index)
-                        if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
-                        durationButtons(for: steps[index], recipe: recipe, step: index)
+                #if os(iOS)
+                TabView(selection: Binding(get: { stepIndex(recipe) }, set: { move(recipe, to: $0, count: steps.count) })) {
+                    ForEach(steps.indices, id: \.self) { index in
+                        stepPage(recipe, index: index, fontSize: fontSize).tag(index)
                     }
-                    .padding(28)
-                    .frame(maxWidth: 820, alignment: .leading)
-                    .frame(maxWidth: .infinity)
                 }
-                .gesture(DragGesture(minimumDistance: 40).onEnded { value in
-                    if value.translation.width < -40 { move(recipe, to: index + 1, count: steps.count) }
-                    if value.translation.width > 40 { move(recipe, to: index - 1, count: steps.count) }
-                })
-                HStack(spacing: 16) {
-                    Button { move(recipe, to: index - 1, count: steps.count) } label: {
-                        Label("Previous", systemImage: "chevron.left").frame(maxWidth: .infinity)
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                #else
+                stepPage(recipe, index: stepIndex(recipe), fontSize: fontSize)
+                    .background {
+                        Button("Previous Step") { move(recipe, to: stepIndex(recipe) - 1, count: steps.count) }
+                            .keyboardShortcut(.leftArrow, modifiers: []).opacity(0)
+                        Button("Next Step") { move(recipe, to: stepIndex(recipe) + 1, count: steps.count) }
+                            .keyboardShortcut(.rightArrow, modifiers: []).opacity(0)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(index == 0)
-                    Button {
-                        if index == steps.count - 1 { session.isPresented = false } else { move(recipe, to: index + 1, count: steps.count) }
-                    } label: {
-                        Label(index == steps.count - 1 ? "Done" : "Next", systemImage: index == steps.count - 1 ? "checkmark" : "chevron.right")
-                            .labelStyle(.titleAndIcon).frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.rightArrow, modifiers: [])
-                }
-                .controlSize(.large)
-                .padding(20)
+                #endif
             }
         }
     }
 
-    @ViewBuilder
-    private func durationButtons(for text: String, recipe: Recipe, step: Int) -> some View {
-        let found = DurationDetector.find(in: text)
-        if !found.isEmpty {
-            HStack {
-                ForEach(found, id: \.self) { duration in
-                    Button {
-                        timers.start(label: "\(recipe.title) · step \(step + 1)", seconds: duration.seconds)
-                    } label: {
-                        Label("Start \(duration.text) timer", systemImage: "timer")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+    private func stepPage(_ recipe: Recipe, index: Int, fontSize: CGFloat) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Step \(index + 1) of \(recipe.steps.count)")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                timerHighlighted(recipe.steps[index])
+                    .font(.system(size: fontSize))
+                    .lineSpacing(fontSize * 0.25)
+                    .fixedSize(horizontal: false, vertical: true)
                     .tint(Theme.accent)
+                    .textRenderer(TimerPillRenderer())
+                    .environment(\.openURL, OpenURLAction { url in
+                        guard url.scheme == Self.timerScheme,
+                              let seconds = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                                .queryItems?.first(where: { $0.name == "seconds" })?.value.flatMap(Int.init)
+                        else { return .systemAction }
+                        timers.start(label: "\(recipe.title) · step \(index + 1)", seconds: seconds)
+                        return .handled
+                    })
+                CookStepIngredients(recipe: recipe, step: index)
+                if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
+            }
+            .padding(.horizontal, Self.margin)
+            .padding(.top, 12)
+            .padding(.bottom, 20)
+            .frame(maxWidth: 820, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func timerHighlighted(_ text: String) -> Text {
+        var parts: [Text] = []
+        var cursor = text.startIndex
+        for duration in DurationDetector.find(in: text) {
+            guard let range = text.range(of: duration.text, range: cursor..<text.endIndex) else { continue }
+            parts.append(Text(String(text[cursor..<range.lowerBound])))
+            let label = duration.text.replacingOccurrences(of: " ", with: "\u{00A0}")
+            var pill = AttributedString("\u{00A0}\u{23F2}\u{FE0E}\u{00A0}\(label)\u{00A0}")
+            pill.link = URL(string: "\(Self.timerScheme)://start?seconds=\(duration.seconds)")
+            pill.foregroundColor = Theme.accent
+            parts.append(Text(pill).customAttribute(TimerPill()))
+            cursor = range.upperBound
+        }
+        parts.append(Text(String(text[cursor...])))
+        return parts.dropFirst().reduce(parts[0]) { Text("\($0)\($1)") }
+    }
+
+    @ViewBuilder
+    private func controls(_ recipe: Recipe, wide: Bool, short: Bool) -> some View {
+        let showsTimers = !timers.timers.isEmpty
+        if showsTimers || !wide {
+            ZStack(alignment: .bottomTrailing) {
+                if showsTimers {
+                    TimerStrip().padding(.trailing, wide ? 0 : 72)
+                }
+                if !wide {
+                    Button { showingIngredients = true } label: {
+                        Image(systemName: "checklist.checked").font(.title3.weight(.semibold)).frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.extraLarge)
+                    .disabled(recipe.ingredients.isEmpty)
+                    .accessibilityLabel("Ingredients")
                 }
             }
+            .padding(.horizontal, Self.margin)
+            .padding(.bottom, 8)
         }
     }
 
@@ -169,41 +212,78 @@ struct CookModeView: View {
     }
 }
 
-/// The recipe's video, pinned above the steps. Once it is open it jumps to each step's moment as you move through them.
+private struct TimerPill: TextAttribute {}
+
+private struct TimerPillRenderer: TextRenderer {
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        for line in layout {
+            let pill = line.filter { $0[TimerPill.self] != nil }.map(\.typographicBounds.rect)
+            if let first = pill.first {
+                let rect = pill.dropFirst().reduce(first) { $0.union($1) }.insetBy(dx: 0, dy: -2)
+                context.fill(Path(roundedRect: rect, cornerRadius: rect.height / 2), with: .color(Theme.accent.opacity(0.14)))
+            }
+            for run in line { context.draw(run) }
+        }
+    }
+}
+
+private struct StepDots: View {
+    let count: Int
+    let index: Int
+    let select: (Int) -> Void
+
+    private var visible: Range<Int> {
+        let window = 9
+        guard count > window else { return 0..<count }
+        let start = min(max(index - window / 2, 0), count - window)
+        return start..<(start + window)
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(visible, id: \.self) { step in
+                Button { select(step) } label: {
+                    Circle()
+                        .fill(step == index ? Color.primary : Color.secondary.opacity(0.35))
+                        .frame(width: 6, height: 6)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Step \(step + 1)")
+            }
+        }
+    }
+}
+
+/// The recipe's video as a small player in the corner. Once it is open it jumps to each step's moment as you move through them.
 struct CookVideo: View {
     let recipe: Recipe
     let videoID: String
     let step: Int
+    let width: CGFloat
     @StateObject private var player = YouTubePlayerController()
 
     var body: some View {
-        YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, startAt: recipe.timestamp(forStep: step) ?? 0)
-            .frame(maxWidth: 560)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .onChange(of: step) { _, new in
-                if player.isShown, let seconds = recipe.timestamp(forStep: new) { player.play(from: seconds) }
-            }
+        HStack {
+            Spacer(minLength: 0)
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, startAt: recipe.timestamp(forStep: step) ?? 0, isCompact: true)
+                .frame(width: width)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
+        .onChange(of: step) { _, new in
+            if player.isShown, let seconds = recipe.timestamp(forStep: new) { player.play(from: seconds) }
+        }
     }
 }
 
 struct TimerStrip: View {
     @EnvironmentObject private var timers: TimerCenter
     @Environment(\.referenceDate) private var referenceDate
-    let onAdd: () -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                Button(action: onAdd) {
-                    Label("Timer", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(Theme.accent.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.accent)
+            HStack(spacing: 8) {
                 ForEach(timers.timers) { timer in
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         TimerChip(timer: timer, remaining: timer.remaining(at: referenceDate ?? context.date)) {
@@ -212,8 +292,7 @@ struct TimerStrip: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, 2)
         }
     }
 }
@@ -225,12 +304,13 @@ private struct TimerChip: View {
 
     var body: some View {
         let done = remaining == 0
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(timer.label).font(.caption).foregroundStyle(done ? .white.opacity(0.85) : .secondary).lineLimit(1)
-                Text(done ? "Done" : formatTimer(remaining))
-                    .font(.system(.title3, design: .rounded, weight: .semibold)).monospacedDigit()
-            }
+        HStack(spacing: 8) {
+            Text(done ? "Done" : formatTimer(remaining))
+                .font(.system(.headline, design: .rounded, weight: .semibold)).monospacedDigit()
+            Text(timer.label)
+                .font(.caption).lineLimit(1)
+                .foregroundStyle(done ? .white.opacity(0.85) : .secondary)
+                .frame(maxWidth: 120, alignment: .leading)
             Button(action: dismiss) { Image(systemName: "xmark.circle.fill") }
                 .buttonStyle(.plain)
                 .opacity(0.7)
@@ -238,8 +318,7 @@ private struct TimerChip: View {
         }
         .foregroundStyle(done ? .white : .primary)
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .frame(maxWidth: 240)
-        .background(done ? Theme.accent : Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+        .glassEffect(done ? .regular.tint(Theme.accent) : .regular, in: Capsule())
     }
 }
 
