@@ -107,10 +107,8 @@ public enum RecipeImporter {
     private static func makeRecipe(from object: [String: Any], sourceURL: URL?) -> Recipe? {
         guard let title = text(object["name"]), !title.isEmpty else { return nil }
         let ingredients = strings(object["recipeIngredient"] ?? object["ingredients"])
-        let keywords = (text(object["keywords"]) ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        let categories = strings(object["recipeCategory"])
         var tags: [String] = []
-        for tag in categories + keywords where !tag.isEmpty && !tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+        for tag in strings(object["recipeCategory"]) where !tag.isEmpty && !tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
             tags.append(tag)
         }
         return Recipe(
@@ -121,7 +119,7 @@ public enum RecipeImporter {
             cookMinutes: minutes(from: object["cookTime"]),
             ingredients: ingredients,
             steps: instructions(object["recipeInstructions"]),
-            tags: Array(tags.prefix(8)),
+            tags: Array(tags.prefix(3)),
             sourceURL: sourceURL?.absoluteString,
             imageURL: imageString(object["image"])
         )

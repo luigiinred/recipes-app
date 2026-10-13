@@ -28,7 +28,7 @@ struct RecipeEditorView: View {
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
-    @State private var tags: String
+    @State private var tags: [String]
     @State private var source: String
     @State private var notes: String
 
@@ -55,7 +55,7 @@ struct RecipeEditorView: View {
         _steps = State(initialValue: recipe.steps.enumerated().map { index, text in
             EditableLine(text: text, time: recipe.timestamp(forStep: index).map(Recipe.clock) ?? "")
         })
-        _tags = State(initialValue: recipe.tags.joined(separator: ", "))
+        _tags = State(initialValue: recipe.tags)
         _source = State(initialValue: recipe.sourceURL ?? "")
         _notes = State(initialValue: recipe.notes)
     }
@@ -90,9 +90,11 @@ struct RecipeEditorView: View {
                 Section {
                     Toggle(isOn: $isFavorite) { Label("Favorite", systemImage: "heart") }
                     Toggle(isOn: $wantToCook) { Label("Want to Cook", systemImage: "arrow.right.circle") }
-                    TextField("Categories (comma separated)", text: $tags)
+                }
+                Section {
+                    TagEditor(tags: $tags)
                 } header: {
-                    Text("Organize")
+                    Text("Categories")
                 } footer: {
                     Text("Use a slash to nest a category, like Dinner/Pasta.")
                 }
@@ -269,7 +271,7 @@ struct RecipeEditorView: View {
         let kept = keptSteps()
         recipe.steps = kept.map(\.text)
         recipe.stepTimestamps = kept.contains { $0.seconds != nil } ? kept.map(\.seconds) : []
-        recipe.tags = tags.split(separator: ",").map { CategoryTree.normalized(String($0)) }.filter { !$0.isEmpty }
+        recipe.tags = tags
         let trimmedSource = source.trimmingCharacters(in: .whitespaces)
         recipe.sourceURL = trimmedSource.isEmpty ? nil : trimmedSource
         recipe.notes = notes

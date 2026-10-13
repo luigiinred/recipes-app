@@ -256,23 +256,30 @@ struct CollectionStrip: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 14) {
                     ForEach(pages, id: \.self) { page in
                         let selected = page == selection
                         Button {
                             withAnimation(.snappy) { selection = page }
                         } label: {
-                            Label(page.title, systemImage: page.symbol)
-                                .font(.subheadline.weight(.medium))
-                                .padding(.horizontal, 14).padding(.vertical, 8)
-                                .glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.35)).interactive() : .regular.interactive(), in: Capsule())
+                            VStack(spacing: 6) {
+                                Image(systemName: page.symbol)
+                                    .font(.title3)
+                                    .frame(width: 52, height: 52)
+                                    .glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.4)).interactive() : .regular.interactive(), in: Circle())
+                                Text(page.title)
+                                    .font(.caption.weight(selected ? .semibold : .regular))
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 68)
+                            .foregroundStyle(selected ? Theme.accent : .primary)
                         }
                         .buttonStyle(.plain)
                         .id(page)
                         .accessibilityAddTraits(selected ? .isSelected : [])
                     }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 8)
+                .padding(.horizontal, 16).padding(.vertical, 6)
             }
             .onChange(of: selection) { _, new in
                 withAnimation(.snappy) { proxy.scrollTo(new, anchor: .center) }
@@ -329,20 +336,26 @@ struct RecipeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             RecipeImageView(recipe: recipe)
-                .aspectRatio(16 / 10, contentMode: .fit)
+                .aspectRatio(4 / 3, contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(recipe.title).font(.system(.title3, design: .serif, weight: .semibold)).lineLimit(2)
-                    RecipeBadges(recipe: recipe)
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .overlay(alignment: .topTrailing) {
+                    if recipe.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.subheadline).foregroundStyle(Theme.accent)
+                            .frame(width: 34, height: 34)
+                            .glassEffect(.regular, in: Circle())
+                            .padding(10)
+                    }
                 }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recipe.title).font(.system(.title3, design: .serif, weight: .semibold)).lineLimit(2)
                 if !recipe.summary.isEmpty {
                     Text(recipe.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 RecipeMeta(recipe: recipe)
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 4)
         }
     }
 }

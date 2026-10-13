@@ -41,7 +41,7 @@ final class ShareModel: ObservableObject {
     func save() async {
         guard var result, let library else { return }
         state = .saving
-        let typed = newCategory.split(separator: ",").map { CategoryTree.normalized(String($0)) }.filter { !$0.isEmpty }
+        let typed = CategoryTree.tags(from: newCategory)
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         result.recipe.title = trimmed.isEmpty ? result.recipe.title : trimmed
         result.recipe.tags = selected.sorted() + typed.filter { !selected.contains($0) }

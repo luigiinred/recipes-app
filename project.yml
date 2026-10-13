@@ -20,7 +20,7 @@ targets:
   Recipes:
     type: application
     supportedDestinations: [iOS, macOS]
-    sources: [App]
+    sources: [App, ShareExtension/ChipFlow.swift]
     dependencies:
       - package: RecipeKit
         product: RecipeKit
