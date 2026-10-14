@@ -30,12 +30,16 @@ public enum RecipeImporter {
         let html = try await fetchHTML(from: url)
         progress?(.finished(0))
         progress?(.began(1))
-        let recipe = try recipe(fromHTML: html, sourceURL: url)
+        let parsed = try recipe(fromHTML: html, sourceURL: url)
+        var recipe = parsed.standardized()
+        recipe.steps = await StepSplitter.split(recipe.steps)
+        let stepsKept = recipe.steps.count == parsed.steps.count
         progress?(.finished(1))
         progress?(.began(2))
         async let cover = RecipeImageProcessing.download(recipe.imageURL, relativeTo: url)
         async let stepPhotos = downloadStepImages(stepImageURLs(fromHTML: html), relativeTo: url)
-        let result = ImportResult(recipe: recipe, imageData: await cover, stepImageData: await stepPhotos)
+        let photos = await stepPhotos
+        let result = ImportResult(recipe: recipe, imageData: await cover, stepImageData: stepsKept ? photos : [])
         progress?(.finished(2))
         return result
     }

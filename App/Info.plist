@@ -43,6 +43,8 @@
 	<string>Recipes keeps your grocery list in sync with a list in the Reminders app.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Recipes keeps your grocery list in sync with a list in the Reminders app.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.garrabrant.recipes</key>

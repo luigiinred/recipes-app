@@ -18,6 +18,9 @@ struct RecipesApp: App {
                 .environmentObject(router)
                 .tint(Theme.accent)
                 .task { await library.run() }
+                #if os(iOS)
+                .task { await TimerLiveActivities.endAll() }
+                #endif
                 .onOpenURL { url in
                     if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
                 }

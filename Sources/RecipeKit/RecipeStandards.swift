@@ -45,6 +45,37 @@ public enum RecipeStandards {
         return result
     }
 
+    /// "DRESSING:" or "For the sauce" on a line of its own inside an ingredient list.
+    static func ingredientHeading(_ text: String) -> String? {
+        let trimmed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !trimmed.isEmpty, trimmed.count <= 40, !trimmed.contains(where: \.isNumber) else { return nil }
+        let name = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespaces))
+        guard !name.isEmpty, trimmed.hasSuffix(":") || name.lowercased().hasPrefix("for the ") else { return nil }
+        let isShouting = name == name.uppercased() && name.contains(where: \.isLetter)
+        return isShouting ? name.capitalized : name
+    }
+
+    /// A step that really holds several numbered ones ("... 1. Brown the beef. 2. Add the peppers. 3. ..."), and any text
+    /// before the first number. Nil unless the numbers run 1, 2, 3 in order.
+    static func splitNumberedSteps(_ text: String) -> (preamble: String, steps: [String])? {
+        guard let regex = try? NSRegularExpression(pattern: #"(?<![^\s])(\d{1,2})[.)]\s+(?=[A-Z"“(])"#) else { return nil }
+        var markers: [NSTextCheckingResult] = []
+        for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let range = Range(match.range(at: 1), in: text), Int(text[range]) == markers.count + 1 else { continue }
+            markers.append(match)
+        }
+        guard markers.count >= 3 else { return nil }
+        func piece(_ from: Int, _ to: Int) -> String {
+            guard let low = Range(NSRange(location: from, length: to - from), in: text) else { return "" }
+            return text[low].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let preamble = piece(0, markers[0].range.location)
+        let steps = markers.indices.map { index in
+            piece(markers[index].range.location + markers[index].range.length, index + 1 < markers.count ? markers[index + 1].range.location : (text as NSString).length)
+        }
+        return (preamble, steps.filter { !$0.isEmpty })
+    }
+
     public static func standardStep(_ text: String) -> String {
         var step = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let range = NSRange(step.startIndex..., in: step)
@@ -64,22 +95,45 @@ extension Recipe {
         var recipe = self
         recipe.title = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         recipe.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parsed = ingredients.map { Ingredient(parsing: $0).text }
-        let keptIngredients = parsed.indices.filter { !parsed[$0].isEmpty }
-        recipe.ingredients = keptIngredients.map { parsed[$0] }
-        recipe.ingredientSections = RecipeStandards.standardSections(
-            ingredientSections.map { section in IngredientSection(title: section.title, start: keptIngredients.filter { $0 < section.start }.count) },
-            ingredientCount: recipe.ingredients.count
-        )
+        var cleanedIngredients: [String] = []
+        var headings: [IngredientSection] = []
+        var landing: [Int] = []
+        for text in ingredients {
+            landing.append(cleanedIngredients.count)
+            let parsed = Ingredient(parsing: text).text
+            if parsed.isEmpty { continue }
+            if let title = RecipeStandards.ingredientHeading(parsed) {
+                headings.append(IngredientSection(title: title, start: cleanedIngredients.count))
+            } else {
+                cleanedIngredients.append(parsed)
+            }
+        }
+        recipe.ingredients = cleanedIngredients
+        let moved = ingredientSections.map { IngredientSection(title: $0.title, start: landing.indices.contains($0.start) ? landing[$0.start] : cleanedIngredients.count) }
+        recipe.ingredientSections = RecipeStandards.standardSections(moved + headings, ingredientCount: cleanedIngredients.count)
 
-        let cleaned = steps.map(RecipeStandards.standardStep)
+        var expanded: [(text: String, origin: Int, isFirst: Bool)] = []
+        var preface: [String] = []
+        for (index, step) in steps.enumerated() {
+            if let split = RecipeStandards.splitNumberedSteps(step) {
+                if !split.preamble.isEmpty { preface.append(split.preamble) }
+                expanded += split.steps.enumerated().map { ($1, index, $0 == 0) }
+            } else {
+                expanded.append((step, index, true))
+            }
+        }
+        let cleaned = expanded.map { RecipeStandards.standardStep($0.text) }
         let kept = cleaned.indices.filter { !cleaned[$0].isEmpty }
         recipe.steps = kept.map { cleaned[$0] }
-        if kept.count != cleaned.count {
-            if !stepTimestamps.isEmpty { recipe.stepTimestamps = kept.map { timestamp(forStep: $0) } }
-            if !stepImages.isEmpty { recipe.stepImages = kept.map { stepImage(forStep: $0) } }
+        if kept.count != steps.count || expanded.count != steps.count {
+            if !stepTimestamps.isEmpty { recipe.stepTimestamps = kept.map { expanded[$0].isFirst ? timestamp(forStep: expanded[$0].origin) : nil } }
+            if !stepImages.isEmpty { recipe.stepImages = kept.map { expanded[$0].isFirst ? stepImage(forStep: expanded[$0].origin) : nil } }
         }
         if recipe.stepImages.allSatisfy({ $0 == nil }) { recipe.stepImages = [] }
+        if !preface.isEmpty {
+            let extra = preface.joined(separator: "\n")
+            if !notes.contains(extra) { recipe.notes = notes.isEmpty ? extra : notes + "\n\n" + extra }
+        }
 
         recipe.rating = rating.flatMap { (1...5).contains($0) ? $0 : nil }
         if !wantToCook { recipe.queuedAt = nil }
