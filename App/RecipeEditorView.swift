@@ -28,10 +28,8 @@ struct RecipeEditorView: View {
     @State private var prep: String
     @State private var cook: String
     @State private var ingredients: [EditableIngredient]
-    @State private var isGrouping = false
     @State private var isCleaning = false
     @State private var cleanupMessage: String?
-    @State private var groupingMessage: String?
     @State private var steps: [EditableLine]
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
@@ -95,26 +93,13 @@ struct RecipeEditorView: View {
                     }
                 }
                 Section {
-                    Button { Task { await cleanUp() } } label: {
-                        Label(isCleaning ? "Cleaning Up…" : "Clean Up with Apple Intelligence", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(isCleaning)
-                } footer: {
-                    if let cleanupMessage {
-                        Text(cleanupMessage)
-                    } else {
-                        Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
-                    }
+                    PlainField("Title", text: $title).font(.title3.weight(.semibold))
+                    PlainField("Summary", text: $summary, axis: .vertical)
                 }
                 Section {
-                    TextField("Title", text: $title)
-                    TextField("Summary", text: $summary, axis: .vertical)
-                }
-                Section {
-                    LabeledContent("Servings") { TextField("", text: $servings).multilineTextAlignment(.trailing) }
-                    LabeledContent("Prep minutes") { TextField("", text: $prep).multilineTextAlignment(.trailing) }
-                    LabeledContent("Cook minutes") { TextField("", text: $cook).multilineTextAlignment(.trailing) }
+                    LabeledContent("Servings") { PlainField("", text: $servings).multilineTextAlignment(.trailing) }
+                    LabeledContent("Prep minutes") { PlainField("", text: $prep).multilineTextAlignment(.trailing) }
+                    LabeledContent("Cook minutes") { PlainField("", text: $cook).multilineTextAlignment(.trailing) }
                 }
                 Section {
                     ForEach($ingredients) { $line in
@@ -133,21 +118,10 @@ struct RecipeEditorView: View {
                         focused = line.id
                         ingredients.append(line)
                     }
-                    Button { Task { await groupIngredients() } } label: {
-                        Label(isGrouping ? "Grouping…" : "Group with Apple Intelligence", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(isGrouping || !AppleIntelligence.status.isAvailable || realIngredients.count < 4)
                 } header: {
                     Text("Ingredients")
                 } footer: {
-                    if let groupingMessage {
-                        Text(groupingMessage)
-                    } else if !AppleIntelligence.status.isAvailable {
-                        Text("Grouping needs Apple Intelligence. " + AppleIntelligence.status.explanation)
-                    } else {
-                        Text("Sections such as “Dough” and “Sauce” make a long list easier to scan. Drag a heading to move it.")
-                    }
+                    Text("Add a section only for a distinct part of the meal, like a salad’s dressing. Drag a heading to move it.")
                 }
                 Section("Steps") {
                     ForEach($steps) { $line in
@@ -175,8 +149,23 @@ struct RecipeEditorView: View {
                     Text("Keep categories generic: the main ingredient, vegetarian or vegan, and the course. Use a slash to nest one, like Dinner/Pasta.")
                 }
                 Section {
-                    TextField("Source URL", text: $source)
-                    TextField("Notes", text: $notes, axis: .vertical)
+                    PlainField("Source URL", text: $source)
+                    PlainField("Notes", text: $notes, axis: .vertical)
+                }
+                Section {
+                    Button { Task { await cleanUp() } } label: {
+                        Label(isCleaning ? "Cleaning Up…" : "Clean Up with Apple Intelligence", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isCleaning)
+                    .frame(maxWidth: .infinity)
+                } footer: {
+                    if let cleanupMessage {
+                        Text(cleanupMessage)
+                    } else {
+                        Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
+                    }
                 }
             }
             .navigationTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
@@ -197,7 +186,7 @@ struct RecipeEditorView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 520, minHeight: 640)
+        .frame(minWidth: 560, idealWidth: 600, minHeight: 640, idealHeight: 800)
         #endif
     }
 
@@ -206,7 +195,7 @@ struct RecipeEditorView: View {
         #if os(iOS)
         Form { content() }
         #else
-        List { content() }.listStyle(.inset)
+        Form { content() }.formStyle(.grouped)
         #endif
     }
 
@@ -293,28 +282,6 @@ struct RecipeEditorView: View {
         }
     }
 
-    private func groupIngredients() async {
-        isGrouping = true
-        groupingMessage = nil
-        defer { isGrouping = false }
-        let outcome = await IngredientGrouper.group(
-            title: title, ingredients: realIngredients, steps: steps.map(\.text).filter { !$0.isEmpty }
-        )
-        withAnimation(.snappy) {
-            switch outcome {
-            case .grouped(let list, let sections):
-                ingredients = Self.rows(for: Recipe(title: title, ingredients: list, ingredientSections: sections))
-                groupingMessage = "Grouped into \(sections.count) sections. Drag ingredients between sections to fix any mix-ups."
-            case .unchanged:
-                groupingMessage = "These ingredients all belong together, so no sections were added."
-            case .unavailable(let status):
-                groupingMessage = status.explanation
-            case .failed(let reason):
-                groupingMessage = "Couldn't group the ingredients: \(reason)"
-            }
-        }
-    }
-
     private func ingredientRow(line: Binding<EditableIngredient>) -> some View {
         if line.wrappedValue.isHeading { return AnyView(headingRow(line: line)) }
         return AnyView(plainIngredientRow(line: line))
@@ -323,7 +290,7 @@ struct RecipeEditorView: View {
     private func headingRow(line: Binding<EditableIngredient>) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "text.alignleft").foregroundStyle(Theme.accent).accessibilityHidden(true)
-            TextField("Section name", text: line.item)
+            PlainField("Section name", text: line.item)
                 .font(.headline)
                 .focused($focused, equals: line.wrappedValue.id)
             #if os(macOS)
@@ -338,14 +305,14 @@ struct RecipeEditorView: View {
 
     private func plainIngredientRow(line: Binding<EditableIngredient>) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            TextField("Qty", text: line.quantity)
+            PlainField("Qty", text: line.quantity)
                 .multilineTextAlignment(.trailing)
                 #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
                 #endif
                 .frame(width: 46)
             UnitMenu(unit: line.unit)
-            TextField("Ingredient", text: line.item, axis: .vertical)
+            PlainField("Ingredient", text: line.item, axis: .vertical)
                 .focused($focused, equals: line.wrappedValue.id)
             #if os(macOS)
             Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
@@ -368,11 +335,11 @@ struct RecipeEditorView: View {
                     .frame(width: 22, height: 22)
                     .background(Theme.accent, in: Circle())
             }
-            TextField(placeholder, text: line.text, axis: .vertical)
+            PlainField(placeholder, text: line.text, axis: .vertical)
                 .focused($focused, equals: line.wrappedValue.id)
             if number != nil { StepPhotoButton(line: line) }
             if showsTime {
-                TextField("m:ss", text: line.time)
+                PlainField("m:ss", text: line.time)
                     .multilineTextAlignment(.trailing)
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(Theme.accent)
@@ -542,6 +509,27 @@ struct EditableIngredient: Identifiable, Hashable {
     }
 }
 
+/// A text field whose placeholder stays inside the field. A grouped Mac form would otherwise turn it into a row label.
+struct PlainField: View {
+    let title: String
+    @Binding var text: String
+    var axis: Axis = .horizontal
+
+    init(_ title: String, text: Binding<String>, axis: Axis = .horizontal) {
+        self.title = title
+        _text = text
+        self.axis = axis
+    }
+
+    var body: some View {
+        #if os(macOS)
+        TextField("", text: $text, prompt: Text(title), axis: axis).labelsHidden()
+        #else
+        TextField(title, text: $text, axis: axis)
+        #endif
+    }
+}
+
 struct UnitMenu: View {
     @Binding var unit: IngredientUnit?
 
@@ -562,7 +550,7 @@ struct UnitMenu: View {
         }
         #if os(macOS)
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .frame(width: 76, alignment: .leading)
         #endif
         .accessibilityLabel("Unit")
     }
