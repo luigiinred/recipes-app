@@ -126,8 +126,18 @@ public enum RecipeImporter {
         }
         let range = NSRange(html.startIndex..., in: html)
         return regex.matches(in: html, range: range).compactMap { match in
-            Range(match.range(at: 1), in: html).map { String(html[$0]) }
+            Range(match.range(at: 1), in: html).map { stripJSONLDWrappers(String(html[$0])) }
         }
+    }
+
+    /// Some sites (e.g. eatwell101) wrap their JSON-LD in "// <![CDATA[" ... "// ]]>"
+    /// JavaScript comments, which makes it invalid JSON. Strip those markers.
+    private static func stripJSONLDWrappers(_ block: String) -> String {
+        var t = block
+        for marker in ["// <![CDATA[", "//<![CDATA[", "// ]]>", "//]]>", "<![CDATA[", "]]>"] {
+            t = t.replacingOccurrences(of: marker, with: "")
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func findRecipe(in json: Any) -> [String: Any]? {
@@ -179,6 +189,9 @@ public enum RecipeImporter {
         if let object = value as? [String: Any] {
             if let nested = object["itemListElement"] { return instructionSteps(nested) }
             if let step = text(object["text"]) ?? text(object["name"]) { return [(step, imageString(object["image"]))] }
+            // Numeric-key dict {"0": "step", "1": "step"} (some sites serialize arrays this way).
+            let sorted = object.sorted { (Int($0.key) ?? .max) < (Int($1.key) ?? .max) }
+            return sorted.flatMap { instructionSteps($0.value) }
         }
         return []
     }
@@ -187,6 +200,10 @@ public enum RecipeImporter {
         if let string = value as? String { return [clean(string)].filter { !$0.isEmpty } }
         if let number = value as? NSNumber { return [number.stringValue] }
         if let array = value as? [Any] { return array.flatMap { strings($0) } }
+        if let object = value as? [String: Any] {
+            let sorted = object.sorted { (Int($0.key) ?? .max) < (Int($1.key) ?? .max) }
+            return sorted.flatMap { strings($0.value) }
+        }
         return []
     }
 

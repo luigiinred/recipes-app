@@ -27,4 +27,33 @@ final class RecipeImporterTests: XCTestCase {
     func testThrowsWithoutRecipe() {
         XCTAssertThrowsError(try RecipeImporter.recipe(fromHTML: "<html></html>", sourceURL: nil))
     }
+
+    func testParsesCDATAWrappedRecipe() throws {
+        let html = """
+        <script type="application/ld+json">
+        // <![CDATA[
+        {"@context":"https://schema.org","@type":"Recipe","name":"Wrapped Soup",
+         "recipeIngredient":["1 cup broth","1 tsp salt"],
+         "recipeInstructions":[{"@type":"HowToStep","text":"Simmer."}]}
+        // ]]>
+        </script>
+        """
+        let recipe = try RecipeImporter.recipe(fromHTML: html, sourceURL: nil)
+        XCTAssertEqual(recipe.title, "Wrapped Soup")
+        XCTAssertEqual(recipe.ingredients, ["1 cup broth", "1 tsp salt"])
+        XCTAssertEqual(recipe.steps, ["Simmer."])
+    }
+
+    func testParsesObjectSerializedLists() throws {
+        let html = """
+        <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"Recipe","name":"Dict Recipe",
+         "recipeIngredient":{"0":"1 cup flour","1":"2 eggs"},
+         "recipeInstructions":{"0":"Whisk.","1":"Cook."}}
+        </script>
+        """
+        let recipe = try RecipeImporter.recipe(fromHTML: html, sourceURL: nil)
+        XCTAssertEqual(recipe.ingredients, ["1 cup flour", "2 eggs"])
+        XCTAssertEqual(recipe.steps, ["Whisk.", "Cook."])
+    }
 }
