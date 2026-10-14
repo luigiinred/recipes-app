@@ -341,6 +341,14 @@ final class RecipeLibrary: ObservableObject {
         await perform { library in for item in done { try library.groceries.delete(item) } }
     }
 
+    /// Re-saves every recipe whose ingredients, steps or tags aren't in the standard form yet; returns how many changed.
+    func tidyRecipes() async -> Int {
+        let changed = recipes.filter { $0.standardized() != $0 }
+        guard !changed.isEmpty else { return 0 }
+        await perform { library in for recipe in changed { try library.recipes.save(recipe) } }
+        return changed.count
+    }
+
     func clearAllGroceries() async {
         let all = groceries
         await perform { library in for item in all { try library.groceries.delete(item) } }
