@@ -25,9 +25,9 @@ struct AppScreenSnapshotTests {
         )
     }
 
-    @Test("iPad: Planner with the month, Up Next and the agenda in the sidebar")
-    func iPadPlanner() {
-        assertPageSnapshots(of: RootView(tab: .calendar), inNavigationStack: false, coverage: .iPad)
+    @Test("iPad: Plan, My Week beside the open recipe")
+    func iPadPlan() {
+        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week), inNavigationStack: false, coverage: .iPad)
     }
 
     @Test("Search tab, with results")
@@ -35,22 +35,19 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .search, searchQuery: "tomato"), inNavigationStack: false)
     }
 
-    @Test("Calendar tab: month dots over the agenda")
-    func calendarTab() {
-        assertPageSnapshots(of: RootView(tab: .calendar), inNavigationStack: false)
+    @Test("Plan tab: Up Next queue")
+    func planQueue() {
+        assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false)
     }
 
-    @Test("Calendar tab: weekly planner")
-    func calendarPlanner() {
-        assertPageSnapshots(
-            of: RootView(tab: .calendar, calendarMode: .planner),
-            inNavigationStack: false, coverage: .adaptive
-        )
+    @Test("Plan tab: My Week")
+    func planWeek() {
+        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week), inNavigationStack: false, coverage: .adaptive)
     }
 
-    @Test("Calendar tab: add sheet with search, open over the planner")
-    func calendarAddSheet() {
-        assertPageSnapshots(of: RootView(tab: .calendar, calendarMode: .planner, showsAddSheet: true), inNavigationStack: false)
+    @Test("Plan tab: smart plan sheet over My Week")
+    func planSmart() {
+        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week, showsSmartPlan: true), inNavigationStack: false)
     }
 
     @Test("Groceries tab")
@@ -63,14 +60,14 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(section: .recipes(.all), selection: SampleData.shakshuka.id), inNavigationStack: false)
     }
 
-    @Test("Calendar")
-    func calendar() {
-        assertPageSnapshots(of: RootView(section: .calendar, selection: SampleData.chili.id), inNavigationStack: false)
+    @Test("Plan: Up Next with a recipe open")
+    func planQueue() {
+        assertPageSnapshots(of: RootView(section: .plan, selection: SampleData.chili.id), inNavigationStack: false)
     }
 
-    @Test("Calendar: weekly planner, recipe drawer on the left")
-    func planner() {
-        assertPageSnapshots(of: RootView(section: .calendar, calendarMode: .planner), inNavigationStack: false)
+    @Test("Plan: My Week")
+    func planWeek() {
+        assertPageSnapshots(of: RootView(section: .plan, planMode: .week), inNavigationStack: false)
     }
 
     @Test("Groceries")

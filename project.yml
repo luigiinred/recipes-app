@@ -79,7 +79,6 @@ targets:
       - App/AppSettings.swift
       - App/Theme.swift
       - App/RecipeLink.swift
-      - App/PlannerDrag.swift
     dependencies:
       - package: RecipeKit
         product: RecipeKit
