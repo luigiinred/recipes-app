@@ -37,12 +37,15 @@ struct OnboardingTests {
     }
 
     private func snapshot(_ step: OnboardingView.Step, library: RecipeLibrary? = nil, testName: String = #function) {
-        let page = OnboardingView(step: step) {}.environmentObject(library ?? self.library(adding: []))
+        let page = OnboardingView(step: step, loadsPreviews: false) {}.environmentObject(library ?? self.library(adding: []))
         assertPageSnapshots(of: page, inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet, testName: testName)
     }
 
     @Test("welcome")
     func welcome() { snapshot(.welcome) }
+
+    @Test("share sheet explainer")
+    func share() { snapshot(.share) }
 
     @Test("add: nothing imported yet")
     func addEmpty() { snapshot(.add) }

@@ -3,20 +3,25 @@ import SwiftUI
 
 struct OnboardingView: View {
     enum Step: Int, CaseIterable {
-        case welcome, add, tryIt, discover
+        case welcome, share, add, tryIt, discover
     }
 
     @EnvironmentObject private var library: RecipeLibrary
     let onFinish: () -> Void
+    private let loadsPreviews: Bool
 
     @State private var step: Step
     @State private var reviewing: ScanDraft?
     @State private var importing: OnboardingSource?
     @State private var failures: [OnboardingSource.ID: String] = [:]
+    @State private var previews: [OnboardingSource.ID: ImportResult] = [:]
+    @State private var covers: [OnboardingSource.ID: CGImage] = [:]
+    @State private var isLoadingPreviews = false
     @StateObject private var progress = ImportProgressModel()
 
-    init(step: Step = .welcome, onFinish: @escaping () -> Void) {
+    init(step: Step = .welcome, loadsPreviews: Bool = true, onFinish: @escaping () -> Void) {
         _step = State(initialValue: step)
+        self.loadsPreviews = loadsPreviews
         self.onFinish = onFinish
     }
 
@@ -43,7 +48,9 @@ struct OnboardingView: View {
             .scrollBounceBehavior(.basedOnSize)
             footer
         }
+        .background(.background)
         .animation(.snappy, value: step)
+        .task { await loadPreviews() }
         #if os(macOS)
         .frame(width: 560, height: 700)
         #endif
@@ -62,6 +69,7 @@ struct OnboardingView: View {
     private var page: some View {
         switch step {
         case .welcome: welcome
+        case .share: share
         case .add: add
         case .tryIt: tryIt
         case .discover: discover
@@ -82,12 +90,28 @@ struct OnboardingView: View {
         }
     }
 
+    private var share: some View {
+        VStack(spacing: 24) {
+            header(symbol: "square.and.arrow.up", title: "Share to add recipes",
+                   subtitle: "Found a recipe in Safari or a video on YouTube? Share it with Recipes to import it.")
+            ShareSheetMock(cover: OnboardingSources.all.first.flatMap { covers[$0.id] })
+            VStack(alignment: .leading, spacing: 18) {
+                shareStep(1, "Open the recipe", "A recipe page in Safari, or a video in YouTube.")
+                shareStep(2, "Tap Share", "The square with an arrow, in the toolbar. On a Mac it's in Safari's toolbar too.")
+                shareStep(3, "Choose Save to Recipes", "Swipe along the row of apps. If you don't see it, tap More and turn it on.")
+                shareStep(4, "Check it over", "Recipes opens the editor with everything filled in. Tap the checkmark to save.")
+            }
+            Text("You can also paste a link from the Recipes toolbar.")
+                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+    }
+
     private var add: some View {
         VStack(spacing: 24) {
-            header(symbol: "plus.circle.fill", title: "Add your first recipes",
-                   subtitle: "These are real recipes from around the web. Tap one to import it, check it over, then tap the checkmark to save it.")
-            VStack(spacing: 12) {
-                ForEach(OnboardingSources.all) { source in sourceRow(source) }
+            header(symbol: "plus.circle.fill", title: "Try it on a real recipe",
+                   subtitle: "Tap a recipe to import it the same way, check it over, then tap the checkmark to save it.")
+            VStack(spacing: 16) {
+                ForEach(OnboardingSources.all) { source in sourceCard(source) }
             }
         }
     }
@@ -98,6 +122,7 @@ struct OnboardingView: View {
                    subtitle: addedRecipes.first.map { "Try two things on \($0.title). You can undo both from the app any time." }
                        ?? "Try two things on a recipe. You can undo both from the app any time.")
             if let recipe = addedRecipes.first {
+                RecipeCard(recipe: recipe).frame(maxWidth: 320)
                 VStack(spacing: 14) {
                     TryCard(
                         symbol: "text.line.first.and.arrowtriangle.forward", title: "Up Next",
@@ -167,39 +192,97 @@ struct OnboardingView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func sourceRow(_ source: OnboardingSource) -> some View {
-        let isAdded = savedRecipe(for: source) != nil
+    private func shareStep(_ number: Int, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text("\(number)")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(Theme.accent, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sourceCard(_ source: OnboardingSource) -> some View {
+        let saved = savedRecipe(for: source)
         return Button { startImport(source) } label: {
-            HStack(spacing: 12) {
-                Image(systemName: source.kind == .video ? "play.rectangle.fill" : "globe")
-                    .font(.title2)
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 56, height: 56)
-                    .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                    .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack(alignment: .topTrailing) {
+                    Color.clear
+                        .aspectRatio(2, contentMode: .fit)
+                        .overlay { sourceImage(source, saved: saved) }
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                    Image(systemName: saved != nil ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                        .font(.title)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(saved != nil ? Color.white : Color.white, saved != nil ? Theme.accent : Color.black.opacity(0.45))
+                        .symbolEffect(.bounce, value: saved != nil)
+                        .padding(10)
+                }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(source.title).font(.system(.headline, design: .serif)).foregroundStyle(.primary)
+                    Text(source.title).font(.system(.title3, design: .serif, weight: .semibold)).foregroundStyle(.primary)
                     Text(source.site).font(.caption.weight(.medium)).foregroundStyle(Theme.accent)
                     if let failure = failures[source.id] {
                         Text(failure).font(.caption).foregroundStyle(.red).lineLimit(2)
                     } else {
-                        Text(source.detail).font(.caption).foregroundStyle(.secondary)
+                        Text(source.detail).font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
-                Spacer(minLength: 8)
-                Image(systemName: isAdded ? "checkmark.circle.fill" : "arrow.down.circle")
-                    .font(.title2)
-                    .foregroundStyle(isAdded ? Theme.accent : Color.secondary)
-                    .symbolEffect(.bounce, value: isAdded)
+                .padding(.horizontal, 4)
             }
             .multilineTextAlignment(.leading)
-            .padding(10)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
-            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .allowsHitTesting(!isAdded && importing == nil)
-        .accessibilityLabel(isAdded ? "\(source.title), added" : "Import \(source.title) from \(source.site)")
+        .allowsHitTesting(saved == nil && importing == nil)
+        .accessibilityLabel(saved != nil ? "\(source.title), added" : "Import \(source.title) from \(source.site)")
+    }
+
+    @ViewBuilder
+    private func sourceImage(_ source: OnboardingSource, saved: Recipe?) -> some View {
+        if let saved {
+            RecipeImageView(recipe: saved)
+        } else {
+            ZStack {
+                LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                if let cover = covers[source.id] {
+                    Image(decorative: cover, scale: 1).resizable().scaledToFill().transition(.opacity)
+                } else if isLoadingPreviews, previews[source.id] == nil {
+                    ProgressView()
+                } else {
+                    Image(systemName: source.kind == .video ? "play.rectangle.fill" : "fork.knife")
+                        .font(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))
+                }
+                if source.kind == .video, covers[source.id] != nil {
+                    Image(systemName: "play.circle.fill").font(.system(size: 44)).foregroundStyle(.white.opacity(0.9)).shadow(radius: 4)
+                }
+            }
+            .animation(.easeOut, value: covers[source.id] != nil)
+        }
+    }
+
+    private func loadPreviews() async {
+        guard loadsPreviews else { return }
+        isLoadingPreviews = true
+        defer { isLoadingPreviews = false }
+        let pending = OnboardingSources.all.filter { previews[$0.id] == nil }
+        await withTaskGroup(of: (OnboardingSource.ID, ImportResult?).self) { group in
+            for source in pending {
+                group.addTask { (source.id, try? await RecipeImporter.importResult(from: source.url)) }
+            }
+            for await (id, result) in group {
+                guard let result else { continue }
+                previews[id] = result
+                covers[id] = result.imageData.flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: 900) }
+            }
+        }
     }
 
     private func importCard(_ source: OnboardingSource) -> some View {
@@ -218,21 +301,29 @@ struct OnboardingView: View {
 
     private func startImport(_ source: OnboardingSource) {
         guard importing == nil else { return }
+        if let result = previews[source.id] {
+            reviewing = draft(from: result)
+            return
+        }
         importing = source
         failures[source.id] = nil
         progress.reset()
         Task {
             do {
                 let result = try await RecipeImporter.importResult(from: source.url, progress: progress.report)
-                reviewing = ScanDraft(
-                    recipe: result.recipe, text: result.sourceText, textTitle: result.sourceTitle,
-                    notice: result.message, imageData: result.imageData, stepImages: result.stepImageData
-                )
+                reviewing = draft(from: result)
             } catch {
                 failures[source.id] = error.localizedDescription
             }
             importing = nil
         }
+    }
+
+    private func draft(from result: ImportResult) -> ScanDraft {
+        ScanDraft(
+            recipe: result.recipe, text: result.sourceText, textTitle: result.sourceTitle,
+            notice: result.message, imageData: result.imageData, stepImages: result.stepImageData
+        )
     }
 
     private func inGroceries(_ recipe: Recipe) -> Bool {
@@ -274,7 +365,7 @@ struct OnboardingView: View {
     private var primaryTitle: String {
         switch step {
         case .welcome: "Get Started"
-        case .add, .tryIt: "Continue"
+        case .share, .add, .tryIt: "Continue"
         case .discover: "Start Cooking"
         }
     }
@@ -306,6 +397,63 @@ private struct TryCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+/// A stand-in for Safari's share sheet with Save to Recipes highlighted.
+private struct ShareSheetMock: View {
+    let cover: CGImage?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                ZStack {
+                    LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    if let cover { Image(decorative: cover, scale: 1).resizable().scaledToFill() }
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("World's Best Lasagna").font(.subheadline.weight(.semibold))
+                    Text("allrecipes.com").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            Divider()
+            HStack(alignment: .top, spacing: 18) {
+                appIcon("message.fill", "Messages", .green)
+                appIcon("envelope.fill", "Mail", .blue)
+                appIcon("note.text", "Notes", .yellow)
+                appIcon("fork.knife", "Save to Recipes", Theme.accent, highlighted: true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 16)
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.quaternary))
+        .frame(maxWidth: 360)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Example share sheet with Save to Recipes in the row of apps")
+    }
+
+    private func appIcon(_ symbol: String, _ name: String, _ color: Color, highlighted: Bool = false) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(color.gradient, in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    if highlighted { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.accent, lineWidth: 2.5).padding(-5) }
+                }
+            Text(name)
+                .font(.caption2.weight(highlighted ? .semibold : .regular))
+                .foregroundStyle(highlighted ? Theme.accent : .secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
