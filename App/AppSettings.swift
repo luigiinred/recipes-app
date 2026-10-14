@@ -12,6 +12,7 @@ enum AppSettings {
         static let listStyle = "recipeListStyle"
         static let reminders = "syncGroceriesWithReminders"
         static let ratingStyle = "ratingStyle"
+        static let showDeleteSwipe = "showDeleteInSwipeActions"
     }
 
     enum WeekStart: String, CaseIterable {

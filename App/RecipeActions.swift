@@ -60,6 +60,49 @@ struct RecipeQuickActions: View {
     }
 }
 
+/// Swipe a recipe row left for Up Next, Favorite and, when turned on in Settings, Delete. The buttons stay open until tapped.
+struct RecipeSwipeActions: ViewModifier {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
+    @AppStorage(AppSettings.Key.showDeleteSwipe) private var showsDelete = false
+    @State private var confirmingDelete = false
+    let recipe: Recipe
+
+    func body(content: Content) -> some View {
+        content
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if showsDelete {
+                    Button { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
+                        .tint(.red)
+                }
+                if (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites {
+                    Button {
+                        Task { await library.setFavorite(recipe, !recipe.isFavorite) }
+                    } label: {
+                        Label(recipe.isFavorite ? "Unfavorite" : "Favorite", systemImage: recipe.isFavorite ? "heart.slash" : "heart")
+                    }
+                    .tint(Theme.accent)
+                }
+                Button {
+                    Task { await library.setQueued(recipe, !recipe.wantToCook) }
+                } label: {
+                    Label(recipe.wantToCook ? "Unqueue" : "Up Next",
+                          systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward")
+                }
+                .tint(.orange)
+            }
+            .confirmationDialog("Delete “\(recipe.title)”?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete Recipe", role: .destructive) { Task { await library.delete(recipe) } }
+            } message: {
+                Text("This can't be undone. The recipe and its photo are removed from all your devices.")
+            }
+    }
+}
+
+extension View {
+    func recipeSwipeActions(for recipe: Recipe) -> some View { modifier(RecipeSwipeActions(recipe: recipe)) }
+}
+
 struct RatingMenu: View {
     @EnvironmentObject private var library: RecipeLibrary
     let recipe: Recipe

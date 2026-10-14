@@ -191,6 +191,17 @@ final class RatingAndQueueTests: XCTestCase {
 }
 
 final class IngredientSectionTests: XCTestCase {
+    func testMentionsMarkTheIngredientNamesInTheStep() {
+        func found(_ step: String, _ list: [String]) -> [String] {
+            IngredientMatcher.mentions(in: step, ingredients: list).map { String(step[$0]) }
+        }
+        XCTAssertEqual(found("Add the black beans and stir.", ["1 can black beans"]), ["black beans"])
+        XCTAssertEqual(found("Scatter the parsley on top.", ["2 tbsp finely chopped fresh parsley"]), ["parsley"])
+        XCTAssertEqual(found("Dice the onions.", ["1 onion"]), ["onions"])
+        XCTAssertEqual(found("Fold in the berries.", ["1 cup blueberries"]), [])
+        XCTAssertEqual(found("Heat the olive oil.", ["2 tbsp extra virgin olive oil"]), ["olive oil"])
+    }
+
     func testStepsFindTheirIngredients() {
         let chili = [
             "500 g black beans, dried", "4 cans diced tomatoes", "1 can corn", "4 bell peppers", "1 onion", "2 cloves garlic",

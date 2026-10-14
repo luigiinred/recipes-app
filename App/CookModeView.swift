@@ -141,7 +141,7 @@ struct CookModeView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Step \(index + 1) of \(recipe.steps.count)")
                     .font(.subheadline).foregroundStyle(.secondary)
-                timerHighlighted(recipe.steps[index])
+                timerHighlighted(recipe.steps[index], ingredients: recipe.ingredients)
                     .font(.system(size: fontSize))
                     .lineSpacing(fontSize * 0.25)
                     .fixedSize(horizontal: false, vertical: true)
@@ -166,17 +166,34 @@ struct CookModeView: View {
         }
     }
 
-    private func timerHighlighted(_ text: String) -> Text {
-        var parts: [Text] = []
+    private func timerHighlighted(_ text: String, ingredients: [String]) -> Text {
+        var timerSpans: [(range: Range<String.Index>, seconds: Int, label: String)] = []
         var cursor = text.startIndex
         for duration in DurationDetector.find(in: text) {
             guard let range = text.range(of: duration.text, range: cursor..<text.endIndex) else { continue }
+            timerSpans.append((range, duration.seconds, duration.text))
+            cursor = range.upperBound
+        }
+        let mentions = IngredientMatcher.mentions(in: text, ingredients: ingredients)
+            .filter { mention in !timerSpans.contains { $0.range.overlaps(mention) } }
+
+        enum Piece { case timer(seconds: Int, label: String), ingredient }
+        let pieces = (timerSpans.map { ($0.range, Piece.timer(seconds: $0.seconds, label: $0.label)) } + mentions.map { ($0, Piece.ingredient) })
+            .sorted { $0.0.lowerBound < $1.0.lowerBound }
+
+        var parts: [Text] = []
+        cursor = text.startIndex
+        for (range, piece) in pieces {
             parts.append(Text(String(text[cursor..<range.lowerBound])))
-            let label = duration.text.replacingOccurrences(of: " ", with: "\u{00A0}")
-            var pill = AttributedString("\u{00A0}\u{23F2}\u{FE0E}\u{00A0}\(label)\u{00A0}")
-            pill.link = URL(string: "\(Self.timerScheme)://start?seconds=\(duration.seconds)")
-            pill.foregroundColor = Theme.accent
-            parts.append(Text(pill).customAttribute(TimerPill()))
+            switch piece {
+            case .timer(let seconds, let label):
+                var pill = AttributedString("\u{00A0}\u{23F2}\u{FE0E}\u{00A0}\(label.replacingOccurrences(of: " ", with: "\u{00A0}"))\u{00A0}")
+                pill.link = URL(string: "\(Self.timerScheme)://start?seconds=\(seconds)")
+                pill.foregroundColor = Theme.accent
+                parts.append(Text(pill).customAttribute(TimerPill()))
+            case .ingredient:
+                parts.append(Text(String(text[range])).fontWeight(.semibold).foregroundColor(Theme.accent))
+            }
             cursor = range.upperBound
         }
         parts.append(Text(String(text[cursor...])))

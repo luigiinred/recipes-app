@@ -4,26 +4,26 @@ import SwiftUI
 enum AppSection: Hashable {
     case recipes(RecipeCollection)
     case feed(UUID)
-    case calendar
+    case plan
     case groceries
 }
 
 #if os(iOS)
 struct RootView: View {
-    enum AppTab: Hashable { case recipes, feeds, calendar, groceries, search }
+    enum AppTab: Hashable { case recipes, feeds, plan, groceries, search }
 
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @State private var tab: AppTab
     @State private var query: String
-    private let calendarMode: CalendarMode
-    private let showsAddSheet: Bool
+    private let planMode: PlanMode
+    private let showsSmartPlan: Bool
     private let recipesPath: [RecipesRoute]
     private let recipeSelection: Recipe.ID?
     private let recipesCollection: RecipeCollection
 
     init(
-        tab: AppTab = .recipes, searchQuery: String = "", calendarMode: CalendarMode = .agenda, showsAddSheet: Bool = false,
+        tab: AppTab = .recipes, searchQuery: String = "", planMode: PlanMode = .queue, showsSmartPlan: Bool = false,
         recipesPath: [RecipesRoute] = [], recipeSelection: Recipe.ID? = nil, recipesCollection: RecipeCollection = .all
     ) {
         self.recipesCollection = recipesCollection
@@ -31,14 +31,14 @@ struct RootView: View {
         self.recipeSelection = recipeSelection
         _tab = State(initialValue: tab)
         _query = State(initialValue: searchQuery)
-        self.calendarMode = calendarMode
-        self.showsAddSheet = showsAddSheet
+        self.planMode = planMode
+        self.showsSmartPlan = showsSmartPlan
     }
 
     var body: some View {
         TabView(selection: $tab) {
             Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
-            Tab("Planner", systemImage: "calendar", value: AppTab.calendar) { CalendarTab(mode: calendarMode, showsAddSheet: showsAddSheet) }
+            Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             Tab(value: AppTab.search, role: .search) { SearchTab(query: $query) }
         }
@@ -63,6 +63,7 @@ struct SearchTab: View {
         NavigationStack(path: $path) {
             List(results) { recipe in
                 NavigationLink(value: recipe.id) { RecipeRow(recipe: recipe) }
+                    .recipeSwipeActions(for: recipe)
             }
             .listStyle(.plain)
             .overlay {
@@ -155,57 +156,39 @@ struct RecipesTab: View {
     }
 }
 
-struct CalendarTab: View {
+struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [UUID] = []
     @State private var selection: Recipe.ID?
-    @State private var mode: CalendarMode
-    private let showsAddSheet: Bool
+    @State private var mode: PlanMode
+    private let showsSmartPlan: Bool
 
-    init(mode: CalendarMode = .agenda, showsAddSheet: Bool = false) {
+    init(mode: PlanMode = .queue, showsSmartPlan: Bool = false) {
         _mode = State(initialValue: mode)
-        self.showsAddSheet = showsAddSheet
-    }
-
-    private var optionalMode: Binding<CalendarMode?> {
-        Binding(get: { mode }, set: { if let value = $0 { mode = value } })
+        self.showsSmartPlan = showsSmartPlan
     }
 
     var body: some View {
         if sizeClass == .regular {
             NavigationSplitView {
-                Group {
-                    if mode == .agenda {
-                        CalendarView(open: { selection = $0 }, mode: $mode)
-                    } else {
-                        RecipeDrawer(mode: optionalMode)
-                    }
-                }
-                .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 460)
+                PlanView(mode: $mode, open: { selection = $0 }, showsSmartPlan: showsSmartPlan)
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 480)
             } detail: {
-                if mode == .planner {
-                    WeekPlannerView(open: { selection = $0; mode = .agenda }, mode: $mode)
-                } else if let recipe = library.recipe(id: selection) {
+                if let recipe = library.recipe(id: selection) {
                     RecipeDetailView(recipe: recipe).id(recipe.id)
                 } else {
-                    ContentUnavailableView("Select a meal", systemImage: "calendar")
+                    ContentUnavailableView("Select a recipe", systemImage: "calendar")
                 }
             }
         } else {
             NavigationStack(path: $path) {
-                Group {
-                    if mode == .agenda {
-                        CalendarView(open: { path.append($0) }, mode: $mode)
-                    } else {
-                        WeekPlannerView(open: { path.append($0) }, mode: $mode, isCompact: true, showsAddSheet: showsAddSheet)
+                PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+                    .navigationDestination(for: UUID.self) { id in
+                        if let recipe = library.recipe(id: id) {
+                            RecipeDetailView(recipe: recipe)
+                        }
                     }
-                }
-                .navigationDestination(for: UUID.self) { id in
-                    if let recipe = library.recipe(id: id) {
-                        RecipeDetailView(recipe: recipe)
-                    }
-                }
             }
         }
     }
@@ -223,7 +206,7 @@ struct GroceriesTab: View {
                     GroceriesView(layout: .completed, embedded: true)
                 }
                 .navigationTitle("Groceries")
-                .toolbar { ClearCompletedButton() }
+                .toolbar { GroceriesMenu() }
             } else {
                 GroceriesView(layout: .combined)
             }
@@ -241,10 +224,10 @@ struct RootView: View {
     @State private var entrySelection: FeedEntry.ID?
     @State private var collection: RecipeCollection
     @State private var addingFeed = false
-    @State private var calendarMode: CalendarMode
+    @State private var planMode: PlanMode
 
-    init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil, entrySelection: FeedEntry.ID? = nil, calendarMode: CalendarMode = .agenda) {
-        _calendarMode = State(initialValue: calendarMode)
+    init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil, entrySelection: FeedEntry.ID? = nil, planMode: PlanMode = .queue) {
+        _planMode = State(initialValue: planMode)
         _section = State(initialValue: section)
         _selection = State(initialValue: selection)
         _entrySelection = State(initialValue: entrySelection)
@@ -266,12 +249,8 @@ struct RootView: View {
                 if let feed = library.feeds.first(where: { $0.id == id }) {
                     FeedEntriesList(feed: feed, selection: $entrySelection).id(feed.id)
                 }
-            case .calendar:
-                if calendarMode == .agenda {
-                    CalendarView(open: { selection = $0 }, mode: $calendarMode)
-                } else {
-                    RecipeDrawer(mode: Binding(get: { calendarMode }, set: { if let value = $0 { calendarMode = value } }))
-                }
+            case .plan:
+                PlanView(mode: $planMode, open: { selection = $0 })
             case .groceries:
                 GroceriesView(layout: .toBuy)
             }
@@ -279,8 +258,6 @@ struct RootView: View {
             switch section ?? .recipes(.all) {
             case .groceries:
                 GroceriesView(layout: .completed)
-            case .calendar where calendarMode == .planner:
-                WeekPlannerView(open: { selection = $0; calendarMode = .agenda }, mode: $calendarMode)
             case .feed(let id):
                 FeedDetail(feedID: id, entryID: entrySelection)
             default:
@@ -337,7 +314,7 @@ struct SidebarView: View {
             }
             }
             Section {
-                Label("Planner", systemImage: "calendar").tag(AppSection.calendar)
+                Label("Plan", systemImage: "calendar").tag(AppSection.plan)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
             }
         }
