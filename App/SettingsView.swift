@@ -27,7 +27,7 @@ struct SettingsView: View {
                 Section {
                     NavigationLink { DataSettingsPage() } label: { Label("Data & Developer", systemImage: "externaldrive") }
                 }
-                Section("Help") {
+                Section {
                     Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
                 }
             }
