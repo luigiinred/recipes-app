@@ -2,6 +2,16 @@ import XCTest
 @testable import RecipeKit
 
 final class YouTubeTests: XCTestCase {
+    func testPlayerShapeFromOEmbed() {
+        func ratio(_ width: Int, _ height: Int) -> Double? {
+            YouTubeImporter.aspectRatio(fromOEmbed: Data("{\"width\":\(width),\"height\":\(height)}".utf8))
+        }
+        XCTAssertEqual(ratio(113, 200), 113.0 / 200.0)
+        XCTAssertEqual(ratio(200, 113) ?? 0, 1.77, accuracy: 0.01)
+        XCTAssertEqual(ratio(10, 100), 0.5)
+        XCTAssertNil(YouTubeImporter.aspectRatio(fromOEmbed: Data("{}".utf8)))
+    }
+
     func testVideoIDs() {
         func id(_ s: String) -> String? { YouTubeImporter.videoID(from: URL(string: s)!) }
         XCTAssertEqual(id("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10"), "dQw4w9WgXcQ")

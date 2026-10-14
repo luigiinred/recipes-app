@@ -42,13 +42,19 @@ struct TagEditor: View {
                 ChipFlow {
                     ForEach(suggestions, id: \.self) { tag in
                         Button { add(tag) } label: {
-                            Label(CategoryTree.displayName(tag), systemImage: "plus")
-                                .font(.callout)
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.14), in: Capsule())
-                                .foregroundStyle(.primary)
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.caption2.weight(.bold))
+                                Text(CategoryTree.displayName(tag))
+                            }
+                            .font(.callout)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Color.secondary.opacity(0.14), in: Capsule())
+                            .foregroundStyle(.primary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Add \(CategoryTree.displayName(tag))")
                     }
                 }
             }
