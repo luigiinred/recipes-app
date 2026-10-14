@@ -191,6 +191,51 @@ final class RatingAndQueueTests: XCTestCase {
 }
 
 final class IngredientSectionTests: XCTestCase {
+    func testDecorativeSymbolsAreStrippedFromIngredients() {
+        let recipe = Recipe(title: "R", ingredients: ["🔹 1 lb boneless chicken", "• 2 tbsp. ghee", "▢ Kosher salt", "½ cup flour"]).standardized()
+        XCTAssertEqual(recipe.ingredients, ["1 lb boneless chicken", "2 tbsp ghee", "Kosher salt", "1/2 cup flour"])
+    }
+
+    func testShoutedHeadingsBecomeIngredientSections() {
+        let recipe = Recipe(title: "R", ingredients: [
+            "DRESSING:", "1/3 cup olive oil", "3 tbsp white wine vinegar", "SALAD:", "5 cups torn romaine", "1 apple",
+        ]).standardized()
+        XCTAssertEqual(recipe.ingredients, ["1/3 cup olive oil", "3 tbsp white wine vinegar", "5 cups torn romaine", "1 apple"])
+        XCTAssertEqual(recipe.ingredientSections, [IngredientSection(title: "Dressing", start: 0), IngredientSection(title: "Salad", start: 2)])
+        XCTAssertEqual(recipe.standardized(), recipe)
+    }
+
+    func testNumberedStepsRunTogetherAreSplitAndNotesMoveOut() {
+        let blob = "NOTE #1: Cut this up into 1/2\" chunks. NOTE #2: Drain and reserve 1/2 of the liquid. "
+            + "1. In a large pot, brown the beef over medium heat. 2. Add the bell pepper. Cook for 5 to 10 more minutes. "
+            + "3. Reduce heat to low. 4. Blend in the tomatoes and simmer for 5-10 minutes."
+        let recipe = Recipe(title: "R", steps: [blob], notes: "").standardized()
+        XCTAssertEqual(recipe.steps, [
+            "In a large pot, brown the beef over medium heat.",
+            "Add the bell pepper. Cook for 5 to 10 more minutes.",
+            "Reduce heat to low.",
+            "Blend in the tomatoes and simmer for 5-10 minutes.",
+        ])
+        XCTAssertTrue(recipe.notes.hasPrefix("NOTE #1:"))
+        XCTAssertEqual(recipe.standardized(), recipe)
+    }
+
+    func testOrdinaryStepsWithNumbersAreLeftAlone() {
+        let steps = ["Bake at 350. 2 cups of sugar go in the bowl. Mix well.", "Cook 10. Minutes pass."]
+        XCTAssertEqual(Recipe(title: "R", steps: steps).standardized().steps.count, 2)
+    }
+
+    func testMentionsMarkTheIngredientNamesInTheStep() {
+        func found(_ step: String, _ list: [String]) -> [String] {
+            IngredientMatcher.mentions(in: step, ingredients: list).map { String(step[$0]) }
+        }
+        XCTAssertEqual(found("Add the black beans and stir.", ["1 can black beans"]), ["black beans"])
+        XCTAssertEqual(found("Scatter the parsley on top.", ["2 tbsp finely chopped fresh parsley"]), ["parsley"])
+        XCTAssertEqual(found("Dice the onions.", ["1 onion"]), ["onions"])
+        XCTAssertEqual(found("Fold in the berries.", ["1 cup blueberries"]), [])
+        XCTAssertEqual(found("Heat the olive oil.", ["2 tbsp extra virgin olive oil"]), ["olive oil"])
+    }
+
     func testStepsFindTheirIngredients() {
         let chili = [
             "500 g black beans, dried", "4 cans diced tomatoes", "1 can corn", "4 bell peppers", "1 onion", "2 cloves garlic",
@@ -260,5 +305,20 @@ final class IngredientSectionTests: XCTestCase {
         XCTAssertEqual(recipe.ingredients.count, 4)
         XCTAssertEqual(recipe.ingredientSections.map(\.title), ["For the chips", "Cinnamon sugar"])
         XCTAssertEqual(recipe.ingredientSections.map(\.start), [0, 2])
+    }
+}
+
+final class StepSplitterTests: XCTestCase {
+    func testOnlyVeryLongStepsNeedHelp() {
+        XCTAssertFalse(StepSplitter.needsHelp(["Brown the beef.", "Add the peppers."]))
+        XCTAssertTrue(StepSplitter.needsHelp([String(repeating: "Stir and wait. ", count: 40)]))
+    }
+
+    func testModelOutputThatLosesTheTextIsRejected() {
+        let original = String(repeating: "Brown the beef and onions over medium heat. ", count: 8)
+        XCTAssertNil(StepSplitter.validated(["Brown the beef."], original: original))
+        XCTAssertNil(StepSplitter.validated(["Brown the beef.", "Add peppers."], original: original))
+        let whole = original.split(separator: ".").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map { $0 + "." }
+        XCTAssertEqual(StepSplitter.validated(whole, original: original)?.count, 8)
     }
 }

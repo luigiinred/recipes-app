@@ -119,12 +119,15 @@ struct YouTubeEmbed: View {
     @ObservedObject var controller: YouTubePlayerController
     /// Where the video starts when the poster is tapped.
     var startAt = 0
-    /// How far the page has scrolled past its resting position; the video shrinks and pins to the top while playing.
+    /// How far the page has scrolled past its resting position; the video shrinks and pins to the top, playing or not.
     var scrolled: CGFloat = 0
     /// A small player without the "Open in YouTube" row.
     var isCompact = false
     @State private var width: CGFloat = 0
+    @State private var aspect: Double = 16 / 9
 
+    private static let maxHeight: CGFloat = 560
+    private static let compactMaxHeight: CGFloat = 150
     private static let pinMargin: CGFloat = 8
     private static let shrinkDistance: CGFloat = 160
 
@@ -134,7 +137,7 @@ struct YouTubeEmbed: View {
     }
 
     var body: some View {
-        let progress = controller.isPlaying ? min(1, max(0, scrolled / Self.shrinkDistance)) : 0
+        let progress = min(1, max(0, scrolled / Self.shrinkDistance))
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 if controller.isShown {
@@ -143,13 +146,15 @@ struct YouTubeEmbed: View {
                     poster
                 }
             }
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .frame(maxWidth: .infinity)
+            .aspectRatio(aspect, contentMode: .fit)
+            .frame(maxHeight: isCompact ? Self.compactMaxHeight : Self.maxHeight)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : 16 - 8 * progress))
+            .frame(maxWidth: .infinity)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .task(id: videoID) { aspect = await Self.ratio(for: videoID) }
             .scaleEffect(1 - (1 - miniScale) * progress, anchor: .topTrailing)
-            .offset(y: controller.isPlaying ? max(0, scrolled - Self.pinMargin) : 0)
+            .offset(y: max(0, scrolled - Self.pinMargin))
             .shadow(color: .black.opacity(isCompact ? 0.25 : 0.3 * progress), radius: isCompact ? 8 : 10 * progress, y: 4)
 
             if let message = controller.errorMessage {
@@ -161,6 +166,15 @@ struct YouTubeEmbed: View {
                     .foregroundStyle(Theme.accent)
             }
         }
+    }
+
+    @MainActor private static var known: [String: Double] = [:]
+
+    private static func ratio(for id: String) async -> Double {
+        if let cached = known[id] { return cached }
+        let ratio = await YouTubeImporter.aspectRatio(id: id) ?? 16 / 9
+        known[id] = ratio
+        return ratio
     }
 
     private var poster: some View {

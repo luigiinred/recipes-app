@@ -281,18 +281,40 @@ final class RecipeLibrary: ObservableObject {
         await remove(entry)
     }
 
-    /// Handles a drag that ended on a planner slot: a recipe becomes a new meal, a planned meal moves.
-    func drop(_ payload: PlannerPayload, on day: Date, meal: Meal) async {
-        switch payload.kind {
-        case .recipe:
-            guard let recipe = recipe(id: payload.id) else { return }
-            await plan(recipe, on: day, meal: meal)
-        case .entry:
-            guard var entry = mealPlan.first(where: { $0.id == payload.id }) else { return }
-            entry.day = DayKey.string(from: day)
-            entry.meal = meal
-            await update(entry)
+    /// Puts a smart plan on the calendar; recipes that were in Up Next leave the queue.
+    func plan(_ suggestions: [PlanSuggestion]) async {
+        let entries = suggestions.compactMap { suggestion -> MealPlanEntry? in
+            guard let recipe = recipe(id: suggestion.recipeID) else { return nil }
+            return MealPlanEntry(recipeID: recipe.id, title: recipe.title, day: suggestion.day, meal: suggestion.meal)
         }
+        let used = Set(suggestions.map(\.recipeID))
+        let dequeued = recipes.filter { used.contains($0.id) && $0.wantToCook }.map { recipe -> Recipe in
+            var changed = recipe
+            changed.wantToCook = false
+            changed.queuedAt = nil
+            return changed
+        }
+        await perform { library in
+            for entry in entries { try library.mealPlan.save(entry) }
+            for recipe in dequeued { try library.recipes.save(recipe) }
+        }
+    }
+
+    /// Reorders Up Next after a drag by renumbering the queue times of the recipes that moved.
+    func moveQueued(from source: IndexSet, to destination: Int) async {
+        let queue = RecipeCollection.wantToCook.filter(recipes)
+        guard queue.count > 1 else { return }
+        var ordered = queue
+        ordered.move(fromOffsets: source, toOffset: destination)
+        let base = queue.map { $0.queuedAt ?? $0.createdAt }.min() ?? Date()
+        let changed = ordered.enumerated().compactMap { index, recipe -> Recipe? in
+            let time = base.addingTimeInterval(Double(index))
+            guard recipe.queuedAt != time else { return nil }
+            var changed = recipe
+            changed.queuedAt = time
+            return changed
+        }
+        await perform { library in for recipe in changed { try library.recipes.save(recipe) } }
     }
 
     func addGroceries(_ items: [GroceryItem]) async {
@@ -317,6 +339,19 @@ final class RecipeLibrary: ObservableObject {
     func clearCompleted() async {
         let done = groceries.filter(\.isChecked)
         await perform { library in for item in done { try library.groceries.delete(item) } }
+    }
+
+    /// Re-saves every recipe whose ingredients, steps or tags aren't in the standard form yet; returns how many changed.
+    func tidyRecipes() async -> Int {
+        let changed = recipes.filter { $0.standardized() != $0 }
+        guard !changed.isEmpty else { return 0 }
+        await perform { library in for recipe in changed { try library.recipes.save(recipe) } }
+        return changed.count
+    }
+
+    func clearAllGroceries() async {
+        let all = groceries
+        await perform { library in for item in all { try library.groceries.delete(item) } }
     }
 
     /// Saves fixed sample content, replacing earlier copies of it.

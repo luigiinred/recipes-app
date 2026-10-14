@@ -19,6 +19,7 @@ struct RecipeDetailView: View {
     @State private var scrollRequest = 0
     @State private var scrolled: CGFloat = 0
     @State private var topInset: CGFloat = 0
+    @State private var headerOffset: CGFloat = 0
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
@@ -112,7 +113,7 @@ struct RecipeDetailView: View {
                     if recipe.youTubeVideoID != nil {
                         video.padding([.horizontal, .top], 24)
                     } else if hasArtwork {
-                        compactHero.padding(.top, -topInset)
+                        Color.clear.frame(height: CollapsingRecipeHeader<EmptyView, EmptyView>.photoHeight)
                     }
                     VStack(alignment: .leading, spacing: 24) {
                         header(showsTitle: !hasArtwork)
@@ -128,8 +129,33 @@ struct RecipeDetailView: View {
                 }
                 .textSelection(.enabled)
             }
-            .trackingVideoScroll($scrolled, active: player.isPlaying)
+            .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
+            .trackingHeaderScroll($headerOffset, active: hasArtwork)
+            .overlay(alignment: .top) {
+                if hasArtwork {
+                    CollapsingRecipeHeader(title: recipe.title, topInset: topInset, offset: headerOffset) {
+                        artwork
+                    } actions: {
+                        headerActions
+                    }
+                }
+            }
             .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
+        }
+    }
+
+    @ViewBuilder
+    private var headerActions: some View {
+        if previewSave == nil {
+            HeaderActionButton(title: "Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
+                .disabled(recipe.steps.isEmpty)
+            HeaderActionButton(title: "Add to Groceries", systemImage: "checklist") { addingToGroceries = true }
+                .disabled(recipe.ingredients.isEmpty)
+            HeaderActionButton(title: recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next",
+                               systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
+                Task { await library.setQueued(recipe, !recipe.wantToCook) }
+            }
+            HeaderActionButton(title: "Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
         }
     }
 
@@ -148,7 +174,7 @@ struct RecipeDetailView: View {
                     .frame(maxWidth: 720, alignment: .leading)
                     .frame(maxWidth: .infinity)
                 }
-                .trackingVideoScroll($scrolled, active: player.isPlaying)
+                .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
                 .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
             }
             Divider()
@@ -205,24 +231,6 @@ struct RecipeDetailView: View {
         } else {
             RecipeImageView(recipe: recipe)
         }
-    }
-
-    private var compactHero: some View {
-        Color.clear
-            .frame(height: 320 + topInset)
-            .frame(maxWidth: .infinity)
-            .overlay { artwork }
-            .clipped()
-            .overlay(alignment: .bottomLeading) {
-                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
-                    .allowsHitTesting(false)
-            }
-            .overlay(alignment: .bottomLeading) {
-                Text(recipe.title)
-                    .font(.system(.largeTitle, design: .serif, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(20)
-            }
     }
 
     private func header(showsTitle: Bool) -> some View {
@@ -286,6 +294,9 @@ struct RecipeDetailView: View {
                     .disabled(recipe.steps.isEmpty)
                 tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
                     .disabled(recipe.ingredients.isEmpty)
+                tile(recipe.wantToCook ? "Queued" : "Up Next", systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
+                    Task { await library.setQueued(recipe, !recipe.wantToCook) }
+                }
                 tile("Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
             }
         }
@@ -423,7 +434,15 @@ struct AddToCalendarSheet: View {
 }
 
 private extension View {
-    /// Reports how far a scroll view has moved past its resting position, but only while a video is playing.
+    /// Reports how far a scroll view has moved past its resting position, but only when the recipe has a video.
+    func trackingHeaderScroll(_ offset: Binding<CGFloat>, active: Bool) -> some View {
+        onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
+            active ? geometry.contentOffset.y + geometry.contentInsets.top : 0
+        } action: { _, value in
+            offset.wrappedValue = value
+        }
+    }
+
     func trackingVideoScroll(_ scrolled: Binding<CGFloat>, active: Bool) -> some View {
         onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
             active ? max(0, geometry.contentOffset.y + geometry.contentInsets.top) : 0

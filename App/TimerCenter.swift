@@ -31,11 +31,17 @@ final class TimerCenter: ObservableObject {
         let timer = CookTimer(label: label, duration: seconds, endsAt: Date().addingTimeInterval(Double(seconds)))
         timers.append(timer)
         scheduleNotification(for: timer)
+        #if os(iOS)
+        TimerLiveActivities.start(timer)
+        #endif
     }
 
     func cancel(_ timer: CookTimer) {
         timers.removeAll { $0.id == timer.id }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [timer.id.uuidString])
+        #if os(iOS)
+        Task { await TimerLiveActivities.end(timer.id) }
+        #endif
     }
 
     private func scheduleNotification(for timer: CookTimer) {
