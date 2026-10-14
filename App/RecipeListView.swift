@@ -83,6 +83,7 @@ struct RecipeListView: View {
                     .tag(recipe.id)
                     .listRowSeparator(style == .cards ? .hidden : .automatic)
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
+                    .recipeSwipeActions(for: recipe)
                     .contextMenu {
                         RecipeQuickActions(recipe: recipe)
                         Button("Edit", systemImage: "pencil") { editing = recipe }
@@ -360,25 +361,71 @@ struct RecipeMeta: View {
 }
 
 struct RecipeCard: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     let recipe: Recipe
 
+    private var hasPhoto: Bool { library.hasImage(recipe.id) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            RecipeImageView(recipe: recipe)
-                .aspectRatio(4 / 3, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 22))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(recipe.title).font(.system(.title3, design: .serif, weight: .semibold)).lineLimit(2)
-                    RecipeBadges(recipe: recipe)
+        Color.clear
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .overlay { backdrop }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(recipe.title)
+                        .font(.system(.title2, design: .serif, weight: .semibold))
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+                    details
                 }
-                if !recipe.summary.isEmpty {
-                    Text(recipe.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-                }
-                RecipeMeta(recipe: recipe)
+                .foregroundStyle(.white)
+                .padding(16)
             }
-            .padding(.horizontal, 4)
+            .overlay(alignment: .topTrailing) { badges.padding(12) }
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+            .accessibilityElement(children: .combine)
+    }
+
+    private var backdrop: some View {
+        ZStack {
+            if hasPhoto {
+                RecipeImageView(recipe: recipe)
+            } else {
+                LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 56)).foregroundStyle(.white.opacity(0.22))
+            }
+            LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
+        }
+    }
+
+    private var details: some View {
+        var parts: [String] = []
+        if let minutes = recipe.totalMinutes { parts.append("\(minutes) min") }
+        if let tag = recipe.tags.first { parts.append(CategoryTree.displayName(tag)) }
+        return Text(parts.joined(separator: "  ·  "))
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.white.opacity(0.88))
+            .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var badges: some View {
+        let showsFavorite = (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites && recipe.isFavorite
+        if showsFavorite || recipe.wantToCook || (recipe.rating != nil && (RatingStyle(rawValue: styleRaw) ?? .favorites) == .stars) {
+            HStack(spacing: 8) {
+                if showsFavorite { Image(systemName: "heart.fill").foregroundStyle(Theme.accent) }
+                if let rating = recipe.rating, (RatingStyle(rawValue: styleRaw) ?? .favorites) == .stars {
+                    Label("\(rating)", systemImage: "star.fill").foregroundStyle(Theme.accent).monospacedDigit()
+                }
+                if recipe.wantToCook { Image(systemName: "text.line.first.and.arrowtriangle.forward").foregroundStyle(.primary) }
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .glassEffect(.regular, in: Capsule())
         }
     }
 }

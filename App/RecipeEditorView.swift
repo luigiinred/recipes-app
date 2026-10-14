@@ -28,8 +28,8 @@ struct RecipeEditorView: View {
     @State private var prep: String
     @State private var cook: String
     @State private var ingredients: [EditableIngredient]
-    @State private var isGrouping = false
-    @State private var groupingMessage: String?
+    @State private var isCleaning = false
+    @State private var cleanupMessage: String?
     @State private var steps: [EditableLine]
     @FocusState private var focused: UUID?
     @State private var generatingImage = false
@@ -153,18 +153,18 @@ struct RecipeEditorView: View {
                     PlainField("Notes", text: $notes, axis: .vertical)
                 }
                 Section {
-                    Button { Task { await groupIngredients() } } label: {
-                        Label(isGrouping ? "Grouping…" : "Group Ingredients", systemImage: "sparkles")
+                    Button { Task { await cleanUp() } } label: {
+                        Label(isCleaning ? "Cleaning Up…" : "Clean Up with Apple Intelligence", systemImage: "sparkles")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .disabled(isGrouping || !AppleIntelligence.status.isAvailable || realIngredients.count < 4)
+                    .disabled(isCleaning)
                     .frame(maxWidth: .infinity)
                 } footer: {
-                    if let groupingMessage {
-                        Text(groupingMessage)
-                    } else if !AppleIntelligence.status.isAvailable {
-                        Text("Grouping needs Apple Intelligence. " + AppleIntelligence.status.explanation)
+                    if let cleanupMessage {
+                        Text(cleanupMessage)
+                    } else {
+                        Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
                     }
                 }
             }
@@ -227,25 +227,58 @@ struct RecipeEditorView: View {
         }
     }
 
-    private func groupIngredients() async {
-        isGrouping = true
-        groupingMessage = nil
-        defer { isGrouping = false }
-        let outcome = await IngredientGrouper.group(
-            title: title, ingredients: realIngredients, steps: steps.map(\.text).filter { !$0.isEmpty }
-        )
-        withAnimation(.snappy) {
-            switch outcome {
-            case .grouped(let list, let sections):
-                ingredients = Self.rows(for: Recipe(title: title, ingredients: list, ingredientSections: sections))
-                groupingMessage = "Grouped into \(sections.count) sections. Drag ingredients between sections to fix any mix-ups."
-            case .unchanged:
-                groupingMessage = "These ingredients all belong together, so no sections were added."
-            case .unavailable(let status):
-                groupingMessage = status.explanation
-            case .failed(let reason):
-                groupingMessage = "Couldn't group the ingredients: \(reason)"
+    private func cleanUp() async {
+        isCleaning = true
+        cleanupMessage = nil
+        defer { isCleaning = false }
+
+        var items: [String] = []
+        var sections: [IngredientSection] = []
+        for row in ingredients {
+            if row.isHeading {
+                let name = row.item.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { sections.append(IngredientSection(title: name, start: items.count)) }
+            } else if !row.text.isEmpty {
+                items.append(row.text)
             }
+        }
+        let before = (ingredients: items, steps: steps.map(\.text), sections: sections.count, notes: notes)
+        var recipe = Recipe(title: title, ingredients: items, ingredientSections: sections, steps: before.steps, notes: notes).standardized()
+
+        let status = AppleIntelligence.status
+        recipe.steps = await StepSplitter.split(recipe.steps)
+        var grouped = false
+        if recipe.ingredientSections.isEmpty, status.isAvailable,
+           case .grouped(let list, let found) = await IngredientGrouper.group(title: title, ingredients: recipe.ingredients, steps: recipe.steps) {
+            recipe.ingredients = list
+            recipe.ingredientSections = found
+            grouped = true
+        }
+
+        var changes: [String] = []
+        let known = Set(before.ingredients)
+        let tidied = recipe.ingredients.filter { !known.contains($0) }.count
+        if tidied > 0 { changes.append("tidied \(tidied) \(tidied == 1 ? "ingredient" : "ingredients")") }
+        if recipe.ingredientSections.count > before.sections {
+            let added = recipe.ingredientSections.count - before.sections
+            changes.append("\(grouped ? "grouped the ingredients into" : "found") \(added) \(added == 1 ? "section" : "sections")")
+        }
+        if recipe.steps.count != steps.filter({ !$0.text.isEmpty }).count { changes.append("split the method into \(recipe.steps.count) steps") }
+        if recipe.notes != before.notes { changes.append("moved loose notes into Notes") }
+
+        withAnimation(.snappy) {
+            ingredients = Self.rows(for: recipe)
+            notes = recipe.notes
+            if recipe.steps.count == steps.count {
+                for index in steps.indices { steps[index].text = recipe.steps[index] }
+            } else {
+                let hadExtras = steps.contains { !$0.time.isEmpty || $0.imageID != nil }
+                steps = recipe.steps.map { EditableLine(text: $0) }
+                if hadExtras { changes.append("cleared step times and photos because the steps changed") }
+            }
+            var message = changes.isEmpty ? "Everything already looks tidy." : "Cleaned up: " + changes.joined(separator: ", ") + "."
+            if !status.isAvailable { message += " Splitting long steps and grouping ingredients need Apple Intelligence. " + status.explanation }
+            cleanupMessage = message
         }
     }
 

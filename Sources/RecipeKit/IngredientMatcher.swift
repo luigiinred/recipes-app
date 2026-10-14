@@ -41,6 +41,38 @@ public enum IngredientMatcher {
         return matched.sorted()
     }
 
+    /// Where the step names the ingredients it uses, for highlighting: the longest form of each name that appears.
+    public static func mentions(in step: String, ingredients: [String]) -> [Range<String.Index>] {
+        var taken: [Range<String.Index>] = []
+        let candidates = indices(in: step, ingredients: ingredients).flatMap { index -> [(Int, [String])] in
+            let name = rawNameWords(of: ingredients[index])
+            return [name, Array(name.suffix(2)), Array(name.suffix(1))].enumerated().compactMap { $0.element.isEmpty ? nil : ($0.offset, $0.element) }
+        }
+        for (_, words) in candidates.sorted(by: { $0.1.count > $1.1.count }) {
+            let pattern = "\\b" + words.map(wordPattern).joined(separator: "\\s+") + "\\b"
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { continue }
+            for match in regex.matches(in: step, range: NSRange(step.startIndex..., in: step)) {
+                guard let range = Range(match.range, in: step), !taken.contains(where: { $0.overlaps(range) }) else { continue }
+                taken.append(range)
+            }
+        }
+        return taken.sorted { $0.lowerBound < $1.lowerBound }
+    }
+
+    private static func rawNameWords(of ingredient: String) -> [String] {
+        let name = Ingredient(parsing: ingredient).name
+            .replacingOccurrences(of: #"\([^)]*\)"#, with: " ", options: .regularExpression)
+        let all = name.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count >= 2 }
+        let meaningful = all.filter { !fillers.contains($0) }
+        return meaningful.isEmpty ? all : meaningful
+    }
+
+    private static func wordPattern(_ word: String) -> String {
+        let stem = singular(word)
+        if stem.hasSuffix("y"), stem.count > 2 { return NSRegularExpression.escapedPattern(for: String(stem.dropLast())) + "(?:y|ies)" }
+        return NSRegularExpression.escapedPattern(for: stem) + "(?:e?s)?"
+    }
+
     private static func nameWords(of ingredient: String) -> [String] {
         let name = Ingredient(parsing: ingredient).name
             .replacingOccurrences(of: #"\([^)]*\)"#, with: " ", options: .regularExpression)

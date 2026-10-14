@@ -37,7 +37,7 @@ struct GroceriesView: View {
                                        description: Text("Add ingredients from any recipe."))
             }
         }
-        .modifier(GroceriesChrome(embedded: embedded, title: layout == .completed ? "Completed" : "Groceries", showsClear: layout != .toBuy))
+        .modifier(GroceriesChrome(embedded: embedded, title: layout == .completed ? "Completed" : "Groceries", showsMenu: layout != .completed))
     }
 
     @ViewBuilder
@@ -145,7 +145,7 @@ struct AddToGroceriesSheet: View {
 private struct GroceriesChrome: ViewModifier {
     let embedded: Bool
     let title: String
-    let showsClear: Bool
+    let showsMenu: Bool
 
     func body(content: Content) -> some View {
         if embedded {
@@ -153,20 +153,39 @@ private struct GroceriesChrome: ViewModifier {
         } else {
             content
                 .navigationTitle(title)
-                .toolbar { if showsClear { ClearCompletedButton() } }
+                .toolbar { if showsMenu { GroceriesMenu() } }
         }
     }
 }
 
-struct ClearCompletedButton: ToolbarContent {
+struct GroceriesMenu: ToolbarContent {
     @EnvironmentObject private var library: RecipeLibrary
+    @State private var confirmingClearAll = false
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Button("Clear Completed", systemImage: "checkmark.circle") {
-                Task { await library.clearCompleted() }
+            Menu("Groceries Options", systemImage: "ellipsis.circle") {
+                Button("Clear Completed", systemImage: "checkmark.circle") {
+                    Task { await library.clearCompleted() }
+                }
+                .disabled(!library.groceries.contains(where: \.isChecked))
+                Button("Clear All", systemImage: "trash", role: .destructive) {
+                    confirmingClearAll = true
+                }
+                .disabled(library.groceries.isEmpty)
+                if library.remindersStatus != .unavailable {
+                    Divider()
+                    Toggle("Sync with Reminders", systemImage: "checklist", isOn: Binding(
+                        get: { library.remindersEnabled },
+                        set: { value in Task { await library.setRemindersEnabled(value) } }
+                    ))
+                }
             }
-            .disabled(!library.groceries.contains(where: \.isChecked))
+            .confirmationDialog("Clear the whole grocery list?", isPresented: $confirmingClearAll, titleVisibility: .visible) {
+                Button("Clear All", role: .destructive) { Task { await library.clearAllGroceries() } }
+            } message: {
+                Text("This removes every item, including ones not yet bought.")
+            }
         }
     }
 }
