@@ -198,9 +198,24 @@ private struct DataSettingsPage: View {
     @State private var isExportPresented = false
     @State private var isExporting = false
     @State private var exportError: String?
+    @State private var tidyMessage: String?
 
     var body: some View {
         Form {
+            Section {
+                Button {
+                    Task {
+                        let count = await library.tidyRecipes()
+                        tidyMessage = count == 0 ? "Every recipe is already tidy." : "Cleaned up \(count) \(count == 1 ? "recipe" : "recipes")."
+                    }
+                } label: {
+                    Label("Tidy imported recipes", systemImage: "wand.and.sparkles")
+                }
+            } header: {
+                Text("Clean up")
+            } footer: {
+                Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, and splits steps that were pasted as one block.")
+            }
             Section {
                 Button { Task { await prepareExport() } } label: {
                     Label("Export all data as JSON", systemImage: "square.and.arrow.up")
@@ -223,6 +238,11 @@ private struct DataSettingsPage: View {
             defaultFilename: LibraryExportDocument.defaultFilename()
         ) { result in
             if case .failure(let error) = result { exportError = error.localizedDescription }
+        }
+        .alert("Tidy imported recipes", isPresented: Binding(get: { tidyMessage != nil }, set: { if !$0 { tidyMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(tidyMessage ?? "")
         }
         .alert("Couldn't export", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK", role: .cancel) {}

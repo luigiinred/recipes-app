@@ -127,6 +127,7 @@ struct YouTubeEmbed: View {
     @State private var aspect: Double = 16 / 9
 
     private static let maxHeight: CGFloat = 560
+    private static let compactMaxHeight: CGFloat = 150
     private static let pinMargin: CGFloat = 8
     private static let shrinkDistance: CGFloat = 160
 
@@ -146,7 +147,7 @@ struct YouTubeEmbed: View {
                 }
             }
             .aspectRatio(aspect, contentMode: .fit)
-            .frame(maxHeight: isCompact ? .infinity : Self.maxHeight)
+            .frame(maxHeight: isCompact ? Self.compactMaxHeight : Self.maxHeight)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : 16 - 8 * progress))
             .frame(maxWidth: .infinity)

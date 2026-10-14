@@ -146,7 +146,7 @@ public struct Ingredient: Hashable, Sendable {
     }
 
     public init(parsing text: String) {
-        var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        var tokens = Self.strippingDecoration(text).split(whereSeparator: \.isWhitespace).map(String.init)
         let original = tokens.joined(separator: " ")
         var quantityTokens: [String] = []
         var unit: IngredientUnit?
@@ -180,6 +180,16 @@ public struct Ingredient: Hashable, Sendable {
         } else {
             self.init(quantity: Self.normalizedQuantity(quantityTokens.joined(separator: " ")), unit: unit, item: item)
         }
+    }
+
+    /// Drops the bullets, diamonds, checkboxes and emoji some sites put in front of an ingredient.
+    static func strippingDecoration(_ text: String) -> String {
+        var rest = Substring(text)
+        while let first = rest.first, !(first.isLetter || first.isNumber || first == "(") {
+            if first == ".", rest.dropFirst().first?.isNumber == true { break }
+            rest = rest.dropFirst()
+        }
+        return String(rest)
     }
 
     /// The quantity and unit together, such as "1 1/2 cups"; empty for items without one.

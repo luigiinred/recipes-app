@@ -29,6 +29,8 @@ struct RecipeEditorView: View {
     @State private var cook: String
     @State private var ingredients: [EditableIngredient]
     @State private var isGrouping = false
+    @State private var isCleaning = false
+    @State private var cleanupMessage: String?
     @State private var groupingMessage: String?
     @State private var steps: [EditableLine]
     @FocusState private var focused: UUID?
@@ -90,6 +92,19 @@ struct RecipeEditorView: View {
                         }
                     } footer: {
                         if notice == nil { Text("Check the recipe below against the scan before saving.") }
+                    }
+                }
+                Section {
+                    Button { Task { await cleanUp() } } label: {
+                        Label(isCleaning ? "Cleaning Up…" : "Clean Up with Apple Intelligence", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isCleaning)
+                } footer: {
+                    if let cleanupMessage {
+                        Text(cleanupMessage)
+                    } else {
+                        Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
                     }
                 }
                 Section {
@@ -220,6 +235,61 @@ struct RecipeEditorView: View {
         recipe.ingredientGroups.flatMap { group -> [EditableIngredient] in
             let heading = group.title.map { [EditableIngredient(heading: $0)] } ?? []
             return heading + group.items.map { EditableIngredient(parsing: $0.text) }
+        }
+    }
+
+    private func cleanUp() async {
+        isCleaning = true
+        cleanupMessage = nil
+        defer { isCleaning = false }
+
+        var items: [String] = []
+        var sections: [IngredientSection] = []
+        for row in ingredients {
+            if row.isHeading {
+                let name = row.item.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { sections.append(IngredientSection(title: name, start: items.count)) }
+            } else if !row.text.isEmpty {
+                items.append(row.text)
+            }
+        }
+        let before = (ingredients: items, steps: steps.map(\.text), sections: sections.count, notes: notes)
+        var recipe = Recipe(title: title, ingredients: items, ingredientSections: sections, steps: before.steps, notes: notes).standardized()
+
+        let status = AppleIntelligence.status
+        recipe.steps = await StepSplitter.split(recipe.steps)
+        var grouped = false
+        if recipe.ingredientSections.isEmpty, status.isAvailable,
+           case .grouped(let list, let found) = await IngredientGrouper.group(title: title, ingredients: recipe.ingredients, steps: recipe.steps) {
+            recipe.ingredients = list
+            recipe.ingredientSections = found
+            grouped = true
+        }
+
+        var changes: [String] = []
+        let known = Set(before.ingredients)
+        let tidied = recipe.ingredients.filter { !known.contains($0) }.count
+        if tidied > 0 { changes.append("tidied \(tidied) \(tidied == 1 ? "ingredient" : "ingredients")") }
+        if recipe.ingredientSections.count > before.sections {
+            let added = recipe.ingredientSections.count - before.sections
+            changes.append("\(grouped ? "grouped the ingredients into" : "found") \(added) \(added == 1 ? "section" : "sections")")
+        }
+        if recipe.steps.count != steps.filter({ !$0.text.isEmpty }).count { changes.append("split the method into \(recipe.steps.count) steps") }
+        if recipe.notes != before.notes { changes.append("moved loose notes into Notes") }
+
+        withAnimation(.snappy) {
+            ingredients = Self.rows(for: recipe)
+            notes = recipe.notes
+            if recipe.steps.count == steps.count {
+                for index in steps.indices { steps[index].text = recipe.steps[index] }
+            } else {
+                let hadExtras = steps.contains { !$0.time.isEmpty || $0.imageID != nil }
+                steps = recipe.steps.map { EditableLine(text: $0) }
+                if hadExtras { changes.append("cleared step times and photos because the steps changed") }
+            }
+            var message = changes.isEmpty ? "Everything already looks tidy." : "Cleaned up: " + changes.joined(separator: ", ") + "."
+            if !status.isAvailable { message += " Splitting long steps and grouping ingredients need Apple Intelligence. " + status.explanation }
+            cleanupMessage = message
         }
     }
 
