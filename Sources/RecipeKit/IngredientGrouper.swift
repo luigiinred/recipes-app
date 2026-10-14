@@ -3,7 +3,7 @@ import Foundation
 import FoundationModels
 #endif
 
-/// Sorts a long ingredient list into sections such as "Dough" and "Topping".
+/// Splits an ingredient list into sections only where the recipe makes distinct parts, such as a salad and its dressing.
 public enum IngredientGrouper {
     public struct Group: Sendable {
         public var title: String
@@ -76,15 +76,20 @@ public enum IngredientGrouper {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
             let session = LanguageModelSession(instructions: """
-                You organize a recipe's ingredient list into sections. A section is one component of the dish that the method \
-                makes separately and then combines, such as the main food, a sauce, a dressing, a filling or a topping. \
-                Name each section after what it makes, like "Pancakes", "Syrup" or "Cinnamon sugar", never "Dough" or "Topping" \
-                unless the recipe really is a dough or topping. Only split when the method clearly makes separate components; \
-                otherwise use a single section name for every ingredient. Write one assignment for every ingredient, in order, \
-                using the same section name for ingredients that belong together.
+                You decide whether a recipe's ingredient list needs sections. Most recipes do not: use one section name for every \
+                ingredient unless the method makes a distinct part of the meal separately and then combines or serves it with the \
+                rest, such as a salad's dressing, a pie's filling and crust, or a dish's sauce. Never group by type of ingredient \
+                (spices, produce, dairy, pantry) or by when an ingredient is added; seasonings, oil and garnishes stay with the \
+                part of the meal they flavor. Name each section after the part of the meal it makes, like "Salad" and "Dressing". \
+                Write one assignment for every ingredient, in order, using the same section name for ingredients that belong together.
 
-                Example. Ingredients: 1 flour, 2 eggs, 3 milk, 4 maple syrup, 5 butter. Method: whisk the flour, eggs and milk and fry \
-                the pancakes; warm the syrup with the butter and pour over. Assignments: 1 Pancakes, 2 Pancakes, 3 Pancakes, 4 Syrup, 5 Syrup.
+                Example 1. Ingredients: 1 romaine, 2 cucumber, 3 olive oil, 4 lemon juice, 5 Dijon mustard, 6 salt. Method: toss the \
+                romaine and cucumber; whisk the oil, lemon juice, mustard and salt and pour over. Assignments: 1 Salad, 2 Salad, \
+                3 Dressing, 4 Dressing, 5 Dressing, 6 Dressing.
+
+                Example 2. Ingredients: 1 chicken thighs, 2 onion, 3 garlic, 4 paprika, 5 cumin, 6 salt, 7 olive oil. Method: season \
+                the chicken, then cook it with the onion and garlic in the oil. Assignments: 1 Chicken, 2 Chicken, 3 Chicken, \
+                4 Chicken, 5 Chicken, 6 Chicken, 7 Chicken.
                 """)
             let list = ingredients.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
             let method = steps.joined(separator: " ").prefix(1800)
@@ -117,7 +122,7 @@ public enum IngredientGrouper {
 @available(macOS 26.0, iOS 26.0, *)
 @Generable
 struct GeneratedGrouping {
-    @Guide(description: "One sentence naming the separate things the method makes before combining them.")
+    @Guide(description: "One sentence naming the distinct parts of the meal the method makes separately, or saying it is a single dish.")
     var components: String
     @Guide(description: "One assignment per ingredient, in the order listed.")
     var assignments: [GeneratedAssignment]
@@ -128,7 +133,7 @@ struct GeneratedGrouping {
 struct GeneratedAssignment {
     @Guide(description: "The ingredient's number as listed.")
     var number: Int
-    @Guide(description: "A short name for what its section makes, such as Pancakes, Syrup or Cinnamon sugar.")
+    @Guide(description: "A short name for the part of the meal its section makes, such as Salad or Dressing. Reuse one name for a single dish.")
     var section: String
 }
 #endif

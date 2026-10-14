@@ -9,8 +9,6 @@ struct RecipeDetailView: View {
     var previewSave: (() -> Void)?
     var previewImage: Data?
 
-    @State private var checkedIngredients: Set<Int> = []
-    @State private var doneSteps: Set<Int> = []
     @State private var confirmingDelete = false
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
@@ -320,20 +318,12 @@ struct RecipeDetailView: View {
                             .accessibilityAddTraits(.isHeader)
                     }
                     ForEach(group.items, id: \.index) { index, text in
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Image(systemName: checkedIngredients.contains(index) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(checkedIngredients.contains(index) ? Theme.accent : .secondary)
-                            IngredientLine(text: text)
-                                .strikethrough(checkedIngredients.contains(index))
-                                .foregroundStyle(checkedIngredients.contains(index) ? .secondary : .primary)
-                                .multilineTextAlignment(.leading)
+                        HStack {
+                            IngredientLine(text: text).multilineTextAlignment(.leading)
                             Spacer(minLength: 0)
                         }
                         .padding(12)
                         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                        .contentShape(Rectangle())
-                        .onTapGesture { toggle(&checkedIngredients, index) }
-                        .accessibilityAddTraits(.isButton)
                     }
                 }
             }
@@ -348,10 +338,7 @@ struct RecipeDetailView: View {
                         HStack {
                             Text("STEP \(index + 1)")
                                 .font(.footnote.weight(.bold))
-                                .foregroundStyle(doneSteps.contains(index) ? Color.secondary : Theme.accent)
-                            if doneSteps.contains(index) {
-                                Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                            }
+                                .foregroundStyle(Theme.accent)
                             Spacer(minLength: 0)
                             if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
                                 Button {
@@ -370,13 +357,10 @@ struct RecipeDetailView: View {
                         }
                         Text(text)
                             .font(.system(.body, design: .serif))
-                            .foregroundStyle(doneSteps.contains(index) ? .secondary : .primary)
                             .multilineTextAlignment(.leading)
                         StepIngredientChips(recipe: recipe, step: index)
                         if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggle(&doneSteps, index) }
                 }
             }
         }
@@ -398,10 +382,6 @@ struct RecipeDetailView: View {
             Text(title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1)
             content()
         }
-    }
-
-    private func toggle(_ set: inout Set<Int>, _ index: Int) {
-        if !set.insert(index).inserted { set.remove(index) }
     }
 }
 
