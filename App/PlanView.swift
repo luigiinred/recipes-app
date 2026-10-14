@@ -1,0 +1,130 @@
+import RecipeKit
+import SwiftUI
+
+enum PlanMode: String, CaseIterable {
+    case queue, week
+
+    var title: String { self == .queue ? "Up Next" : "My Week" }
+}
+
+/// The planner: the queue of recipes to cook soon, and the week they land in.
+struct PlanView: View {
+    @Binding var mode: PlanMode
+    let open: (UUID) -> Void
+    var showsSmartPlan = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Plan", selection: $mode) {
+                ForEach(PlanMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            switch mode {
+            case .queue: QueueView(open: open)
+            case .week: MyWeekView(open: open, showsSmartPlan: showsSmartPlan)
+            }
+        }
+        .navigationTitle("Plan")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+struct QueueView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var cook: CookSession
+    let open: (UUID) -> Void
+
+    @State private var planning: Recipe?
+    @State private var adding = false
+
+    private var queue: [Recipe] { RecipeCollection.wantToCook.filter(library.recipes) }
+
+    var body: some View {
+        List {
+            ForEach(queue) { recipe in
+                Button { open(recipe.id) } label: { RecipeRow(recipe: recipe) }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .leading) {
+                        Button { planning = recipe } label: { Label("Plan", systemImage: "calendar.badge.plus") }
+                            .tint(Theme.accent)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button { remove(recipe) } label: { Label("Remove", systemImage: "minus.circle") }
+                            .tint(.orange)
+                    }
+                    .contextMenu {
+                        Button("Plan…", systemImage: "calendar.badge.plus") { planning = recipe }
+                        Button("Cook", systemImage: "frying.pan") { cook.start(recipe) }
+                            .disabled(recipe.steps.isEmpty)
+                        Divider()
+                        Button("Remove from Up Next", systemImage: "minus.circle", role: .destructive) { remove(recipe) }
+                    }
+            }
+            .onMove { source, destination in Task { await library.moveQueued(from: source, to: destination) } }
+        }
+        .listStyle(.plain)
+        .animation(.snappy, value: queue.map(\.id))
+        .overlay {
+            if queue.isEmpty {
+                ContentUnavailableView {
+                    Label("Nothing in Up Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                } description: {
+                    Text("Swipe a recipe left in your library, or tap Add, to line up what you want to cook soon.")
+                } actions: {
+                    Button("Add Recipes") { adding = true }.buttonStyle(.borderedProminent)
+                }
+            }
+        }
+        .toolbar {
+            #if os(iOS)
+            if queue.count > 1 { ToolbarItem(placement: .navigation) { EditButton() } }
+            #endif
+            ToolbarItem(placement: .primaryAction) {
+                Button { adding = true } label: { Label("Add to Up Next", systemImage: "plus") }
+            }
+        }
+        .sheet(item: $planning) { AddToCalendarSheet(recipe: $0) }
+        .sheet(isPresented: $adding) { UpNextPickerSheet() }
+    }
+
+    private func remove(_ recipe: Recipe) {
+        Task { await library.setQueued(recipe, false) }
+    }
+}
+
+struct UpNextPickerSheet: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+
+    private var candidates: [Recipe] { library.recipes.filter { !$0.wantToCook && $0.matches(search) } }
+
+    var body: some View {
+        NavigationStack {
+            List(candidates) { recipe in
+                Button {
+                    Task { await library.setQueued(recipe, true) }
+                    dismiss()
+                } label: { RecipeRow(recipe: recipe) }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+            .overlay {
+                if candidates.isEmpty { ContentUnavailableView.search(text: search) }
+            }
+            .searchable(text: $search, prompt: "Search recipes")
+            .navigationTitle("Add to Up Next")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { ToolbarItem(placement: .cancellationAction) { CancelButton() } }
+        }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 480)
+        #endif
+    }
+}

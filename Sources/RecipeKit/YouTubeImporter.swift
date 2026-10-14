@@ -161,6 +161,21 @@ public enum YouTubeImporter {
     }
 
     /// Timed captions of a video, preferring a human-written English track over auto-generated ones.
+    /// Width over height of the video's player, so vertical videos and other shapes don't get letterboxed.
+    public static func aspectRatio(id: String) async -> Double? {
+        guard let url = URL(string: "https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=\(id)"),
+              let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+        return aspectRatio(fromOEmbed: data)
+    }
+
+    static func aspectRatio(fromOEmbed data: Data) -> Double? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let width = (json["width"] as? NSNumber)?.doubleValue,
+              let height = (json["height"] as? NSNumber)?.doubleValue,
+              width > 0, height > 0 else { return nil }
+        return min(max(width / height, 0.5), 2.4)
+    }
+
     public static func fetchCaptions(id: String) async -> [CaptionSegment] {
         await fetchCaptions(id: id, clients: [.android, .ios])
     }
