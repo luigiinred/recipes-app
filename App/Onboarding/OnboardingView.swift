@@ -16,6 +16,7 @@ struct OnboardingView: View {
     @State private var failures: [OnboardingSource.ID: String] = [:]
     @State private var previews: [OnboardingSource.ID: ImportResult] = [:]
     @State private var covers: [OnboardingSource.ID: CGImage] = [:]
+    @State private var isLoadingPreviews = false
     @StateObject private var progress = ImportProgressModel()
 
     init(step: Step = .welcome, loadsPreviews: Bool = true, onFinish: @escaping () -> Void) {
@@ -253,7 +254,7 @@ struct OnboardingView: View {
                 LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 if let cover = covers[source.id] {
                     Image(decorative: cover, scale: 1).resizable().scaledToFill().transition(.opacity)
-                } else if previews[source.id] == nil, failures[source.id] == nil {
+                } else if isLoadingPreviews, previews[source.id] == nil {
                     ProgressView()
                 } else {
                     Image(systemName: source.kind == .video ? "play.rectangle.fill" : "fork.knife")
@@ -269,6 +270,8 @@ struct OnboardingView: View {
 
     private func loadPreviews() async {
         guard loadsPreviews else { return }
+        isLoadingPreviews = true
+        defer { isLoadingPreviews = false }
         let pending = OnboardingSources.all.filter { previews[$0.id] == nil }
         await withTaskGroup(of: (OnboardingSource.ID, ImportResult?).self) { group in
             for source in pending {
