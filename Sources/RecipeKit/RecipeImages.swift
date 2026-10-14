@@ -60,7 +60,45 @@ public enum RecipeImageProcessing {
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
         ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map(trimmingLetterbox)
+    }
+
+    /// Crops matching black bars off opposite edges, such as the ones baked into YouTube's 4:3 thumbnails. A one-sided dark
+    /// edge is left alone, since that is more likely part of the photo.
+    static func trimmingLetterbox(_ image: CGImage) -> CGImage {
+        let width = image.width, height = image.height
+        guard width >= 16, height >= 16,
+              let context = CGContext(
+                  data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+              ), let base = context.data else { return image }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+
+        func isBlack(_ count: Int, _ brightAt: (Int) -> UInt8) -> Bool {
+            var bright = 0
+            for index in 0..<count where brightAt(index) > 40 { bright += 1 }
+            return bright * 100 <= count
+        }
+        func bars(length: Int, isBlackAt: (Int) -> Bool) -> (leading: Int, trailing: Int) {
+            var leading = 0, trailing = 0
+            while leading < length, isBlackAt(leading) { leading += 1 }
+            while trailing < length - leading, isBlackAt(length - 1 - trailing) { trailing += 1 }
+            return (leading, trailing)
+        }
+
+        let rows = bars(length: height) { row in isBlack(width) { pixels[row * width + $0] } }
+        let columns = bars(length: width) { column in isBlack(height) { pixels[$0 * width + column] } }
+        let minimum = { (length: Int) in max(2, length / 33) }
+        var rect = CGRect(x: 0, y: 0, width: width, height: height)
+        if rows.leading >= minimum(height), rows.trailing >= minimum(height) {
+            rect = CGRect(x: 0, y: rows.leading, width: width, height: height - rows.leading - rows.trailing)
+        } else if columns.leading >= minimum(width), columns.trailing >= minimum(width) {
+            rect = CGRect(x: columns.leading, y: 0, width: width - columns.leading - columns.trailing, height: height)
+        }
+        guard rect.width * rect.height >= CGFloat(width * height) / 2, rect.size != CGSize(width: width, height: height),
+              let cropped = image.cropping(to: rect) else { return image }
+        return cropped
     }
 
     public static func download(_ urlString: String?, relativeTo base: URL? = nil) async -> Data? {
