@@ -11,6 +11,7 @@ struct RecipesApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .onboardingTour()
                 .environmentObject(library)
                 .environmentObject(feeds)
                 .environmentObject(cook)
