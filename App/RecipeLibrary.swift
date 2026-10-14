@@ -23,6 +23,7 @@ final class RecipeLibrary: ObservableObject {
     @Published private(set) var imageStamps: [UUID: Date] = [:]
     @Published private(set) var stepImageStamps: [UUID: Date] = [:]
     @Published private(set) var isICloud = false
+    @Published private(set) var isLoaded = false
     @Published private(set) var remindersStatus = RemindersStatus.unavailable
     @Published private(set) var errorMessage: String?
 
@@ -45,6 +46,7 @@ final class RecipeLibrary: ObservableObject {
         self.groceries = groceries
         self.feeds = feeds
         self.isICloud = isICloud
+        isLoaded = true
         for (id, data) in images {
             guard let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: Self.thumbnailSize) else { continue }
             thumbnails[id] = (.distantPast, image)
@@ -174,6 +176,7 @@ final class RecipeLibrary: ObservableObject {
             if sortedFeeds != self.feeds { self.feeds = sortedFeeds }
             if stamps != imageStamps { imageStamps = stamps }
             if stepStamps != stepImageStamps { stepImageStamps = stepStamps }
+            if !isLoaded { isLoaded = true }
             errorMessage = nil
         case .failure(let error):
             errorMessage = error.localizedDescription

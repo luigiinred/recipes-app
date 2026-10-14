@@ -8,6 +8,8 @@ struct SettingsView: View {
     /// Fixed Apple Intelligence state for previews and snapshots, so they don't depend on the machine.
     var intelligenceOverride: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
+    @State private var showingTour = false
+
     var body: some View {
         NavigationStack {
             Form {
@@ -25,8 +27,16 @@ struct SettingsView: View {
                 Section {
                     NavigationLink { DataSettingsPage() } label: { Label("Data & Developer", systemImage: "externaldrive") }
                 }
+                Section("Help") {
+                    Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
+                }
             }
             .formStyle(.grouped)
+            #if os(iOS)
+            .fullScreenCover(isPresented: $showingTour) { OnboardingView { showingTour = false } }
+            #else
+            .sheet(isPresented: $showingTour) { OnboardingView { showingTour = false } }
+            #endif
             .navigationTitle("Settings")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
