@@ -1,0 +1,27 @@
+name: ci-ios
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ci-ios.yml'
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ci-ios.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  recipekit:
+    # RecipeKit and the `recipes` CLI. The app's snapshot tests need a simulator and run locally (see apps/ios/README.md).
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build --product recipes
+      - run: swift test

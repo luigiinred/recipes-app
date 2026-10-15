@@ -4,7 +4,7 @@ name: release-cli
 # with a Developer ID Application certificate, notarizes it with an App Store
 # Connect API key, and attaches `recipes.zip` to the matching GitHub release.
 #
-# `bin/cut-release.sh` already creates releases tagged `v*-build.*`; pushing such
+# `apps/ios/bin/cut-release.sh` already creates releases tagged `v*-build.*`; pushing such
 # a tag (or running this workflow by hand) drops the CLI onto that release, which
 # the README one-liner then downloads from /releases/latest/download/recipes.zip.
 #
@@ -36,6 +36,9 @@ jobs:
   release-cli:
     # Needs Swift >= 6.0 (swift-argument-parser 1.8.2 declares tools-version 6.0).
     runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios
     steps:
       - uses: actions/checkout@v4
 
