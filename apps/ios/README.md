@@ -50,7 +50,8 @@ Recipes are saved in one standard form, whether they come from the editor, an im
 Run these from `apps/ios`.
 
 ```bash
-xcodegen generate                 # creates Recipes.xcodeproj
+cp .env.example .env              # once: your team ID, bundle ID and iCloud container
+bin/generate.sh                   # creates Recipes.xcodeproj from .env
 open Recipes.xcodeproj            # run the Recipes scheme on Mac or iPhone
 swift test                        # RecipeKit unit tests
 bin/install_cli.sh                # installs `recipes` to ~/.local/bin

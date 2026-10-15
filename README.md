@@ -43,7 +43,8 @@ The iOS app and `RecipeKit`:
 
 ```bash
 cd apps/ios
-xcodegen generate && open Recipes.xcodeproj
+cp .env.example .env   # once: fill in your team ID, bundle ID and iCloud container
+bin/generate.sh && open Recipes.xcodeproj
 swift test         # RecipeKit unit tests
 ```
 
