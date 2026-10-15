@@ -1,0 +1,481 @@
+[
+ {
+  "slug": "pesto-pasta",
+  "title": "Pesto Pasta Salad",
+  "summary": "Bow-tie pasta tossed in basil pesto with blistered tomatoes and arugula. Good warm or cold.",
+  "servings": 4,
+  "prepMinutes": 10,
+  "cookMinutes": 12,
+  "isFavorite": true,
+  "rating": 5,
+  "wantToCook": true,
+  "tags": [
+   "Dinner/Pasta",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "12 oz farfalle",
+   "1 cup basil pesto",
+   "1 pint cherry tomatoes, halved",
+   "2 cups arugula",
+   "1/4 cup pine nuts, toasted",
+   "1/2 cup parmesan, shaved",
+   "1 tbsp lemon juice",
+   "Salt and pepper"
+  ],
+  "steps": [
+   "Boil the pasta in well-salted water for 11 minutes until al dente.",
+   "Drain, reserving a cup of the cooking water.",
+   "Toss the hot pasta with the pesto and a splash of the water until glossy.",
+   "Fold in the tomatoes, arugula and lemon juice.",
+   "Top with pine nuts and parmesan and serve."
+  ]
+ },
+ {
+  "slug": "butternut-soup",
+  "title": "Roasted Butternut Squash Soup",
+  "summary": "Velvety soup with roasted squash, ginger and a swirl of coconut milk.",
+  "servings": 6,
+  "prepMinutes": 15,
+  "cookMinutes": 45,
+  "isFavorite": true,
+  "rating": 5,
+  "tags": [
+   "Dinner/Soups",
+   "Vegan"
+  ],
+  "ingredients": [
+   "1 butternut squash, peeled and cubed",
+   "1 onion, chopped",
+   "3 cloves garlic",
+   "1 tbsp fresh ginger, grated",
+   "2 tbsp olive oil",
+   "4 cups vegetable broth",
+   "1/2 cup coconut milk",
+   "2 tbsp pumpkin seeds, toasted",
+   "Salt and pepper"
+  ],
+  "steps": [
+   "Heat the oven to 425°F.",
+   "Toss the squash, onion and garlic with the oil and roast for 30 minutes until caramelized.",
+   "Tip everything into a pot with the ginger and broth and simmer for 10 minutes.",
+   "Blend until smooth and stir in the coconut milk.",
+   "Season to taste and serve with pumpkin seeds."
+  ]
+ },
+ {
+  "slug": "red-curry",
+  "title": "Thai Red Curry",
+  "summary": "A fragrant coconut curry with vegetables and basil, ready in half an hour.",
+  "servings": 4,
+  "prepMinutes": 15,
+  "cookMinutes": 20,
+  "rating": 4,
+  "tags": [
+   "Dinner/Curries"
+  ],
+  "ingredients": [
+   "2 tbsp red curry paste",
+   "1 can (400 ml) coconut milk",
+   "1 lb chicken thighs, sliced",
+   "1 zucchini, sliced",
+   "1 red bell pepper, sliced",
+   "2 tbsp fish sauce",
+   "1 tbsp brown sugar",
+   "1 handful Thai basil",
+   "Jasmine rice, to serve"
+  ],
+  "steps": [
+   "Fry the curry paste in a splash of coconut cream for 2 minutes until fragrant.",
+   "Add the chicken and cook for 5 minutes until sealed.",
+   "Pour in the rest of the coconut milk with the fish sauce and sugar and simmer for 10 minutes.",
+   "Add the vegetables and cook for 5 minutes until just tender.",
+   "Stir in the basil and serve over rice."
+  ],
+  "wantToCook": true
+ },
+ {
+  "slug": "pappardelle",
+  "title": "Pappardelle with Mushrooms and Sage",
+  "summary": "Wide ribbons of pasta in a browned butter and mushroom sauce.",
+  "servings": 4,
+  "prepMinutes": 10,
+  "cookMinutes": 20,
+  "rating": 4,
+  "tags": [
+   "Dinner/Pasta",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "12 oz pappardelle",
+   "1 lb mixed mushrooms, torn",
+   "4 tbsp butter",
+   "12 sage leaves",
+   "2 cloves garlic, sliced",
+   "1/2 cup parmesan, grated",
+   "Salt and pepper"
+  ],
+  "steps": [
+   "Cook the pasta for 8 minutes until al dente, then drain.",
+   "Brown the mushrooms in a dry pan for 8 minutes.",
+   "Add the butter, sage and garlic and cook for 2 minutes until the butter foams.",
+   "Toss in the pasta with a splash of cooking water.",
+   "Finish with the parmesan."
+  ],
+  "wantToCook": true
+ },
+ {
+  "slug": "quiche",
+  "title": "Spinach and Gruyère Quiche",
+  "summary": "A golden, custardy quiche with a crisp crust. Serve with a green salad.",
+  "servings": 6,
+  "prepMinutes": 20,
+  "cookMinutes": 40,
+  "rating": 4,
+  "tags": [
+   "Brunch",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "1 pie crust",
+   "5 oz baby spinach",
+   "4 eggs",
+   "1 cup cream",
+   "1 cup gruyère, grated",
+   "1 shallot, minced",
+   "1/4 tsp nutmeg",
+   "Salt and pepper"
+  ],
+  "steps": [
+   "Heat the oven to 375°F and blind-bake the crust for 12 minutes.",
+   "Wilt the spinach with the shallot, then squeeze out the water.",
+   "Whisk the eggs, cream, nutmeg and seasoning.",
+   "Scatter the spinach and cheese in the crust and pour over the custard.",
+   "Bake for 30 minutes until just set in the middle."
+  ],
+  "wantToCook": true
+ },
+ {
+  "slug": "shakshuka",
+  "title": "Shakshuka",
+  "summary": "Eggs poached in a spiced tomato and pepper sauce. Serve with crusty bread.",
+  "servings": 2,
+  "prepMinutes": 10,
+  "cookMinutes": 25,
+  "isFavorite": true,
+  "rating": 5,
+  "tags": [
+   "Breakfast",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "2 tbsp olive oil",
+   "1 onion, diced",
+   "1 red bell pepper, sliced",
+   "3 cloves garlic, minced",
+   "1 tsp cumin",
+   "1 tsp smoked paprika",
+   "1 can (400 g) crushed tomatoes",
+   "4 eggs",
+   "Fresh parsley, to serve"
+  ],
+  "steps": [
+   "Warm the olive oil in a wide pan over medium heat and cook the onion and pepper for 8 minutes until soft.",
+   "Stir in the garlic, cumin and paprika and cook for 1 minute.",
+   "Pour in the tomatoes, season well, and simmer for 10 minutes until thickened.",
+   "Make four wells in the sauce and crack in the eggs. Cover and cook for 6 minutes until the whites are set.",
+   "Scatter with parsley and serve straight from the pan."
+  ]
+ },
+ {
+  "slug": "cookies",
+  "title": "Brown Butter Chocolate Chip Cookies",
+  "summary": "Chewy in the middle, crisp at the edges, with pools of dark chocolate.",
+  "servings": 24,
+  "prepMinutes": 20,
+  "cookMinutes": 12,
+  "isFavorite": true,
+  "rating": 5,
+  "tags": [
+   "Dessert/Cookies",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "1 cup butter",
+   "1 cup brown sugar",
+   "1/2 cup sugar",
+   "2 eggs",
+   "1 tbsp vanilla",
+   "2 1/4 cups flour",
+   "1 tsp baking soda",
+   "1 tsp salt",
+   "10 oz dark chocolate, chopped"
+  ],
+  "steps": [
+   "Brown the butter in a pan for 5 minutes until nutty, then let it cool for 10 minutes.",
+   "Whisk in both sugars, the eggs and the vanilla.",
+   "Stir in the flour, baking soda and salt, then fold in the chocolate.",
+   "Chill the dough for 30 minutes.",
+   "Scoop onto a lined tray and bake at 350°F for 12 minutes until golden at the edges."
+  ]
+ },
+ {
+  "slug": "lemon-loaf",
+  "title": "Lemon Lavender Loaf Cake",
+  "summary": "A tender lemon loaf with a sharp glaze and a hint of lavender.",
+  "servings": 8,
+  "prepMinutes": 15,
+  "cookMinutes": 50,
+  "rating": 4,
+  "tags": [
+   "Dessert/Cakes",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "1 1/2 cups flour",
+   "1 cup sugar",
+   "1/2 cup butter, softened",
+   "2 eggs",
+   "1/2 cup yogurt",
+   "2 lemons, zested and juiced",
+   "1 tsp dried lavender",
+   "1 tsp baking powder",
+   "1 cup powdered sugar"
+  ],
+  "steps": [
+   "Heat the oven to 350°F and line a loaf tin.",
+   "Beat the butter, sugar and zest until pale.",
+   "Beat in the eggs, then fold in the flour, baking powder, yogurt and lavender.",
+   "Bake for 50 minutes until a skewer comes out clean.",
+   "Whisk the powdered sugar with a little juice and pour over the cooled cake."
+  ]
+ },
+ {
+  "slug": "braised-beef",
+  "title": "Slow-Braised Beef",
+  "summary": "Fall-apart beef in a glossy red wine sauce. Better the next day.",
+  "servings": 6,
+  "prepMinutes": 20,
+  "cookMinutes": 180,
+  "rating": 5,
+  "tags": [
+   "Dinner/Mains"
+  ],
+  "ingredients": [
+   "3 lb beef chuck, cubed",
+   "2 carrots, chopped",
+   "1 onion, chopped",
+   "3 cloves garlic",
+   "2 tbsp tomato paste",
+   "2 cups red wine",
+   "2 cups beef stock",
+   "2 sprigs thyme",
+   "2 tbsp olive oil"
+  ],
+  "steps": [
+   "Sear the beef in batches in a heavy pot until deeply browned.",
+   "Soften the onion, carrots and garlic, then stir in the tomato paste.",
+   "Add the wine and boil for 5 minutes to reduce.",
+   "Return the beef with the stock and thyme, cover, and cook at 325°F for 2 1/2 hours.",
+   "Skim the fat and serve over mash or polenta."
+  ],
+  "wantToCook": true
+ },
+ {
+  "slug": "noodle-soup",
+  "title": "Miso Ginger Noodle Soup",
+  "summary": "A fast, restorative bowl with scallions, mushrooms and soft egg.",
+  "servings": 2,
+  "prepMinutes": 10,
+  "cookMinutes": 15,
+  "wantToCook": true,
+  "rating": 4,
+  "tags": [
+   "Dinner/Soups"
+  ],
+  "ingredients": [
+   "4 cups chicken or vegetable stock",
+   "2 tbsp white miso",
+   "1 tbsp fresh ginger, grated",
+   "6 oz ramen noodles",
+   "4 shiitake mushrooms, sliced",
+   "2 eggs",
+   "2 scallions, sliced",
+   "1 tsp sesame oil"
+  ],
+  "steps": [
+   "Simmer the stock with the ginger and mushrooms for 8 minutes.",
+   "Boil the eggs for 7 minutes, then cool and peel.",
+   "Cook the noodles for 3 minutes and divide between bowls.",
+   "Whisk the miso with a ladle of hot stock, then stir it back into the pot.",
+   "Ladle over the noodles and top with eggs, scallions and sesame oil."
+  ]
+ },
+ {
+  "slug": "fig-toast",
+  "title": "Fig and Ricotta Toast",
+  "summary": "Thick toast with whipped ricotta, fresh figs and a drizzle of honey.",
+  "servings": 2,
+  "prepMinutes": 10,
+  "cookMinutes": 5,
+  "rating": 4,
+  "tags": [
+   "Breakfast",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "4 slices sourdough",
+   "1 cup ricotta",
+   "4 fresh figs, sliced",
+   "2 tbsp honey",
+   "1 tbsp olive oil",
+   "Flaky salt"
+  ],
+  "steps": [
+   "Toast the sourdough until deep golden.",
+   "Whip the ricotta with the olive oil and a pinch of salt.",
+   "Spread over the toast and arrange the figs on top.",
+   "Drizzle with honey and finish with flaky salt."
+  ]
+ },
+ {
+  "slug": "clams",
+  "title": "Garlic White Wine Clams",
+  "summary": "Clams steamed open in garlic, white wine and lemon. Mop up with bread.",
+  "servings": 2,
+  "prepMinutes": 10,
+  "cookMinutes": 10,
+  "rating": 4,
+  "tags": [
+   "Dinner/Seafood"
+  ],
+  "ingredients": [
+   "2 lb littleneck clams, scrubbed",
+   "4 cloves garlic, sliced",
+   "1 cup dry white wine",
+   "3 tbsp butter",
+   "1 lemon",
+   "1/4 cup parsley, chopped",
+   "Crusty bread, to serve"
+  ],
+  "steps": [
+   "Soften the garlic in the butter for 1 minute.",
+   "Add the wine and boil for 2 minutes.",
+   "Tip in the clams, cover, and steam for 6 minutes until they open.",
+   "Discard any that stay closed.",
+   "Finish with lemon juice and parsley."
+  ]
+ },
+ {
+  "slug": "lentil-salad",
+  "title": "Herby Lentil Salad",
+  "summary": "Peppery lentils with tomatoes, herbs and a sharp mustard dressing.",
+  "servings": 4,
+  "prepMinutes": 15,
+  "cookMinutes": 20,
+  "tags": [
+   "Lunch/Salads",
+   "Vegan"
+  ],
+  "ingredients": [
+   "1 cup black lentils",
+   "2 tomatoes, diced",
+   "1 cucumber, diced",
+   "1/2 red onion, minced",
+   "1/2 cup parsley, chopped",
+   "3 tbsp olive oil",
+   "2 tbsp red wine vinegar",
+   "1 tsp Dijon mustard"
+  ],
+  "steps": [
+   "Simmer the lentils for 20 minutes until tender, then drain and cool.",
+   "Whisk the oil, vinegar and mustard.",
+   "Toss the lentils with the vegetables, parsley and dressing.",
+   "Rest for 10 minutes before serving."
+  ]
+ },
+ {
+  "slug": "egg-salad",
+  "title": "Carrot and Egg Salad Bowl",
+  "summary": "Shaved carrots, jammy eggs and arugula with a lemony yogurt dressing.",
+  "servings": 2,
+  "prepMinutes": 15,
+  "cookMinutes": 7,
+  "tags": [
+   "Lunch/Salads",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "4 eggs",
+   "3 carrots, shaved",
+   "3 cups arugula",
+   "1 cup cherry tomatoes, halved",
+   "1/4 cup yogurt",
+   "1 lemon, juiced",
+   "1 tbsp olive oil"
+  ],
+  "steps": [
+   "Boil the eggs for 7 minutes, cool, and halve.",
+   "Whisk the yogurt, lemon juice and olive oil.",
+   "Pile the carrots, arugula and tomatoes into bowls.",
+   "Top with the eggs and drizzle with the dressing."
+  ]
+ },
+ {
+  "slug": "pancakes",
+  "title": "Buckwheat Pancakes",
+  "summary": "Nutty, fluffy pancakes for a slow weekend morning.",
+  "servings": 4,
+  "prepMinutes": 10,
+  "cookMinutes": 15,
+  "isFavorite": true,
+  "rating": 4,
+  "tags": [
+   "Breakfast",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "1 cup buckwheat flour",
+   "1/2 cup flour",
+   "2 tsp baking powder",
+   "1 egg",
+   "1 1/4 cups milk",
+   "2 tbsp melted butter",
+   "Butter and syrup, to serve"
+  ],
+  "steps": [
+   "Whisk the dry ingredients together.",
+   "Beat in the egg, milk and melted butter until just combined.",
+   "Rest the batter for 10 minutes.",
+   "Cook ladlefuls on a hot griddle for 2 minutes a side until golden.",
+   "Stack and serve with butter and syrup."
+  ]
+ },
+ {
+  "slug": "fried-rice",
+  "title": "Mushroom Fried Rice",
+  "summary": "Day-old rice, crisp mushrooms and a savory soy glaze.",
+  "servings": 3,
+  "prepMinutes": 10,
+  "cookMinutes": 12,
+  "tags": [
+   "Dinner/Rice",
+   "Vegetarian"
+  ],
+  "ingredients": [
+   "3 cups cooked rice, chilled",
+   "8 oz mushrooms, sliced",
+   "2 eggs, beaten",
+   "3 scallions, sliced",
+   "2 tbsp soy sauce",
+   "1 tsp sesame oil",
+   "2 tbsp vegetable oil"
+  ],
+  "steps": [
+   "Fry the mushrooms in the oil over high heat for 5 minutes until browned.",
+   "Push to the side, scramble the eggs, and stir through.",
+   "Add the rice and fry for 4 minutes, breaking up any clumps.",
+   "Stir in the soy sauce, sesame oil and scallions."
+  ]
+ }
+]
