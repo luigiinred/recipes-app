@@ -61,7 +61,6 @@ struct SettingsView: View {
                 if let page { destination(page) } else { ContentUnavailableView("Settings", systemImage: "gearshape") }
             }
         }
-        .ignoresSafeArea(.container, edges: .top)
     }
 
     @ViewBuilder

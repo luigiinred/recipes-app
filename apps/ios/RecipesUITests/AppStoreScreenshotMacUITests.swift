@@ -31,12 +31,10 @@ final class AppStoreScreenshotMacUITests: XCTestCase {
             let week = app.radioButtons["My Week"].firstMatch
             if week.waitForExistence(timeout: 5) { week.click() }
             sleep(1)
-            let curry = app.staticTexts["Thai Red Curry"].firstMatch
-            if curry.waitForExistence(timeout: 5) { curry.click() }
+            openRecipe("Thai Red Curry")
         case "upnext":
             app.staticTexts["Plan"].firstMatch.click()
-            let beef = app.staticTexts["Slow-Braised Beef"].firstMatch
-            if beef.waitForExistence(timeout: 5) { beef.click() }
+            openRecipe("Slow-Braised Beef")
         case "groceries":
             app.staticTexts["Groceries"].firstMatch.click()
         default:
@@ -48,6 +46,18 @@ final class AppStoreScreenshotMacUITests: XCTestCase {
         let saved = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("app-store-\(scene).png")
         try png.write(to: saved)
         print("APP_STORE_SHOT \(saved.path)")
+    }
+
+    /// A click right after a tab switch can land before the list is ready, so click again until the recipe opens.
+    private func openRecipe(_ title: String) {
+        let row = app.staticTexts[title].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 8), "No \(title)")
+        for _ in 0..<3 {
+            sleep(1)
+            row.click()
+            sleep(2)
+            if !app.staticTexts["Select a recipe"].exists { return }
+        }
     }
 }
 #endif
