@@ -92,6 +92,14 @@ struct SettingsView: View {
             }
         }
         Section {
+            Link(destination: FeedbackLink.url(for: .bug)) { Label("Report a Bug", systemImage: "ladybug") }
+            Link(destination: FeedbackLink.url(for: .feature)) { Label("Suggest a Change", systemImage: "lightbulb") }
+        } header: {
+            Text("Feedback")
+        } footer: {
+            Text("Opens a ready-to-fill GitHub issue with your app version and system already added. Nothing from your recipes is included. You'll need a free GitHub account to send it.")
+        }
+        Section {
             Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
             Link(destination: URL(string: "https://github.com/luigiinred/recipes-app")!) {
                 Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
