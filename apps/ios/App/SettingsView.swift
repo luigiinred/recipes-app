@@ -29,6 +29,9 @@ struct SettingsView: View {
                 }
                 Section {
                     Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
+                    Link(destination: URL(string: "https://github.com/luigiinred/recipes-app")!) {
+                        Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
                 }
             }
             .formStyle(.grouped)
