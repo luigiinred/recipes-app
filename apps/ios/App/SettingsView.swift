@@ -2,52 +2,113 @@ import ImagePlayground
 import RecipeKit
 import SwiftUI
 
+enum SettingsPage: Hashable {
+    case recipes, planner, cooking, groceries, intelligence, data
+}
+
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     var inSheet = true
+    /// iPad: the pages sit in a sidebar next to the page you pick, instead of being pushed.
+    var splitsPages = false
     /// Fixed Apple Intelligence state for previews and snapshots, so they don't depend on the machine.
     var intelligenceOverride: (status: AppleIntelligence.Status, imagePlayground: Bool)?
+    var listing = AppStoreLink.listing
+    var writeReview = AppStoreLink.writeReview
 
     @State private var showingTour = false
+    @State private var page: SettingsPage? = .recipes
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    NavigationLink { RecipesSettingsPage() } label: { Label("Recipes", systemImage: "book.closed") }
-                    NavigationLink { PlannerSettingsPage() } label: { Label("Planner", systemImage: "calendar") }
-                    NavigationLink { CookingSettingsPage() } label: { Label("Cooking", systemImage: "frying.pan") }
-                    NavigationLink { GroceriesSettingsPage() } label: { Label("Groceries", systemImage: "checklist") }
-                }
-                Section {
-                    NavigationLink { IntelligenceSettingsPage(override: intelligenceOverride) } label: {
-                        Label("Apple Intelligence", systemImage: "sparkles")
-                    }
-                }
-                Section {
-                    NavigationLink { DataSettingsPage() } label: { Label("Data & Developer", systemImage: "externaldrive") }
-                }
-                Section {
-                    Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
-                }
-            }
-            .formStyle(.grouped)
-            #if os(iOS)
-            .fullScreenCover(isPresented: $showingTour) { OnboardingView { showingTour = false } }
-            #else
-            .sheet(isPresented: $showingTour) { OnboardingView { showingTour = false } }
-            #endif
-            .navigationTitle("Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                if inSheet { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
-            }
+        Group {
+            if splitsPages { split } else { stack }
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showingTour) { OnboardingView { showingTour = false } }
+        #else
+        .sheet(isPresented: $showingTour) { OnboardingView { showingTour = false } }
+        #endif
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 520)
         #endif
+    }
+
+    private var stack: some View {
+        NavigationStack {
+            Form { rows }
+                .formStyle(.grouped)
+                .navigationTitle("Settings")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    if inSheet { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
+                }
+                .navigationDestination(for: SettingsPage.self) { destination($0) }
+        }
+    }
+
+    private var split: some View {
+        NavigationSplitView {
+            List(selection: $page) { rows }
+                .navigationTitle("Settings")
+                .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
+                #if os(iOS)
+                .toolbar(removing: .sidebarToggle)
+                #endif
+        } detail: {
+            NavigationStack {
+                if let page { destination(page) } else { ContentUnavailableView("Settings", systemImage: "gearshape") }
+            }
+        }
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        Section {
+            NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
+            NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
+            NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
+            NavigationLink(value: SettingsPage.groceries) { Label("Groceries", systemImage: "checklist") }
+        }
+        Section {
+            NavigationLink(value: SettingsPage.intelligence) { Label("Apple Intelligence", systemImage: "sparkles") }
+        }
+        Section {
+            NavigationLink(value: SettingsPage.data) { Label("Data & Developer", systemImage: "externaldrive") }
+        }
+        if let listing, let writeReview {
+            Section {
+                Link(destination: writeReview) { Label("Leave a Review", systemImage: "star.bubble") }
+                ShareLink(
+                    item: listing,
+                    message: Text("I keep all my recipes in Recipes. It's free, open source, and has no ads or account.")
+                ) { Label("Tell a Friend Who Cooks", systemImage: "heart") }
+            } header: {
+                Text("Help Support Us")
+            } footer: {
+                Text("Recipes is free, open source, and will never show you an ad, so word of mouth is our whole marketing budget. A kind review is how the next home cook finds a recipe box that doesn't nag them.")
+            }
+        }
+        Section {
+            Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
+            Link(destination: URL(string: "https://github.com/luigiinred/recipes-app")!) {
+                Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ page: SettingsPage) -> some View {
+        switch page {
+        case .recipes: RecipesSettingsPage()
+        case .planner: PlannerSettingsPage()
+        case .cooking: CookingSettingsPage()
+        case .groceries: GroceriesSettingsPage()
+        case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
+        case .data: DataSettingsPage()
+        }
     }
 }
 

@@ -14,6 +14,7 @@ enum AppSettings {
         static let ratingStyle = "ratingStyle"
         static let showDeleteSwipe = "showDeleteInSwipeActions"
         static let onboardingCompleted = "onboardingCompleted"
+        static let reviewPromptDismissed = "reviewPromptDismissed"
     }
 
     enum WeekStart: String, CaseIterable {

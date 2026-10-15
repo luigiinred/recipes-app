@@ -53,3 +53,7 @@ See [`apps/ios/README.md`](apps/ios/README.md) for features, snapshot tests, the
 
 - The server and web UI are complete for browsing, editing, importing web pages, planning, groceries and cook mode. Importing from YouTube, scanning a page, Smart Plan and photo generation are app features that need on-device frameworks; they aren't in the web UI.
 - The `recipes` CLI can sync a library folder with a server (`recipes sync`). The iPhone and Mac apps don't have a "use my server" option yet: the share extension needs an App Group to share a local copy with the app, which is an Apple Developer account change. Until then the apps keep using iCloud.
+
+## License
+
+[MIT](LICENSE).

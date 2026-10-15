@@ -26,6 +26,8 @@ struct RecipeListView: View {
     var styleOverride: RecipeListStyle?
     /// On iPhone a category is a folder with subcategories to open. The iPad sidebar shows the tree instead.
     var showsFolders = true
+    var showsSettings = false
+    var showsFilter = false
 
     @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
     @State private var search = ""
@@ -37,7 +39,12 @@ struct RecipeListView: View {
         recipeList
             .macSearchable(text: $search, prompt: "Search recipes")
             .navigationTitle(collection.title)
-            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }))
+            .toolbar {
+                if showsFilter {
+                    ToolbarItem(placement: .primaryAction) { RecipeFilterMenu(collection: $collection) }
+                }
+            }
+            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }), showsSettings: showsSettings)
             .sheet(item: $editing) { recipe in
                 RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
             }
@@ -82,6 +89,7 @@ struct RecipeListView: View {
                     }
                     .tag(recipe.id)
                     .listRowSeparator(style == .cards ? .hidden : .automatic)
+                    .listRowSeparator(recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
                     .recipeSwipeActions(for: recipe)
                     .contextMenu {
@@ -94,6 +102,7 @@ struct RecipeListView: View {
                 if !subcategories.isEmpty, !items.isEmpty { Text("Recipes") }
                 #endif
             }
+            .listSectionSeparator(.hidden, edges: .top)
         }
         .listStyle(.plain)
         .overlay {
@@ -108,6 +117,50 @@ struct RecipeListView: View {
                 #endif
             } else if items.isEmpty {
                 ContentUnavailableView.search(text: search)
+            }
+        }
+    }
+}
+
+/// Collections and the category tree as filters on the recipe list.
+struct RecipeFilterMenu: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @Binding var collection: RecipeCollection
+
+    private var collections: [RecipeCollection] {
+        RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
+            .filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
+    }
+
+    var body: some View {
+        Menu {
+            Picker("Filter", selection: $collection) {
+                Label(RecipeCollection.all.title, systemImage: RecipeCollection.all.symbol).tag(RecipeCollection.all)
+                ForEach(collections, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+            }
+            if !library.categoryTree.isEmpty {
+                Section("Categories") {
+                    ForEach(library.categoryTree) { CategoryFilterItem(node: $0, collection: $collection) }
+                }
+            }
+        } label: {
+            Label("Filter", systemImage: collection == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
+        }
+    }
+}
+
+private struct CategoryFilterItem: View {
+    let node: CategoryNode
+    @Binding var collection: RecipeCollection
+
+    var body: some View {
+        if node.children.isEmpty {
+            Button(node.name, systemImage: "tag") { collection = .category(node.path) }
+        } else {
+            Menu(node.name, systemImage: "folder") {
+                Button("All \(node.name)", systemImage: "tag") { collection = .category(node.path) }
+                ForEach(node.children) { CategoryFilterItem(node: $0, collection: $collection) }
             }
         }
     }

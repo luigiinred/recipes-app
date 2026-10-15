@@ -29,9 +29,6 @@ on:
 permissions:
   contents: write
 
-env:
-  TEAM_ID: A2VG7FKNF9
-
 jobs:
   release-cli:
     # Needs Swift >= 6.0 (swift-argument-parser 1.8.2 declares tools-version 6.0).

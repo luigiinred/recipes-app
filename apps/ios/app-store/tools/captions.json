@@ -1,0 +1,96 @@
+{
+ "iphone": [
+  {
+   "id": "library",
+   "raw": "library",
+   "caption": "Every recipe,<br><em>beautifully kept.</em>"
+  },
+  {
+   "id": "recipe",
+   "raw": "recipe",
+   "caption": "Recipes that<br><em>read like a cookbook.</em>"
+  },
+  {
+   "id": "steps",
+   "raw": "ingredients",
+   "caption": "Know what<br><em>each step needs.</em>"
+  },
+  {
+   "id": "cook",
+   "raw": "cook",
+   "caption": "Cook with<br><em>your hands full.</em>"
+  },
+  {
+   "id": "week",
+   "raw": "plan",
+   "caption": "Plan your week<br><em>in a minute.</em>"
+  },
+  {
+   "id": "upnext",
+   "raw": "upnext",
+   "caption": "Line up what<br><em>you'll cook next.</em>"
+  },
+  {
+   "id": "groceries",
+   "raw": "groceries",
+   "caption": "Shopping lists that<br><em>stay in sync.</em>"
+  },
+  {
+   "id": "organize",
+   "raw": "home",
+   "caption": "Organize it<br><em>your way.</em>"
+  },
+  {
+   "id": "dark",
+   "raw": "recipe-dark",
+   "caption": "Easy on the eyes,<br><em>day or night.</em>"
+  }
+ ],
+ "ipad": [
+  {
+   "id": "library",
+   "raw": "library",
+   "caption": "Your whole cookbook,<br><em>beautifully laid out.</em>"
+  },
+  {
+   "id": "week",
+   "raw": "plan",
+   "caption": "Plan the week<br><em>with the recipe in hand.</em>"
+  },
+  {
+   "id": "upnext",
+   "raw": "upnext",
+   "caption": "Line up what<br><em>you'll cook next.</em>"
+  },
+  {
+   "id": "cook",
+   "raw": "cook",
+   "caption": "Step by step,<br><em>in large, clear type.</em>"
+  },
+  {
+   "id": "dark",
+   "raw": "library-dark",
+   "caption": "Easy on the eyes,<br><em>day or night.</em>"
+  }
+ ],
+ "card": {
+  "headline": "Open source.<br><em>No account. No ads.</em>",
+  "rows": [
+   {
+    "icon": "code",
+    "title": "Open source",
+    "body": "The code is public under the MIT license. Read it, change it, share it."
+   },
+   {
+    "icon": "cloud",
+    "title": "No account",
+    "body": "Nothing to sign up for. Your recipes are plain files in your own iCloud Drive."
+   },
+   {
+    "icon": "noads",
+    "title": "No ads",
+    "body": "Nothing between you and the recipe."
+   }
+  ]
+ }
+}
