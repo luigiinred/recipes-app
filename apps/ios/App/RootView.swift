@@ -360,7 +360,7 @@ struct SidebarView: View {
     }
 
     private func categoryRows(_ node: CategoryNode) -> AnyView {
-        if node.children.isEmpty { return AnyView(row(.category(node.path))) }
+        if node.children.isEmpty { return AnyView(categoryRow(node.path)) }
         let expanded = Binding(
             get: { !collapsed.contains(node.path) },
             set: { if $0 { collapsed.remove(node.path) } else { collapsed.insert(node.path) } }
@@ -368,8 +368,17 @@ struct SidebarView: View {
         return AnyView(
             DisclosureGroup(isExpanded: expanded) {
                 ForEach(node.children) { categoryRows($0) }
-            } label: { row(.category(node.path)) }
+            } label: { categoryRow(node.path) }
         )
+    }
+
+    /// Dropping a recipe on a category files it there.
+    private func categoryRow(_ path: String) -> some View {
+        row(.category(path))
+            .dropDestination(for: RecipeDragItem.self) { items, _ in
+                Task { for item in items { await library.addTag(item.id, to: path) } }
+                return !items.isEmpty
+            }
     }
 
     private func row(_ collection: RecipeCollection) -> some View {
