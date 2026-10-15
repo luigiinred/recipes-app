@@ -197,7 +197,6 @@ struct PlanTab: View {
                     ContentUnavailableView("Select a recipe", systemImage: "calendar")
                 }
             }
-            .ignoresSafeArea(.container, edges: .top)
         } else {
             NavigationStack(path: $path) {
                 PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)

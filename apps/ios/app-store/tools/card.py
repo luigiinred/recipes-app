@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Renders the closing "open source, no account, no ads" card, the last screenshot in each set.
 
-Usage: card.py <iphone|ipad>
+Usage: card.py <iphone|ipad|mac>
 Reads the copy from captions.json ("card") and writes ../images/<device>/NN-open-source.jpg after the captured shots.
 Needs Google Chrome and ImageMagick.
 """
@@ -15,6 +15,7 @@ ICON = os.path.abspath(f"{HERE}/../images/icon/app-icon.png")
 LAYOUT = {
     "iphone": dict(size=(1320, 2868), head=8.2, top=5.6, icon=26.0, row="column", gap=5.0, glyph=11.0, title=6.4, body=4.3, pad=6.0),
     "ipad": dict(size=(2752, 2064), head=5.2, top=4.4, icon=11.0, row="row", gap=2.2, glyph=5.0, title=2.7, body=1.85, pad=2.6),
+    "mac": dict(size=(2880, 1800), head=4.4, top=3.4, icon=9.0, row="row", gap=2.0, glyph=4.4, title=2.4, body=1.65, pad=2.3),
 }
 
 GLYPHS = {

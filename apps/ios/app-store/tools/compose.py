@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Composes raw simulator captures with a caption into App Store screenshots.
 
-Usage: compose.py <iphone|ipad> [--style dark|light]
+Usage: compose.py <iphone|ipad|mac> [--style dark|light]
 Reads captions.json and raw/<device>/<scene>.png; writes ../images/<device>[-light]/NN-<id>.jpg.
 Needs Google Chrome and ImageMagick.
 """
@@ -17,6 +17,7 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 LAYOUT = {
     "iphone": dict(size=(1320, 2868), fit=0.94, shot_top=0.165, head=8.2, top=5.6, radius=8.0),
     "ipad": dict(size=(2752, 2064), margin=0.05, shot_top=0.235, head=5.2, top=4.4, radius=2.6),
+    "mac": dict(size=(2880, 1800), margin=0.06, shot_top=0.215, head=4.4, top=3.4, radius=0.9),
 }
 
 PAGE = """<!doctype html><meta charset="utf-8"><style>

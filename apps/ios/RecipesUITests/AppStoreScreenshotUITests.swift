@@ -26,6 +26,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(loaded).firstMatch.waitForExistence(timeout: 40), "library should load")
         sleep(3)
         let regular = app.windows.firstMatch.frame.width > 700
+        if regular { showTopTabBar() }
 
         switch scene {
         case "home":
@@ -59,6 +60,13 @@ final class AppStoreScreenshotUITests: XCTestCase {
             if regular { openRecipe("Slow-Braised Beef") }
         case "groceries":
             tab("Groceries")
+        case "settings":
+            tab("Settings")
+        case "roundtrip":
+            tab("Settings")
+            tab("Recipes")
+        case "search":
+            tab("Search")
         case "import":
             tapButton("Add Recipe")
             tapButton("Import from Web or YouTube…")
@@ -90,6 +98,14 @@ final class AppStoreScreenshotUITests: XCTestCase {
         sleep(3)
         let png = XCUIScreen.main.screenshot().pngRepresentation
         try png.write(to: URL(fileURLWithPath: "\(out)/\(named).png"))
+    }
+
+    /// iPad remembers whether the tab bar is in the sidebar; the App Store shots show it across the top.
+    private func showTopTabBar() {
+        let hide = app.buttons["Hide Sidebar"].firstMatch
+        guard hide.waitForExistence(timeout: 5) else { return }
+        hide.tap()
+        sleep(2)
     }
 
     private func open(_ title: String) {
