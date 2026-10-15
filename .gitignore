@@ -10,3 +10,12 @@ build-*/
 # Secrets — never commit (this repo is public)
 .env
 *.p8
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+# Self-hosted server data (a real library; never commit)
+data/
+apps/server/data/

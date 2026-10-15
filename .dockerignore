@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+**/node_modules
+**/dist
+**/data
+apps/ios
+Design
+design.markdown
+build
+build-*
+.build
+*.md
+!README.md

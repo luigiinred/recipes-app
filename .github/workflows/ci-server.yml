@@ -1,0 +1,53 @@
+name: ci-server
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - 'Dockerfile'
+      - '.github/workflows/ci-server.yml'
+  pull_request:
+    paths:
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - 'Dockerfile'
+      - '.github/workflows/ci-server.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image and check that it starts
+        run: |
+          docker build -t recipes-server .
+          docker run -d --name recipes -p 8080:8080 -e RECIPES_PASSWORD=ci-smoke-passphrase recipes-server
+          for _ in $(seq 1 20); do curl -fsS localhost:8080/api/health && break; sleep 1; done
+          curl -fsS localhost:8080/api/session
+          curl -fsS localhost:8080/ | grep -q '<div id="root">'

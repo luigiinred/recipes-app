@@ -1,0 +1,22 @@
+{
+  "name": "recipes-monorepo",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "workspaces": [
+    "packages/*",
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @recipes/server\" \"npm run dev -w @recipes/web\"",
+    "build": "npm run build -w @recipes/web && npm run build -w @recipes/server",
+    "start": "npm run start -w @recipes/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.9.0"
+  }
+}
