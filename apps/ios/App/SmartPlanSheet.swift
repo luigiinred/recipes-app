@@ -128,8 +128,9 @@ struct SmartPlanSheet: View {
 
     private func run() {
         let taken = Set(library.mealPlan.map { PlanRequest.slotKey($0.day, $0.meal) })
-        let queued = RecipeCollection.wantToCook.filter(library.recipes)
-        let rest = library.recipes.filter { !$0.wantToCook }
+        let cookable = library.recipes.filter { !$0.isIdea }
+        let queued = RecipeCollection.wantToCook.filter(cookable)
+        let rest = cookable.filter { !$0.wantToCook }
         let candidates = (queued + rest).map {
             PlanCandidate(id: $0.id, title: $0.title, tags: $0.tags.map(CategoryTree.displayName), minutes: $0.totalMinutes,
                           isFavorite: $0.isFavorite || ($0.rating ?? 0) >= 4, isQueued: $0.wantToCook)

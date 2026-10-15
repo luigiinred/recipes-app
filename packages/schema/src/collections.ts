@@ -44,6 +44,9 @@ export function filterCategory<R extends Recipe>(recipes: R[], category: string)
   return recipes.filter((recipe) => recipe.tags.some((tag) => tagIsIn(tag, category)));
 }
 
+/** Something to cook that has no recipe yet, like "Spaghetti" or "Leftovers": a title and maybe notes. */
+export const isIdea = (recipe: Pick<Recipe, "ingredients" | "steps">): boolean => recipe.ingredients.length === 0 && recipe.steps.length === 0;
+
 /** Every word of the query must appear somewhere in the title, summary, notes, ingredients or tags. */
 export function recipeMatches(recipe: Recipe, query: string): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);

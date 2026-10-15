@@ -1,4 +1,4 @@
-import { filterCollection, recipeMatches } from "@recipes/schema/lib";
+import { filterCollection, isIdea, recipeMatches } from "@recipes/schema/lib";
 import type { MealPlanEntry, RecipeView } from "@recipes/schema";
 import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, ListPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -210,7 +210,12 @@ function AddMealDialog({ day: initialDay, recipe: initialRecipe, onClose }: { da
   const save = async () => {
     const title = chosen?.title ?? custom.trim();
     if (!title) return;
-    const result = await run(() => api.plan.create({ recipeID: chosen?.id, title, day, meal }));
+    const result = await run(async () => {
+      // A typed meal is kept as an idea, so it can be picked again next week.
+      const existing = chosen ?? recipes.find((recipe) => recipe.title.toLowerCase() === title.toLowerCase());
+      const recipe = existing ?? (await api.recipes.create({ title }));
+      return api.plan.create({ recipeID: recipe.id, title: recipe.title, day, meal });
+    });
     if (result) {
       await refresh();
       onClose();
@@ -239,13 +244,14 @@ function AddMealDialog({ day: initialDay, recipe: initialRecipe, onClose }: { da
                 <li key={recipe.id}>
                   <button type="button" className="serif" onClick={() => setChosen(recipe)}>
                     {recipe.title}
+                    {isIdea(recipe) && <span className="muted small"> · Idea</span>}
                   </button>
                 </li>
               ))}
             </ul>
             <label>
-              …or type a meal
-              <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Leftovers, takeout…" />
+              …or add an idea
+              <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Spaghetti, frozen burgers, leftovers…" />
             </label>
           </>
         )}
