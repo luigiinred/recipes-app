@@ -1,4 +1,4 @@
-import { ingredientAmount, ingredientName, ingredientPreparation, groceryParts, parseIngredient } from "@recipes/schema/lib";
+import { groceryParts, ingredientAmount, ingredientName, ingredientPreparation, isIdea, parseIngredient } from "@recipes/schema/lib";
 import type { RecipeView } from "@recipes/schema";
 import {
   CalendarPlus,
@@ -60,6 +60,7 @@ export function RecipeDetail({ recipe }: { recipe: RecipeView }) {
   const { toast } = useToast();
   const [planning, setPlanning] = useState(false);
   const [start, setStart] = useState<number | null>(null);
+  const idea = isIdea(recipe);
   const video = youTubeID(recipe.sourceURL);
   const source = safeHref(recipe.sourceURL);
 
@@ -144,18 +145,22 @@ export function RecipeDetail({ recipe }: { recipe: RecipeView }) {
         )}
         <div className="actions no-print">
           <Rating recipe={recipe} />
-          <Link to={`/recipes/${recipe.id}/cook`} className="button primary">
-            <Play size={16} /> Cook
-          </Link>
+          {!idea && (
+            <Link to={`/recipes/${recipe.id}/cook`} className="button primary">
+              <Play size={16} /> Cook
+            </Link>
+          )}
           <button type="button" onClick={() => void toggleQueue()} aria-pressed={recipe.wantToCook} className={recipe.wantToCook ? "toggled" : ""}>
             <ListPlus size={16} /> {recipe.wantToCook ? "In Up Next" : "Up Next"}
           </button>
           <button type="button" onClick={() => setPlanning(true)}>
             <CalendarPlus size={16} /> Plan
           </button>
-          <button type="button" onClick={() => void addToGroceries()}>
-            <ShoppingBasket size={16} /> Groceries
-          </button>
+          {!idea && (
+            <button type="button" onClick={() => void addToGroceries()}>
+              <ShoppingBasket size={16} /> Groceries
+            </button>
+          )}
           <details className="menu">
             <summary className="icon-button" aria-label="More actions">
               <MoreHorizontal size={18} />
@@ -176,6 +181,14 @@ export function RecipeDetail({ recipe }: { recipe: RecipeView }) {
       </header>
 
       <div className="recipe-body">
+        {idea && (
+          <section aria-labelledby="idea-h">
+            <h2 id="idea-h">Just an idea so far</h2>
+            <p className="muted">
+              Add ingredients and steps when you have a recipe for it, and this becomes a full recipe. <Link to={`/recipes/${recipe.id}/edit`}>Add them now</Link>.
+            </p>
+          </section>
+        )}
         {recipe.ingredients.length > 0 && (
           <section className="ingredients" aria-labelledby="ingredients-h">
             <h2 id="ingredients-h">Ingredients</h2>

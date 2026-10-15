@@ -4,6 +4,7 @@ import {
   filterCategory,
   filterCollection,
   groceryParts,
+  isIdea,
   ingredientAmount,
   ingredientHeading,
   ingredientName,
@@ -112,5 +113,11 @@ describe("categories and collections", () => {
     expect(filterCollection(all, "up-next").map((r) => r.title)).toEqual(["Q2", "Q1"]);
     expect(filterCollection(all, "uncategorized").map((r) => r.title)).not.toContain("C");
     expect(filterCategory(all, "dinner").map((r) => r.title)).toEqual(["C"]);
+  });
+
+  it("treats a recipe with nothing to cook as an idea", () => {
+    expect(isIdea(recipe({ title: "Spaghetti", notes: "Use the good pasta" }))).toBe(true);
+    expect(isIdea(recipe({ title: "Spaghetti", ingredients: ["1 lb spaghetti"] }))).toBe(false);
+    expect(isIdea(recipe({ title: "Spaghetti", steps: ["Boil the pasta."] }))).toBe(false);
   });
 });

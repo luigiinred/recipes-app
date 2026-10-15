@@ -28,7 +28,7 @@ struct RecipeDetailView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if geometry.size.width >= 760 {
+            if geometry.size.width >= 760, !recipe.isIdea {
                 twoColumns(width: geometry.size.width)
             } else {
                 oneColumn
@@ -117,9 +117,13 @@ struct RecipeDetailView: View {
                     }
                     VStack(alignment: .leading, spacing: 24) {
                         header(showsTitle: !hasArtwork)
-                        TwoPaneLayout {
-                            ingredients
-                            steps
+                        if recipe.isIdea {
+                            ideaNote
+                        } else {
+                            TwoPaneLayout {
+                                ingredients
+                                steps
+                            }
                         }
                         footer
                     }
@@ -147,10 +151,12 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var headerActions: some View {
         if previewSave == nil {
-            HeaderActionButton(title: "Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
-                .disabled(recipe.steps.isEmpty)
-            HeaderActionButton(title: "Add to Groceries", systemImage: "checklist") { addingToGroceries = true }
-                .disabled(recipe.ingredients.isEmpty)
+            if !recipe.isIdea {
+                HeaderActionButton(title: "Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
+                    .disabled(recipe.steps.isEmpty)
+                HeaderActionButton(title: "Add to Groceries", systemImage: "checklist") { addingToGroceries = true }
+                    .disabled(recipe.ingredients.isEmpty)
+            }
             HeaderActionButton(title: recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next",
                                systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
                 Task { await library.setQueued(recipe, !recipe.wantToCook) }
@@ -290,10 +296,12 @@ struct RecipeDetailView: View {
     private var actionTiles: some View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
-                tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
-                    .disabled(recipe.steps.isEmpty)
-                tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
-                    .disabled(recipe.ingredients.isEmpty)
+                if !recipe.isIdea {
+                    tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
+                        .disabled(recipe.steps.isEmpty)
+                    tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
+                        .disabled(recipe.ingredients.isEmpty)
+                }
                 tile(recipe.wantToCook ? "Queued" : "Up Next", systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
                     Task { await library.setQueued(recipe, !recipe.wantToCook) }
                 }
@@ -316,6 +324,21 @@ struct RecipeDetailView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var ideaNote: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Just an idea so far", systemImage: "lightbulb").font(.headline)
+            Text("Add ingredients and steps when you have a recipe for it, and this becomes a full recipe.")
+                .foregroundStyle(.secondary)
+            if previewSave == nil {
+                Button("Add Ingredients and Steps", systemImage: "pencil") { editing = true }
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var ingredients: some View {
