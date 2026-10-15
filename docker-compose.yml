@@ -1,0 +1,19 @@
+# docker compose up -d
+# Then open http://localhost:8080. The setup code is in `docker compose logs recipes`.
+services:
+  recipes:
+    build: .
+    image: recipes-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Skip the setup page by choosing the password up front (used only until one exists):
+      # RECIPES_PASSWORD: "choose-a-long-passphrase"
+      # Set to "true" only when a reverse proxy in front of this container sets X-Forwarded-For/Proto:
+      TRUST_PROXY: "false"
+    volumes:
+      - recipes-data:/data
+
+volumes:
+  recipes-data:
