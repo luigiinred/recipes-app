@@ -33,13 +33,13 @@ Notes:
 
 | Role | Hex |
 |---|---|
-| Background | `#2B2320` (dark warm brown). The `.icon` file uses a display-P3 gradient from `0.514, 0.424, 0.386` to `0.300, 0.248, 0.226` |
-| Spoon and fork | `#FF8A4C` (orange) |
-| Book | `#FFF1E0` (cream) |
+| Background | A display-P3 gradient from peach (`1.000, 0.834, 0.656`) at the top to terracotta (`0.750, 0.358, 0.247`) at the bottom |
+| Spoon and fork | Orange glass (`1.000, 0.553, 0.157` to `0.422, 0.257, 0.119`) |
+| Book | Translucent cream glass (`0.843, 0.805, 0.805` to `1.000, 0.834, 0.671`) |
 
-Sources are in `Design/AppIcon/`, and the layered icon is `apps/ios/App/AppIcon.icon`.
+The layered icon is `apps/ios/App/AppIcon.icon`, the source of truth. `Design/AppIcon/` holds the earlier, brown version and is no longer current.
 
-**Known mismatch:** the icon is brown, orange and cream, while the app's accent is a tomato red. They are close in warmth but not the same hue. Pick one direction before the next visual pass. Marketing art (see below) follows the icon, because that is what people see first in the store.
+**Known mismatch:** the icon is peach, terracotta and orange, while the app's accent is a tomato red. They are close in warmth but not the same hue. Pick one direction before the next visual pass. Marketing art (see below) keeps its dark warm brown ground with the icon's orange, so the icon stands out against it.
 
 ### Marketing and App Store art
 
