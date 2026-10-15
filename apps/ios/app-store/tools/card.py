@@ -9,7 +9,7 @@ import json, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-ICON = os.path.abspath(f"{HERE}/../images/icon/app-icon-1024.png")
+ICON = os.path.abspath(f"{HERE}/../images/icon/app-icon.png")
 
 # Canvas size, headline size and top offset as % of canvas width; the rest is in the same units.
 LAYOUT = {
@@ -33,7 +33,7 @@ html, body { background:#000; overflow:hidden; }
   font-family:"NY","New York",Georgia,serif; font-weight:600; letter-spacing:-.012em; line-height:1.08; font-size:calc(var(--u)*%(head).2f); }
 .head em { font-style:normal; background:linear-gradient(95deg,#ffc48a,#ff8a4c); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .body { position:absolute; left:6%%; right:6%%; top:calc(var(--u)*%(body_top).2f); bottom:calc(var(--u)*%(bottom).2f); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(var(--u)*%(gap).2f); }
-.icon { width:calc(var(--u)*%(icon).2f); height:calc(var(--u)*%(icon).2f); border-radius:22.5%%; box-shadow:0 calc(var(--u)*.6) calc(var(--u)*2.4) rgba(0,0,0,.5); }
+.icon { width:calc(var(--u)*%(icon).2f); height:calc(var(--u)*%(icon).2f); filter:drop-shadow(0 calc(var(--u)*.6) calc(var(--u)*1.2) rgba(0,0,0,.5)); }
 .rows { width:100%%; display:flex; flex-direction:%(row)s; gap:calc(var(--u)*%(gap).2f); }
 .row { flex:1; display:flex; flex-direction:%(inner)s; gap:calc(var(--u)*%(gap).2f); align-items:%(align)s; padding:calc(var(--u)*%(pad).2f); border-radius:calc(var(--u)*%(radius).2f);
   background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 calc(var(--u)*.16) rgba(255,255,255,.12); }
