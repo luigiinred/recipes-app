@@ -15,6 +15,8 @@ python3 "$HERE/seed.py" "$lib" >/dev/null
 
 xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b >/dev/null
+# The app remembers which sidebar sections are open, so start from a fresh install.
+xcrun simctl uninstall "$udid" com.garrabrant.recipes 2>/dev/null || true
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularMode active --cellularBars 4 --wifiBars 3 --operatorName ""
 
 # The import scene reads a fictional recipe page served from this machine.

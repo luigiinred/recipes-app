@@ -19,8 +19,8 @@ Design decisions for the artwork (fonts, colors) are in [`design.markdown`](../.
 | What | File | Size | Upload to |
 |---|---|---|---|
 | App icon | [`images/icon/app-icon-1024.png`](images/icon/app-icon-1024.png) | 1024 × 1024, opaque | Reference copy. The shipping icon comes from the binary (`App/AppIcon.icon`) |
-| iPhone screenshots (9) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
-| iPad screenshots (5) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
+| iPhone screenshots (10) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
+| iPad screenshots (6) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
 | Product page header | [`images/creative/header.png`](images/creative/header.png) | 3840 × 1646 (21:9) | Product page header |
 | Search result image | [`images/creative/search.png`](images/creative/search.png) | 3840 × 2560 (3:2) | Search results |
 | Universal creative | [`images/creative/universal.png`](images/creative/universal.png) | 5244 × 2950 (16:9) | Header and search from one file |
@@ -127,16 +127,18 @@ Each screenshot is a real capture from the simulator, using the fictional recipe
 | 7 | [`07-groceries.jpg`](images/iphone/07-groceries.jpg) | Shopping lists that *stay in sync.* | Groceries |
 | 8 | [`08-organize.jpg`](images/iphone/08-organize.jpg) | Organize it *your way.* | Collections and categories |
 | 9 | [`09-dark.jpg`](images/iphone/09-dark.jpg) | Easy on the eyes, *day or night.* | Recipe page in dark mode |
+| 10 | [`10-open-source.jpg`](images/iphone/10-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture: MIT license, iCloud Drive files, no ads |
 
 ### iPad (13", landscape)
 
 | # | File | Caption | Shows |
 |---|---|---|---|
-| 1 | [`01-library.jpg`](images/ipad/01-library.jpg) | Your whole cookbook, *beautifully laid out.* | Three-column library |
+| 1 | [`01-library.jpg`](images/ipad/01-library.jpg) | Your whole cookbook, *beautifully laid out.* | Library with the tab bar built into the sidebar |
 | 2 | [`02-week.jpg`](images/ipad/02-week.jpg) | Plan the week *with the recipe in hand.* | My Week beside a recipe |
 | 3 | [`03-upnext.jpg`](images/ipad/03-upnext.jpg) | Line up what *you'll cook next.* | Up Next beside a recipe |
 | 4 | [`04-cook.jpg`](images/ipad/04-cook.jpg) | Step by step, *in large, clear type.* | Cook mode |
 | 5 | [`05-dark.jpg`](images/ipad/05-dark.jpg) | Easy on the eyes, *day or night.* | Library in dark mode |
+| 6 | [`06-open-source.jpg`](images/ipad/06-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture |
 
 ### Creative assets
 
@@ -214,20 +216,22 @@ All commands run from `apps/ios`. Needs Xcode, XcodeGen, Google Chrome and Image
 swift build -c release --product recipes   # the CLI that seeds the demo library
 xcodegen generate
 xcrun simctl create "Recipes Shots iPhone" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-26-5
-xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-26-5
+xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-27-0
 xcodebuild build-for-testing -project Recipes.xcodeproj -scheme Recipes -destination "id=<sim id>" -derivedDataPath /tmp/shots
 
 app-store/tools/capture.sh iphone <iphone sim id> /tmp/shots home library recipe ingredients cook plan upnext groceries recipe-dark
 app-store/tools/capture.sh ipad <ipad sim id> /tmp/shots library plan upnext cook library-dark
 python3 app-store/tools/compose.py iphone
 python3 app-store/tools/compose.py ipad
+python3 app-store/tools/card.py            # the closing card, last in each set
 python3 app-store/tools/creative.py
 ```
 
 Notes from making these:
 
+- The iPad shots need an iOS 27 simulator. The sidebar's category groups start folded only on iOS 27; on 26.x every group is expanded and the list runs off the bottom.
 - Use a dedicated simulator. A simulator last used by another app shows that app's "back" link in the status bar.
-- `capture.sh` seeds a fresh library every run with `tools/seed.py` (recipes in `tools/seed/recipes.json`, photos in `tools/seed/photos/`) and points the app at it with `RECIPES_DIR`.
+- `capture.sh` reinstalls the app each run, because the app remembers which sidebar sections are open. It seeds a fresh library every run with `tools/seed.py` (recipes in `tools/seed/recipes.json`, photos in `tools/seed/photos/`) and points the app at it with `RECIPES_DIR`.
 - The `TimerWidget` Live Activity extension crashes at launch in the simulator test runner and fails the run ("Critical process TimerWidget crashed"). I worked around it by deleting `PlugIns/TimerWidget.appex` from the *built* app in the derived data folder and re-signing it ad hoc: `rm -rf <DerivedData>/Build/Products/Debug-iphonesimulator/Recipes.app/PlugIns/TimerWidget.appex && codesign --force --sign - --preserve-metadata=entitlements <that .app>`. The crash itself is worth a look: it's an assertion in `_EXRunningExtension._start`.
 - The UI test is `RecipesUITests/AppStoreScreenshotUITests.swift`. It does nothing unless `APP_STORE_SCENE` is set.
 - `capture.sh` ends each scene with `magick -auto-orient`, because iPad landscape captures carry an orientation flag.
