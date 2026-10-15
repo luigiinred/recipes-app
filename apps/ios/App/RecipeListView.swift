@@ -121,6 +121,7 @@ private struct RecipeActionsModifier: ViewModifier {
     var showsSettings = false
 
     @State private var showingNew = false
+    @State private var showingIdea = false
     @State private var showingImport = false
     @State private var showingFileImporter = false
     @State private var showingScanner = false
@@ -157,6 +158,7 @@ private struct RecipeActionsModifier: ViewModifier {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
+                    Button("New Idea…", systemImage: "lightbulb") { showingIdea = true }
                     Button("Import from Web or YouTube…", systemImage: "globe") { showingImport = true }
                     #if os(iOS)
                     Button("Scan Recipe…", systemImage: "doc.viewfinder") {
@@ -173,6 +175,9 @@ private struct RecipeActionsModifier: ViewModifier {
                 Task { await library.save(saved, image: image, steps: steps) }
                 selection = saved.id
             }
+        }
+        .sheet(isPresented: $showingIdea) {
+            NewIdeaSheet { selection = $0.id }
         }
         .sheet(isPresented: $showingImport) {
             ImportURLView(
@@ -353,6 +358,7 @@ struct RecipeMeta: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            if recipe.isIdea { Label("Idea", systemImage: "lightbulb") }
             if let minutes = recipe.totalMinutes { Label("\(minutes) min", systemImage: "clock") }
             if !recipe.tags.isEmpty { Label(recipe.tags.prefix(2).map(CategoryTree.displayName).joined(separator: ", "), systemImage: "tag") }
         }
@@ -404,6 +410,7 @@ struct RecipeCard: View {
 
     private var details: some View {
         var parts: [String] = []
+        if recipe.isIdea { parts.append("Idea") }
         if let minutes = recipe.totalMinutes { parts.append("\(minutes) min") }
         if let tag = recipe.tags.first { parts.append(CategoryTree.displayName(tag)) }
         return Text(parts.joined(separator: "  ·  "))

@@ -144,6 +144,9 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         return (prepMinutes ?? 0) + (cookMinutes ?? 0)
     }
 
+    /// Something to cook that has no recipe yet, like "Spaghetti" or "Leftovers": a title and maybe notes.
+    public var isIdea: Bool { ingredients.isEmpty && steps.isEmpty }
+
     public var markdown: String {
         var lines = ["# \(title)"]
         if !summary.isEmpty { lines += ["", summary] }

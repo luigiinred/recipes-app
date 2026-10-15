@@ -2,6 +2,12 @@ import XCTest
 @testable import RecipeKit
 
 final class FeaturesTests: XCTestCase {
+    func testIdeaIsARecipeWithNothingToCook() {
+        XCTAssertTrue(Recipe(title: "Spaghetti", notes: "Use the good pasta").isIdea)
+        XCTAssertFalse(Recipe(title: "Spaghetti", ingredients: ["1 lb spaghetti"]).isIdea)
+        XCTAssertFalse(Recipe(title: "Spaghetti", steps: ["Boil the pasta."]).isIdea)
+    }
+
     func testDurationDetector() {
         func seconds(_ text: String) -> [Int] { DurationDetector.find(in: text).map(\.seconds) }
         XCTAssertEqual(seconds("Simmer for 10 minutes."), [600])
