@@ -8,7 +8,7 @@ import os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-ICON = os.path.abspath(f"{HERE}/../../../../Design/AppIcon/PNG/preview.png")
+ICON = os.path.abspath(f"{HERE}/../images/icon/app-icon.png")
 PHOTOS = [f"file://{HERE}/seed/photos/{n}.jpg" for n in
           ["pesto-pasta", "butternut-soup", "red-curry", "cookies", "pappardelle", "shakshuka", "fig-toast", "lemon-loaf", "braised-beef", "clams", "noodle-soup", "pancakes", "lentil-salad", "fried-rice"]]
 TARGETS = {"header": (3840, 1646), "search": (3840, 2560), "universal": (5244, 2950)}
@@ -22,7 +22,7 @@ html, body { background:#000; overflow:hidden; }
 .mosaic i { background-size:cover; background-position:center; }
 .shade { position:absolute; inset:0; background: radial-gradient(ellipse 52%% 62%% at 50%% 50%%, rgba(31,24,21,.92), rgba(31,24,21,.62) 70%%, rgba(31,24,21,.45)); }
 .lockup { position:absolute; left:0; right:0; top:50%%; transform:translateY(-50%%); text-align:center; color:#fff; }
-.icon { width:calc(var(--u)*%(icon).2f); height:calc(var(--u)*%(icon).2f); border-radius:22.5%%; box-shadow:0 calc(var(--u)*.8) calc(var(--u)*3) rgba(0,0,0,.5); }
+.icon { width:calc(var(--u)*%(icon).2f); height:calc(var(--u)*%(icon).2f); filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.6) rgba(0,0,0,.5)); }
 h1 { margin-top:calc(var(--u)*%(gap).2f); font-family:"NY","New York",Georgia,serif; font-weight:600; letter-spacing:-.012em; line-height:1.06; font-size:calc(var(--u)*%(head).2f); }
 h1 em { font-style:normal; background:linear-gradient(95deg,#ffc48a,#ff8a4c); -webkit-background-clip:text; background-clip:text; color:transparent; }
 </style><div class="canvas"><div class="mosaic">%(tiles)s</div><div class="shade"></div>

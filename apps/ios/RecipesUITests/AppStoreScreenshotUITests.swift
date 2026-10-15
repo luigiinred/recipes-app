@@ -106,18 +106,32 @@ final class AppStoreScreenshotUITests: XCTestCase {
         sleep(2)
     }
 
+    /// A tab is a button in the top tab bar, or a row in the sidebar when the tab bar is built into it.
     private func tab(_ name: String) {
-        let button = app.tabBars.buttons[name].firstMatch
-        let target = button.exists ? button : app.buttons[name].firstMatch
-        XCTAssertTrue(target.waitForExistence(timeout: 8), "No tab \(name)")
-        target.tap()
-        sleep(1)
+        let places = [app.tabBars.buttons[name], app.buttons[name], app.cells.staticTexts[name], app.staticTexts[name]].map(\.firstMatch)
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline {
+            if let target = places.first(where: { $0.exists && $0.isHittable }) {
+                target.tap()
+                sleep(1)
+                return
+            }
+            usleep(300_000)
+        }
+        print(app.debugDescription)
+        XCTFail("No tab \(name)")
     }
 
     private func tapButton(_ name: String) {
         XCTAssertTrue(app.buttons[name].firstMatch.waitForExistence(timeout: 8), "No button \(name)")
+        let screen = app.windows.firstMatch.frame
         let candidates = app.buttons.matching(NSPredicate(format: "label == %@", name)).allElementsBoundByIndex
-        guard let button = candidates.first(where: \.isHittable) else { return XCTFail("No hittable button \(name)") }
+        // Frames, not isHittable: a hidden copy has no hit point and makes XCTest fail. The visible one is the lowest.
+        guard let button = candidates
+            .filter({ $0.exists && !$0.frame.isEmpty && screen.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) })
+            .max(by: { $0.frame.minY < $1.frame.minY }) else {
+            return XCTFail("No visible button \(name)")
+        }
         button.tap()
     }
 }

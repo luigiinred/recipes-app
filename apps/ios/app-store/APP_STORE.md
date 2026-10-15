@@ -18,9 +18,9 @@ Design decisions for the artwork (fonts, colors) are in [`design.markdown`](../.
 
 | What | File | Size | Upload to |
 |---|---|---|---|
-| App icon | [`images/icon/app-icon-1024.png`](images/icon/app-icon-1024.png) | 1024 × 1024, opaque | Reference copy. The shipping icon comes from the binary (`App/AppIcon.icon`) |
-| iPhone screenshots (9) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
-| iPad screenshots (5) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
+| App icon | [`images/icon/app-icon-1024.png`](images/icon/app-icon-1024.png) | 1024 × 1024, opaque | Approximate flat copy, cropped slightly to drop the rounded bevel. The shipping icon comes from the binary (`App/AppIcon.icon`). [`app-icon.png`](images/icon/app-icon.png) is the rendered Home Screen icon that the card and creative images use |
+| iPhone screenshots (10) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
+| iPad screenshots (6) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
 | Product page header | [`images/creative/header.png`](images/creative/header.png) | 3840 × 1646 (21:9) | Product page header |
 | Search result image | [`images/creative/search.png`](images/creative/search.png) | 3840 × 2560 (3:2) | Search results |
 | Universal creative | [`images/creative/universal.png`](images/creative/universal.png) | 5244 × 2950 (16:9) | Header and search from one file |
@@ -112,7 +112,7 @@ Welcome to Recipes. Save recipes from the web or a video, plan your week, and co
 
 ## Screenshots and captions
 
-Each screenshot is a real capture from the simulator, using the fictional recipe library in `tools/seed/`. Captions are set in New York on the app-icon brown, with the emphasized words in the icon's orange. They live in [`tools/captions.json`](tools/captions.json) so they can be localized without redoing artwork.
+Each screenshot is a real capture from the simulator, using the fictional recipe library in `tools/seed/`. Captions are set in New York on a dark warm brown, with the emphasized words in orange from the icon's utensils. They live in [`tools/captions.json`](tools/captions.json) so they can be localized without redoing artwork.
 
 ### iPhone (6.9")
 
@@ -127,16 +127,18 @@ Each screenshot is a real capture from the simulator, using the fictional recipe
 | 7 | [`07-groceries.jpg`](images/iphone/07-groceries.jpg) | Shopping lists that *stay in sync.* | Groceries |
 | 8 | [`08-organize.jpg`](images/iphone/08-organize.jpg) | Organize it *your way.* | Collections and categories |
 | 9 | [`09-dark.jpg`](images/iphone/09-dark.jpg) | Easy on the eyes, *day or night.* | Recipe page in dark mode |
+| 10 | [`10-open-source.jpg`](images/iphone/10-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture: MIT license, iCloud Drive files, no ads |
 
 ### iPad (13", landscape)
 
 | # | File | Caption | Shows |
 |---|---|---|---|
-| 1 | [`01-library.jpg`](images/ipad/01-library.jpg) | Your whole cookbook, *beautifully laid out.* | Three-column library |
+| 1 | [`01-library.jpg`](images/ipad/01-library.jpg) | Your whole cookbook, *beautifully laid out.* | Library with the tab bar built into the sidebar |
 | 2 | [`02-week.jpg`](images/ipad/02-week.jpg) | Plan the week *with the recipe in hand.* | My Week beside a recipe |
 | 3 | [`03-upnext.jpg`](images/ipad/03-upnext.jpg) | Line up what *you'll cook next.* | Up Next beside a recipe |
 | 4 | [`04-cook.jpg`](images/ipad/04-cook.jpg) | Step by step, *in large, clear type.* | Cook mode |
 | 5 | [`05-dark.jpg`](images/ipad/05-dark.jpg) | Easy on the eyes, *day or night.* | Library in dark mode |
+| 6 | [`06-open-source.jpg`](images/ipad/06-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture |
 
 ### Creative assets
 
@@ -200,7 +202,7 @@ Verify the Developer Tools path on the final build, and decide whether you want 
 - [ ] **Support and privacy policy URLs.** Required, and neither exists in the repo.
 - [ ] **Reserve the app name** (see alternates above).
 - [ ] **Mac screenshots.** None were made. The Mac app launches from this tool's shell but never opens a window, because the shell has no GUI session, so the UI test that captures the window can't run. Mac builds also need a Mac development certificate that isn't on this machine. Run the capture from a normal Terminal tab in your desktop session, or take them by hand at 2880 × 1800 (or 1440 × 900 at 2x).
-- [ ] **Decide the accent.** The icon is brown and orange, while the app's accent is a tomato red. The artwork follows the icon. See [`design.markdown`](../../../design.markdown).
+- [ ] **Decide the accent.** The icon is peach, terracotta and orange, while the app's accent is a tomato red. The artwork keeps its dark brown ground with the icon's orange. See [`design.markdown`](../../../design.markdown).
 - [ ] **Preview the creative assets** in App Store Connect's template for header, search and universal.
 - [ ] **Localize** `tools/captions.json` and the copy above if you ship in other languages.
 - [ ] **App Privacy answers** (YouTube embed question above).
@@ -214,20 +216,24 @@ All commands run from `apps/ios`. Needs Xcode, XcodeGen, Google Chrome and Image
 swift build -c release --product recipes   # the CLI that seeds the demo library
 xcodegen generate
 xcrun simctl create "Recipes Shots iPhone" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-26-5
-xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-26-5
+xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-27-0
 xcodebuild build-for-testing -project Recipes.xcodeproj -scheme Recipes -destination "id=<sim id>" -derivedDataPath /tmp/shots
 
 app-store/tools/capture.sh iphone <iphone sim id> /tmp/shots home library recipe ingredients cook plan upnext groceries recipe-dark
 app-store/tools/capture.sh ipad <ipad sim id> /tmp/shots library plan upnext cook library-dark
 python3 app-store/tools/compose.py iphone
 python3 app-store/tools/compose.py ipad
+"/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" App/AppIcon.icon --export-image \
+  --output-file app-store/images/icon/app-icon.png --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
+python3 app-store/tools/card.py            # the closing card, last in each set (also run creative.py after an icon change)
 python3 app-store/tools/creative.py
 ```
 
 Notes from making these:
 
+- The iPad shots need an iOS 27 simulator. The sidebar's category groups start folded only on iOS 27; on 26.x every group is expanded and the list runs off the bottom.
 - Use a dedicated simulator. A simulator last used by another app shows that app's "back" link in the status bar.
-- `capture.sh` seeds a fresh library every run with `tools/seed.py` (recipes in `tools/seed/recipes.json`, photos in `tools/seed/photos/`) and points the app at it with `RECIPES_DIR`.
+- `capture.sh` reinstalls the app each run, because the app remembers which sidebar sections are open. It seeds a fresh library every run with `tools/seed.py` (recipes in `tools/seed/recipes.json`, photos in `tools/seed/photos/`) and points the app at it with `RECIPES_DIR`.
 - The `TimerWidget` Live Activity extension crashes at launch in the simulator test runner and fails the run ("Critical process TimerWidget crashed"). I worked around it by deleting `PlugIns/TimerWidget.appex` from the *built* app in the derived data folder and re-signing it ad hoc: `rm -rf <DerivedData>/Build/Products/Debug-iphonesimulator/Recipes.app/PlugIns/TimerWidget.appex && codesign --force --sign - --preserve-metadata=entitlements <that .app>`. The crash itself is worth a look: it's an assertion in `_EXRunningExtension._start`.
 - The UI test is `RecipesUITests/AppStoreScreenshotUITests.swift`. It does nothing unless `APP_STORE_SCENE` is set.
 - `capture.sh` ends each scene with `magick -auto-orient`, because iPad landscape captures carry an orientation flag.
