@@ -279,6 +279,23 @@ final class RecipeLibrary: ObservableObject {
         await perform { try $0.mealPlan.delete(entry) }
     }
 
+    /// Saves the idea as a recipe, unless one with that title exists, and puts it on the calendar.
+    func plan(idea title: String, on day: Date, meal: Meal) async {
+        let existing = recipes.first { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }
+        let idea = existing ?? Recipe(title: title)
+        let entry = MealPlanEntry(recipeID: idea.id, title: idea.title, day: DayKey.string(from: day), meal: meal)
+        await perform { library in
+            if existing == nil { try library.recipes.save(idea) }
+            try library.mealPlan.save(entry)
+        }
+    }
+
+    func addIdea(title: String, notes: String) async -> Recipe {
+        let idea = Recipe(title: title, notes: notes)
+        await save(idea)
+        return idea
+    }
+
     func removeEntry(id: UUID) async {
         guard let entry = mealPlan.first(where: { $0.id == id }) else { return }
         await remove(entry)

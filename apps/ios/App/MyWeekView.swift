@@ -159,7 +159,7 @@ struct MyWeekView: View {
     }
 }
 
-/// Pick a recipe for a day: Up Next first, or anything in the library.
+/// Pick a recipe for a day, or jot down an idea: Up Next first, or anything in the library.
 struct AddMealSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
@@ -167,6 +167,7 @@ struct AddMealSheet: View {
 
     @State private var meal: Meal
     @State private var search = ""
+    @State private var idea = ""
     @State private var source: Source
 
     enum Source: String, CaseIterable { case queue = "Up Next", all = "All Recipes" }
@@ -183,9 +184,25 @@ struct AddMealSheet: View {
         return pool.filter { $0.matches(search) }
     }
 
+    private var trimmedIdea: String { idea.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private func addIdea() {
+        guard !trimmedIdea.isEmpty else { return }
+        Task { await library.plan(idea: trimmedIdea, on: day, meal: meal) }
+        dismiss()
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    TextField("Or add an idea, like “Spaghetti” or “Leftovers”", text: $idea)
+                        .submitLabel(.done)
+                        .onSubmit(addIdea)
+                    Button("Add", action: addIdea).disabled(trimmedIdea.isEmpty)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                Divider()
                 if !queued.isEmpty {
                     Picker("Source", selection: $source) {
                         ForEach(Source.allCases, id: \.self) { Text($0.rawValue).tag($0) }

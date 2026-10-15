@@ -1,7 +1,8 @@
-import { categoryDisplayName, collectionTitles, COLLECTIONS, filterCategory, filterCollection, recipeMatches, type CollectionId } from "@recipes/schema/lib";
+import { categoryDisplayName, collectionTitles, COLLECTIONS, filterCategory, filterCollection, isIdea, recipeMatches, type CollectionId } from "@recipes/schema/lib";
 import type { RecipeView } from "@recipes/schema";
-import { ArrowLeft, BookOpen, Download, LayoutGrid, List, Plus, Search } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { ArrowLeft, BookOpen, Download, LayoutGrid, Lightbulb, List, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { NewIdeaDialog } from "../components/NewIdeaDialog.js";
 import { RecipeDetail } from "../components/RecipeDetail.js";
 import { RatingBadge } from "../components/Rating.js";
 import { EmptyState, Photo } from "../components/ui.js";
@@ -14,6 +15,7 @@ export function RecipesPage({ selectedId }: { selectedId?: string }) {
   const { recipes, loaded, error, recipe: lookup, refresh } = useLibrary();
   const { search } = useLocation();
   const prefs = usePrefs();
+  const [addingIdea, setAddingIdea] = useState(false);
 
   const rawCollection = search.get("collection");
   const collection: CollectionId = (COLLECTIONS as readonly string[]).includes(rawCollection ?? "") ? (rawCollection as CollectionId) : "all";
@@ -60,6 +62,9 @@ export function RecipesPage({ selectedId }: { selectedId?: string }) {
                 <Link to="/new">
                   <Plus size={15} /> New recipe
                 </Link>
+                <button type="button" onClick={() => setAddingIdea(true)}>
+                  <Lightbulb size={15} /> New idea
+                </button>
                 <Link to="/import">
                   <Download size={15} /> Import from a web page
                 </Link>
@@ -128,6 +133,7 @@ export function RecipesPage({ selectedId }: { selectedId?: string }) {
           <EmptyState icon={<BookOpen size={44} />} title="Pick a recipe" />
         </section>
       )}
+      {addingIdea && <NewIdeaDialog onClose={() => setAddingIdea(false)} />}
     </div>
   );
 }
@@ -141,6 +147,7 @@ function RecipeRow({ recipe, cards, selected, to }: { recipe: RecipeView; cards:
         <div className="row-text">
           <span className="row-title serif">{recipe.title}</span>
           <span className="row-meta muted">
+            {isIdea(recipe) && <span>Idea</span>}
             {minutes > 0 && <span>{formatMinutes(minutes)}</span>}
             {recipe.tags[0] && <span>{recipe.tags[0].split("/").at(-1)}</span>}
             <RatingBadge recipe={recipe} />

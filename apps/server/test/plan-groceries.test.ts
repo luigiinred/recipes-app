@@ -51,4 +51,14 @@ describe("groceries", () => {
     const [item] = await (await api.post("/api/groceries", { name: "Salt" })).json();
     expect(Object.keys(item).sort()).toEqual(["createdAt", "id", "isChecked", "name", "quantity", "updatedAt"]);
   });
+
+  it("plans an idea, a recipe with only a title", async () => {
+    server = await makeServer();
+    const api = await client(server);
+    const idea = await (await api.post("/api/recipes", { title: "Frozen burgers", notes: "From the freezer" })).json();
+    expect(idea).toMatchObject({ ingredients: [], steps: [], notes: "From the freezer" });
+
+    const entry = await (await api.post("/api/meal-plan", { recipeID: idea.id, day: "2026-10-15" })).json();
+    expect(entry).toMatchObject({ title: "Frozen burgers", recipeID: idea.id, meal: "dinner" });
+  });
 });
