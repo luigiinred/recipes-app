@@ -6,7 +6,7 @@ A recipe manager synced through iCloud Drive, with a command-line tool for agent
 
 ## Features
 
-- **Recipes** with photos, shown as a compact list (default) or photo cards. One tap toggles between them. On iPhone the Recipes tab opens on a home list (All Recipes, Most Recent, Favorites or Top Rated) and your categories; tap a category to see its subcategories and recipes, and keep drilling (`Dessert` → `Cookies`). On Mac it is a three-column split: collections and the category tree, the recipes in the one you pick, and the recipe. On iPad the tab bar is built into the sidebar, so Recipes, Plan, Groceries and Search sit above the collections and a collapsible category tree; the same control switches back to a tab bar across the top, and the Recipes tab shows the recipes in the one you pick beside the recipe.
+- **Recipes** with photos, shown as a compact list (default) or photo cards. One tap toggles between them. On iPhone the Recipes tab opens on a home list (All Recipes, Most Recent, Favorites or Top Rated) and your categories; tap a category to see its subcategories and recipes, and keep drilling (`Dessert` → `Cookies`). On Mac it is a three-column split: collections and the category tree, the recipes in the one you pick, and the recipe. On iPad the tab bar is built into the sidebar, so Recipes, Plan, Groceries, Settings and Search sit in one list; the same control switches back to a tab bar across the top. The Recipes tab is a list beside the recipe, and its filter menu narrows the list to a collection or category.
 - **Organizing**: favorites or one-to-five star ratings (chosen in Settings; Top Rated lists 4 and 5 stars), the Up Next queue, and nested categories (`Dinner/Pasta`).
 - **Import** from any recipe web page (schema.org data), from **YouTube** videos, from a scanned book page (camera or photo/PDF), or by typing it in. Every import opens a review step for the title and categories, including from the Share sheet.
 - **YouTube**: the video stays pinned above the recipe while you scroll, and cook mode shows it too, jumping to each step's moment as you move through the steps. The recipe is read from the description. When the description has none, the video's captions are used, structured by the on-device language model where available. Each step gets a timestamp, and the video plays inline on the recipe page. Tap a step's time to jump there.
@@ -50,7 +50,8 @@ Recipes are saved in one standard form, whether they come from the editor, an im
 Run these from `apps/ios`.
 
 ```bash
-xcodegen generate                 # creates Recipes.xcodeproj
+cp .env.example .env              # once: your team ID, bundle ID and iCloud container
+bin/generate.sh                   # creates Recipes.xcodeproj from .env
 open Recipes.xcodeproj            # run the Recipes scheme on Mac or iPhone
 swift test                        # RecipeKit unit tests
 bin/install_cli.sh                # installs `recipes` to ~/.local/bin

@@ -21,7 +21,6 @@ SCHEME="$APP_NAME"
 PROJECT_YML="project.yml"
 BUILD_DIR="./build"
 DERIVED_DATA="${BUILD_DIR}/DerivedData"
-TEAM_ID="A2VG7FKNF9"
 
 PLATFORM="all"
 SKIP_BUMP=false
@@ -46,11 +45,12 @@ step() { echo "==> $*"; }
 die()  { echo "❌ $*" >&2; exit 1; }
 
 require_env() {
-  [[ -f .env ]] || die "missing .env (copy .env.example and set ASC_KEY_ID / ASC_ISSUER_ID)"
+  [[ -f .env ]] || die "missing .env (copy .env.example and fill it in)"
   set -a; source .env; set +a
-  for var in ASC_KEY_ID ASC_ISSUER_ID; do
+  for var in RECIPES_TEAM_ID RECIPES_BUNDLE_ID RECIPES_ICLOUD_CONTAINER ASC_KEY_ID ASC_ISSUER_ID; do
     [[ -n "${!var:-}" ]] || die ".env must set $var"
   done
+  TEAM_ID="$RECIPES_TEAM_ID"
   local key_path="$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8"
   [[ -f "$key_path" ]] || die "missing App Store Connect API key at $key_path"
 
@@ -118,6 +118,10 @@ archive_and_upload() {
   local archive_path="${BUILD_DIR}/${APP_NAME}-${platform}.xcarchive"
 
   [[ -f "$export_plist" ]] || die "missing $export_plist"
+  mkdir -p "$BUILD_DIR"
+  local resolved_plist="${BUILD_DIR}/$(basename "$export_plist")"
+  cp "$export_plist" "$resolved_plist"
+  /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" "$resolved_plist"
 
   step "Archiving for ${platform}..."
   run_xcodebuild archive \
@@ -135,7 +139,7 @@ archive_and_upload() {
   step "Uploading ${platform} to TestFlight..."
   run_xcodebuild -exportArchive \
     -archivePath "$archive_path" \
-    -exportOptionsPlist "$export_plist" \
+    -exportOptionsPlist "$resolved_plist" \
     "${AUTH_ARGS[@]}"
 
   step "${platform} upload complete ✓"

@@ -5,7 +5,7 @@
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>teamID</key>
-	<string>A2VG7FKNF9</string>
+	<string>YOUR_TEAM_ID</string>
 	<key>destination</key>
 	<string>upload</string>
 	<!-- Cloud-managed signing: xcodebuild resolves the App Store distribution

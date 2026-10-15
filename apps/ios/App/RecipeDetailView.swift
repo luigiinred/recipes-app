@@ -20,6 +20,7 @@ struct RecipeDetailView: View {
     @State private var scrolled: CGFloat = 0
     @State private var topInset: CGFloat = 0
     @State private var headerOffset: CGFloat = 0
+    @State private var sidePaneScrolled = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
@@ -185,19 +186,21 @@ struct RecipeDetailView: View {
             }
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 0) {
                     if hasArtwork {
                         Color.clear
                             .frame(height: 280 + topInset)
                             .frame(maxWidth: .infinity)
                             .overlay { artwork }
                             .clipped()
-                            .padding(.top, -topInset)
-                            .padding(.horizontal, -24)
                     }
-                    ingredients
+                    ingredients.padding(24)
                 }
-                .padding(24)
+            }
+            .ignoresSafeArea(edges: .top)
+            .scrollEdgeEffectHidden(!sidePaneScrolled, for: .top)
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 1 } action: { _, scrolled in
+                sidePaneScrolled = scrolled
             }
             .frame(width: min(420, max(320, width * 0.36)))
             .background(.quaternary.opacity(0.25))

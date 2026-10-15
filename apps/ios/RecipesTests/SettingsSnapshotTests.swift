@@ -7,7 +7,11 @@ import Testing
 struct SettingsSnapshotTests {
     @Test("settings")
     func settings() {
-        assertPageSnapshots(of: SettingsView(intelligenceOverride: (.notEnabled, false)), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: SettingsView(
+            intelligenceOverride: (.notEnabled, false),
+            listing: URL(string: "https://apps.apple.com/app/id1")!,
+            writeReview: URL(string: "https://apps.apple.com/app/id1?action=write-review")!
+        ), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
     @Test("add a meal: Up Next and search")

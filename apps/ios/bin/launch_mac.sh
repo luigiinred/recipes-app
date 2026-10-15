@@ -54,7 +54,7 @@ step() { echo "==> $*"; }
 generate_project() {
   command -v xcodegen >/dev/null || { echo "❌ xcodegen not installed (brew install xcodegen)" >&2; exit 1; }
   step "Generating project (xcodegen)"
-  xcodegen generate
+  "$SCRIPT_DIR/generate.sh"
 }
 
 kill_running() {

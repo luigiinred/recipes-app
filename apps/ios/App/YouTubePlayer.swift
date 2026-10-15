@@ -59,7 +59,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
     #endif
 
     // YouTube rejects embeds that don't identify the host app (errors 152/153), so use the bundle ID as the origin.
-    static let origin = "https://" + (Bundle.main.bundleIdentifier ?? "com.garrabrant.recipes").lowercased()
+    static let origin = "https://" + (Bundle.main.bundleIdentifier ?? "localhost").lowercased()
 
     static func html(videoID: String, start: Int) -> String {
         """

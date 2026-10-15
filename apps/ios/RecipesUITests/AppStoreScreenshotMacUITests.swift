@@ -15,7 +15,7 @@ final class AppStoreScreenshotMacUITests: XCTestCase {
 
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-onboardingCompleted", "YES", "-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES", "-ApplePersistenceIgnoreState", "YES"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts[hero].firstMatch.waitForExistence(timeout: 40), "library should load")

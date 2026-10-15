@@ -17,7 +17,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
         if dark { app.launchArguments += ["-AppleInterfaceStyle", "Dark"] }
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()

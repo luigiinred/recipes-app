@@ -201,6 +201,7 @@ Verify the Developer Tools path on the final build, and decide whether you want 
 
 - [ ] **Support and privacy policy URLs.** Required, and neither exists in the repo.
 - [ ] **Reserve the app name** (see alternates above).
+- [ ] **Set the Apple ID** in `App/AppStoreLink.swift` once the app exists in App Store Connect. Until then Settings hides the "Help Support Us" section. The "Rate us" banner uses the in-app rating dialog and needs no ID.
 - [ ] **Mac screenshots.** None were made. The Mac app launches from this tool's shell but never opens a window, because the shell has no GUI session, so the UI test that captures the window can't run. Mac builds also need a Mac development certificate that isn't on this machine. Run the capture from a normal Terminal tab in your desktop session, or take them by hand at 2880 × 1800 (or 1440 × 900 at 2x).
 - [ ] **Decide the accent.** The icon is peach, terracotta and orange, while the app's accent is a tomato red. The artwork keeps its dark brown ground with the icon's orange. See [`design.markdown`](../../../design.markdown).
 - [ ] **Preview the creative assets** in App Store Connect's template for header, search and universal.
