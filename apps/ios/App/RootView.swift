@@ -10,10 +10,17 @@ enum AppSection: Hashable {
 
 #if os(iOS)
 struct RootView: View {
-    enum AppTab: Hashable { case recipes, feeds, plan, groceries, search }
+    enum AppTab: Hashable {
+        case recipes, feeds, plan, groceries, search
+        /// A collection or category other than All Recipes; only listed in the iPad sidebar.
+        case collection(RecipeCollection)
+    }
 
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @State private var tab: AppTab
     @State private var query: String
     private let planMode: PlanMode
@@ -29,24 +36,96 @@ struct RootView: View {
         self.recipesCollection = recipesCollection
         self.recipesPath = recipesPath
         self.recipeSelection = recipeSelection
-        _tab = State(initialValue: tab)
+        _tab = State(initialValue: tab == .recipes && recipesCollection != .all ? .collection(recipesCollection) : tab)
         _query = State(initialValue: searchQuery)
         self.planMode = planMode
         self.showsSmartPlan = showsSmartPlan
     }
 
+    private var collections: [RecipeCollection] {
+        let liked: RecipeCollection = (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .stars ? .topRated : .favorites
+        return [.recent, liked, .uncategorized].filter { $0 == .recent || $0 == liked || !$0.filter(library.recipes).isEmpty }
+    }
+
+    /// The tab bar and the sidebar are one component on iPad: the collections and categories live in its sidebar.
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+            Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: .all) }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             Tab(value: AppTab.search, role: .search) { SearchTab(query: $query) }
+            if sizeClass == .regular {
+                TabSection("Collections") {
+                    ForEach(collections, id: \.self) { collection in
+                        Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) {
+                            RecipesTab(selection: recipesCollection == collection ? recipeSelection : nil, collection: collection)
+                        }
+                        .defaultVisibility(.hidden, for: .tabBar)
+                    }
+                }
+                if !library.categoryTree.isEmpty {
+                    categoryTabs
+                }
+            }
         }
+        .tabViewStyle(.sidebarAdaptable)
+        .sidebarFirst()
         .tabViewSearchActivation(.searchTabSelection)
         .cookModeCover(cook)
         .onChange(of: router.recipeID, initial: true) { _, id in
             if id != nil { tab = .recipes }
         }
+    }
+
+    private var categoryTabs: some TabContent<AppTab> {
+        TabSection("Categories") {
+            ForEach(library.categoryTree) { node in
+                if node.children.isEmpty {
+                    categoryTab(node)
+                } else {
+                    collapsed(TabSection(node.name) {
+                        categoryTab(node, title: "All \(node.name)")
+                        ForEach(node.children) { child in
+                            if child.children.isEmpty {
+                                categoryTab(child)
+                            } else {
+                                collapsed(TabSection(child.name) {
+                                    categoryTab(child, title: "All \(child.name)")
+                                    ForEach(Self.descendants(of: child)) { categoryTab($0, title: $0.path.components(separatedBy: "/").dropFirst(CategoryTree.components(child.path).count).joined(separator: " › ")) }
+                                })
+                            }
+                        }
+                    })
+                }
+            }
+        }
+    }
+
+    /// Everything below a category, flattened: the sidebar nests two levels and folds the rest into the second.
+    private static func descendants(of node: CategoryNode) -> [CategoryNode] {
+        node.children.flatMap { [$0] + descendants(of: $0) }
+    }
+
+    /// Groups start folded, so a long tree stays short until it's opened.
+    @TabContentBuilder<AppTab>
+    private func collapsed(_ section: some TabContent<AppTab>) -> some TabContent<AppTab> {
+        if #available(iOS 27.0, *) { section.defaultSectionExpansion(.collapsed) } else { section }
+    }
+
+    private func categoryTab(_ node: CategoryNode, title: String? = nil) -> some TabContent<AppTab> {
+        let collection = RecipeCollection.category(node.path)
+        return Tab(title ?? node.name, systemImage: node.children.isEmpty ? "tag" : "folder", value: AppTab.collection(collection)) {
+            RecipesTab(selection: recipesCollection == collection ? recipeSelection : nil, collection: collection)
+        }
+        .defaultVisibility(.hidden, for: .tabBar)
+    }
+}
+
+private extension View {
+    /// Starts iPad in the sidebar, where the user can still switch to the top tab bar.
+    @ViewBuilder
+    func sidebarFirst() -> some View {
+        if #available(iOS 27.0, *) { defaultTabBarPlacement(.sidebar) } else { self }
     }
 }
 
@@ -89,12 +168,12 @@ struct RecipesTab: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
-    @State private var sidebarSelection: RecipeCollection?
+    private let collection: RecipeCollection
 
     init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
         _path = State(initialValue: path)
         _selection = State(initialValue: selection)
-        _sidebarSelection = State(initialValue: collection)
+        self.collection = collection
     }
 
     var body: some View {
@@ -102,9 +181,8 @@ struct RecipesTab: View {
             if sizeClass == .regular { columns } else { stack }
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
-            guard let id else { return }
+            guard let id, collection == .all else { return }
             if sizeClass == .regular {
-                sidebarSelection = .all
                 selection = id
             } else {
                 path = [.recipe(id)]
@@ -126,16 +204,11 @@ struct RecipesTab: View {
         }
     }
 
-    /// iPad: collections and categories, the recipes in the one you pick, and the recipe itself.
+    /// iPad: the recipes in the collection picked in the sidebar, and the recipe itself.
     private var columns: some View {
         NavigationSplitView {
-            RecipesSidebar(selection: $sidebarSelection)
-        } content: {
-            RecipeListView(
-                collection: Binding(get: { sidebarSelection ?? .all }, set: { sidebarSelection = $0 }),
-                selection: $selection, showsFolders: false
-            )
-            .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
+            RecipeListView(collection: .constant(collection), selection: $selection, showsFolders: false, showsSettings: true)
+                .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
         } detail: {
             if let recipe = library.recipe(id: selection) {
                 RecipeDetailView(recipe: recipe).id(recipe.id)
