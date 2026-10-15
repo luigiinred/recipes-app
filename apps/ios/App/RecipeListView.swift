@@ -35,6 +35,10 @@ struct RecipeListView: View {
 
     private var style: RecipeListStyle { styleOverride ?? storedStyle }
 
+    private var browsedCategory: String? {
+        if case .category(let path) = collection { path } else { nil }
+    }
+
     var body: some View {
         recipeList
             .macSearchable(text: $search, prompt: "Search recipes")
@@ -91,10 +95,14 @@ struct RecipeListView: View {
                     .listRowSeparator(style == .cards ? .hidden : .automatic)
                     .listRowSeparator(recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
-                    .recipeSwipeActions(for: recipe)
+                    .recipeSwipeActions(for: recipe, removingTagFrom: browsedCategory)
+                    .draggable(RecipeDragItem(id: recipe.id))
                     .contextMenu {
                         RecipeQuickActions(recipe: recipe)
                         Button("Edit", systemImage: "pencil") { editing = recipe }
+                        if let browsedCategory {
+                            Button("Remove Tag", systemImage: "tag.slash") { Task { await library.removeTags(recipe, in: browsedCategory) } }
+                        }
                     }
                 }
             } header: {
@@ -318,6 +326,10 @@ struct CategoryRow: View {
             } label: {
                 Label(node.name, systemImage: node.children.isEmpty ? "tag" : "folder")
             }
+        }
+        .dropDestination(for: RecipeDragItem.self) { items, _ in
+            Task { for item in items { await library.addTag(item.id, to: node.path) } }
+            return !items.isEmpty
         }
     }
 }

@@ -236,6 +236,22 @@ final class RecipeLibrary: ObservableObject {
         await save(changed)
     }
 
+    /// Files a recipe under a category unless it is already in it or one of its subcategories.
+    func addTag(_ recipeID: UUID, to category: String) async {
+        guard var changed = recipe(id: recipeID) else { return }
+        let tag = CategoryTree.normalized(category)
+        guard !tag.isEmpty, !changed.tags.contains(where: { CategoryTree.tag($0, isIn: tag) }) else { return }
+        changed.tags.append(tag)
+        await save(changed)
+    }
+
+    /// Takes a recipe out of a category by dropping its tags in that category and beneath it.
+    func removeTags(_ recipe: Recipe, in category: String) async {
+        var changed = recipe
+        changed.tags.removeAll { CategoryTree.tag($0, isIn: category) }
+        await save(changed)
+    }
+
     func setRating(_ recipe: Recipe, _ value: Int?) async {
         var changed = recipe
         changed.rating = value

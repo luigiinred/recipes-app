@@ -1,5 +1,16 @@
+import CoreTransferable
 import RecipeKit
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// What a dragged recipe row carries, so a category can file it by id.
+struct RecipeDragItem: Codable, Transferable {
+    let id: UUID
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .data)
+    }
+}
 
 extension AppSettings {
     static var ratingStyle: RatingStyle {
@@ -61,16 +72,24 @@ struct RecipeQuickActions: View {
 }
 
 /// Swipe a recipe row left for Up Next, Favorite and, when turned on in Settings, Delete. The buttons stay open until tapped.
+/// Inside a category, Remove Tag takes the recipe out of it.
 struct RecipeSwipeActions: ViewModifier {
     @EnvironmentObject private var library: RecipeLibrary
     @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showsDelete = false
     @State private var confirmingDelete = false
     let recipe: Recipe
+    var category: String?
 
     func body(content: Content) -> some View {
         content
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if let category {
+                    Button { Task { await library.removeTags(recipe, in: category) } } label: {
+                        Label("Remove Tag", systemImage: "tag.slash")
+                    }
+                    .tint(.gray)
+                }
                 if showsDelete {
                     Button { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
                         .tint(.red)
@@ -100,7 +119,9 @@ struct RecipeSwipeActions: ViewModifier {
 }
 
 extension View {
-    func recipeSwipeActions(for recipe: Recipe) -> some View { modifier(RecipeSwipeActions(recipe: recipe)) }
+    func recipeSwipeActions(for recipe: Recipe, removingTagFrom category: String? = nil) -> some View {
+        modifier(RecipeSwipeActions(recipe: recipe, category: category))
+    }
 }
 
 struct RatingMenu: View {
