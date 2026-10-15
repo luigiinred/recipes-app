@@ -26,6 +26,7 @@ struct RecipeListView: View {
     var styleOverride: RecipeListStyle?
     /// On iPhone a category is a folder with subcategories to open. The iPad sidebar shows the tree instead.
     var showsFolders = true
+    var showsSettings = false
 
     @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
     @State private var search = ""
@@ -37,7 +38,7 @@ struct RecipeListView: View {
         recipeList
             .macSearchable(text: $search, prompt: "Search recipes")
             .navigationTitle(collection.title)
-            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }))
+            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }), showsSettings: showsSettings)
             .sheet(item: $editing) { recipe in
                 RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
             }
