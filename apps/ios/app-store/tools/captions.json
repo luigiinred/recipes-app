@@ -72,5 +72,25 @@
    "raw": "library-dark",
    "caption": "Easy on the eyes,<br><em>day or night.</em>"
   }
- ]
+ ],
+ "card": {
+  "headline": "Open source.<br><em>No account. No ads.</em>",
+  "rows": [
+   {
+    "icon": "code",
+    "title": "Open source",
+    "body": "The code is public under the MIT license. Read it, change it, share it."
+   },
+   {
+    "icon": "cloud",
+    "title": "No account",
+    "body": "Nothing to sign up for. Your recipes are plain files in your own iCloud Drive."
+   },
+   {
+    "icon": "noads",
+    "title": "No ads",
+    "body": "Nothing between you and the recipe."
+   }
+  ]
+ }
 }

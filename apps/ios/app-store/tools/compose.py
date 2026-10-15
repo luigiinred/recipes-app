@@ -10,10 +10,13 @@ import json, os, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-# Canvas size, screenshot width as a fraction of it, headline size and top offset as % of canvas width.
+# Canvas size, headline size and top offset as % of canvas width, and where the screenshot sits.
+# With `margin`, the whole screen shows, that fraction of the canvas height above the bottom edge.
+# Without it the screen is `fit` of the canvas width and runs off the bottom edge.
+# `shot_top` is the screenshot's top as a fraction of the canvas height.
 LAYOUT = {
-    "iphone": dict(size=(1320, 2868), fit=0.84, head=8.2, top=5.6, radius=8.0),
-    "ipad": dict(size=(2752, 2064), fit=0.80, head=5.2, top=4.4, radius=2.6),
+    "iphone": dict(size=(1320, 2868), fit=0.94, shot_top=0.165, head=8.2, top=5.6, radius=8.0),
+    "ipad": dict(size=(2752, 2064), margin=0.05, shot_top=0.235, head=5.2, top=4.4, radius=2.6),
 }
 
 PAGE = """<!doctype html><meta charset="utf-8"><style>
@@ -43,8 +46,11 @@ def compose(device, index, shot, style):
     w, h = cfg["size"]
     raw = f"{HERE}/raw/{device}/{shot['raw']}.png"
     rw, rh = map(int, subprocess.check_output(["magick", "identify", "-format", "%w %h", raw]).split())
-    shot_w = round(w * cfg["fit"]); shot_h = round(shot_w * rh / rw)
-    shot_top = h - shot_h + round(h * 0.004) if h > w else round(h * 0.235)
+    shot_top = round(h * cfg["shot_top"])
+    if "margin" in cfg:
+        shot_h = h - shot_top - round(h * cfg["margin"]); shot_w = round(shot_h * rw / rh)
+    else:
+        shot_w = round(w * cfg["fit"]); shot_h = round(shot_w * rh / rw)
     html = PAGE % dict(u=w / 100, w=w, h=h, top=cfg["top"], head=cfg["head"], caption=shot["caption"], shot_w=shot_w, shot_h=shot_h,
                        shot_top=shot_top, radius=cfg["radius"], raw=raw, style_css=LIGHT_CSS % {} if style == "light" else "")
     out_dir = f"{HERE}/../images/{device}{'-light' if style == 'light' else ''}"
