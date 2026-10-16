@@ -40,7 +40,7 @@ def build(name):
     out = f"{out_dir}/{name}.png"
     with tempfile.TemporaryDirectory() as tmp:
         open(f"{tmp}/p.html", "w").write(page)
-        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
+        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--disable-features=MediaRouter,DialMediaRouteProvider", "--hide-scrollbars", "--force-device-scale-factor=1",
                         "--allow-file-access-from-files", "--virtual-time-budget=6000", f"--window-size={w},{h + 200}",
                         f"--screenshot={tmp}/s.png", f"file://{tmp}/p.html"], capture_output=True, check=True)
         subprocess.run(["magick", f"{tmp}/s.png", "-crop", f"{w}x{h}+0+0", "+repage", "-background", "black", "-alpha", "remove",
