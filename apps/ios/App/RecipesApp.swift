@@ -18,6 +18,9 @@ struct RecipesApp: App {
                 .environmentObject(timers)
                 .environmentObject(router)
                 .tint(Theme.accent)
+                #if os(macOS)
+                .sizedFromEnvironment()
+                #endif
                 .task { await library.run() }
                 #if os(iOS)
                 .task { await TimerLiveActivities.endAll() }

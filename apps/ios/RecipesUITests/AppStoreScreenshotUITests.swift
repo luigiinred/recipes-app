@@ -17,7 +17,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES"]
         if dark { app.launchArguments += ["-AppleInterfaceStyle", "Dark"] }
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
@@ -75,7 +75,9 @@ final class AppStoreScreenshotUITests: XCTestCase {
             field.tap()
             field.typeText("http://localhost:8765/lemon-herb-gnocchi.html")
             tapButton("Import")
-            XCTAssertTrue(app.staticTexts["Lemon Herb Gnocchi"].firstMatch.waitForExistence(timeout: 40), "the import should open a preview")
+            let previewed = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Lemon Herb Gnocchi' OR value == 'Lemon Herb Gnocchi'")).firstMatch.waitForExistence(timeout: 40)
+            try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "\(out)/\(named).png"))
+            XCTAssertTrue(previewed, "the import should open a preview")
         case "idea":
             tab("Plan")
             tapButton("My Week")
@@ -86,6 +88,17 @@ final class AppStoreScreenshotUITests: XCTestCase {
             XCTAssertTrue(field.waitForExistence(timeout: 8))
             field.tap()
             field.typeText("Taco night")
+            tapButton("Add")
+            XCTAssertTrue(app.staticTexts["Taco night"].firstMatch.waitForExistence(timeout: 8), "the idea should join the week")
+            if regular { openRecipe("Thai Red Curry") }
+        case "cleanup":
+            if !regular { open("All Recipes") }
+            openRecipe(hero)
+            tapButton("More")
+            tapButton("Edit")
+            let cleanUp = app.buttons["Clean Up with Apple Intelligence"].firstMatch
+            for _ in 0..<8 where !cleanUp.exists || !cleanUp.isHittable { app.swipeUp() }
+            XCTAssertTrue(cleanUp.exists, "No Clean Up button")
         case "smartplan":
             tab("Plan")
             tapButton("My Week")
