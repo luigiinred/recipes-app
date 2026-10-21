@@ -295,6 +295,13 @@ private struct DataSettingsPage: View {
                 Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, and splits steps that were pasted as one block.")
             }
             Section {
+                NavigationLink { MealieSettingsPage() } label: { Label("Mealie", systemImage: "server.rack") }
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text("Keep your recipes, planned meals and groceries in step with your own Mealie server.")
+            }
+            Section {
                 Button { Task { await prepareExport() } } label: {
                     Label("Export all data as JSON", systemImage: "square.and.arrow.up")
                 }

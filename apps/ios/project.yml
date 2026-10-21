@@ -45,6 +45,9 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Recipes connects to your Mealie server on your home network to sync recipes.
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         LSApplicationCategoryType: public.app-category.food-and-drink

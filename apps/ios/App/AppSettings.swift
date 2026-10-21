@@ -15,6 +15,11 @@ enum AppSettings {
         static let showDeleteSwipe = "showDeleteInSwipeActions"
         static let onboardingCompleted = "onboardingCompleted"
         static let reviewPromptDismissed = "reviewPromptDismissed"
+        static let mealieServer = "mealieServer"
+        static let mealieUser = "mealieUser"
+        static let mealieList = "mealieShoppingList"
+        static let mealieSyncPlan = "mealieSyncMealPlan"
+        static let mealieSyncGroceries = "mealieSyncGroceries"
     }
 
     enum WeekStart: String, CaseIterable {

@@ -8,7 +8,7 @@ A recipe manager for iPhone, iPad and Mac, and a self-hostable server with a web
 | [`apps/server`](apps/server) | A Node server: REST API, file-sync endpoints and the built web UI, in one process. Stores the library as plain files. |
 | [`apps/web`](apps/web) | The web UI (React + Vite). Browse, edit, import from a web page, plan the week, keep a grocery list, cook step by step. |
 | [`packages/schema`](packages/schema) | The recipe data model and helpers (ingredient parsing, categories, collections), shared by the server and the web UI. |
-| [`docs`](docs) | The [sync protocol](docs/sync-protocol.md). |
+| [`docs`](docs) | The [sync protocol](docs/sync-protocol.md) and [syncing the app with Mealie](docs/mealie.md). |
 | [`Design`](Design) | App icon sources. |
 
 Both sides use the same library format: one JSON file per recipe, meal, grocery item and feed, plus JPEG photos. A library can be copied between an iCloud folder and the server's data folder as is, and the server's "Download everything" produces the same document as the app's "Export all data".
