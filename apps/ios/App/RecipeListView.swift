@@ -24,12 +24,12 @@ struct RecipeListView: View {
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
     var styleOverride: RecipeListStyle?
+    /// On iPhone a category is a folder with subcategories to open. The iPad sidebar shows the tree instead.
+    var showsFolders = true
     var showsSettings = false
+    var showsFilter = false
 
     @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    #endif
     @State private var search = ""
     @State private var editing: Recipe?
 
@@ -39,38 +39,25 @@ struct RecipeListView: View {
         if case .category(let path) = collection { path } else { nil }
     }
 
-    private var usesGrid: Bool {
-        guard styleOverride != .list else { return false }
-        #if os(iOS)
-        return sizeClass == .regular
-        #else
-        return true
-        #endif
-    }
-
     var body: some View {
-        content
+        recipeList
             .macSearchable(text: $search, prompt: "Search recipes")
             .navigationTitle(collection.title)
-            .recipeActions(
-                selection: $selection,
-                listStyle: usesGrid ? nil : Binding(get: { style }, set: { storedStyle = $0 }),
-                showsSettings: showsSettings
-            )
+            .toolbar {
+                if showsFilter {
+                    ToolbarItem(placement: .primaryAction) { RecipeFilterMenu(collection: $collection) }
+                }
+            }
+            .recipeActions(selection: $selection, listStyle: Binding(get: { style }, set: { storedStyle = $0 }), showsSettings: showsSettings)
             .sheet(item: $editing) { recipe in
                 RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
             }
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if usesGrid { recipeGrid } else { recipeList }
-    }
-
     /// A category on iPhone and iPad is a folder: its subcategories, then the recipes filed directly in it.
     private var items: [Recipe] {
         #if os(iOS)
-        if case .category(let path) = collection {
+        if showsFolders, case .category(let path) = collection {
             return library.recipes.filter { recipe in
                 recipe.tags.contains { CategoryTree.components($0).count == CategoryTree.components(path).count && CategoryTree.tag($0, isIn: path) }
             }.filter { $0.matches(search) }
@@ -81,18 +68,10 @@ struct RecipeListView: View {
 
     #if os(iOS)
     private var subcategories: [CategoryNode] {
-        guard case .category(let path) = collection, search.isEmpty else { return [] }
+        guard showsFolders, case .category(let path) = collection, search.isEmpty else { return [] }
         return CategoryTree.node(at: path, in: library.categoryTree)?.children ?? []
     }
     #endif
-
-    private var hasSubcategories: Bool {
-        #if os(iOS)
-        !subcategories.isEmpty
-        #else
-        false
-        #endif
-    }
 
     private var recipeList: some View {
         let items = items
@@ -119,7 +98,13 @@ struct RecipeListView: View {
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
                     .recipeSwipeActions(for: recipe, removingTagFrom: browsedCategory)
                     .draggable(RecipeDragItem(id: recipe.id))
-                    .contextMenu { recipeMenu(recipe) }
+                    .contextMenu {
+                        RecipeQuickActions(recipe: recipe)
+                        Button("Edit", systemImage: "pencil") { editing = recipe }
+                        if let browsedCategory {
+                            Button("Remove Tag", systemImage: "tag.slash") { Task { await library.removeTags(recipe, in: browsedCategory) } }
+                        }
+                    }
                 }
             } header: {
                 #if os(iOS)
@@ -131,76 +116,63 @@ struct RecipeListView: View {
         .listStyle(.plain)
         .themedCanvas()
         .animation(.snappy, value: items.map(\.id))
-        .overlay { emptyState }
-    }
-
-    @ViewBuilder
-    private var emptyState: some View {
-        if library.recipes.isEmpty {
-            ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                   description: Text("Tap + to add one, or use the recipes command-line tool."))
-        } else if items.isEmpty, search.isEmpty {
-            #if os(iOS)
-            if subcategories.isEmpty { ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet.")) }
-            #else
-            ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet."))
-            #endif
-        } else if items.isEmpty {
-            ContentUnavailableView.search(text: search)
-        }
-    }
-
-    @ViewBuilder
-    private func recipeMenu(_ recipe: Recipe) -> some View {
-        RecipeQuickActions(recipe: recipe)
-        Button("Edit", systemImage: "pencil") { editing = recipe }
-        if let browsedCategory {
-            Button("Remove Tag", systemImage: "tag.slash") { Task { await library.removeTags(recipe, in: browsedCategory) } }
-        }
-    }
-
-    /// Wide screens: subcategories and photo cards in a grid. Opening a recipe takes over the screen.
-    private var recipeGrid: some View {
-        let items = items
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+        .overlay {
+            if library.recipes.isEmpty {
+                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
+                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+            } else if items.isEmpty, search.isEmpty {
                 #if os(iOS)
-                if !subcategories.isEmpty {
-                    GridSection(title: "Categories", minimum: 240, spacing: 16) {
-                        ForEach(subcategories) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
-                    }
-                }
+                if subcategories.isEmpty { ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet.")) }
+                #else
+                ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet."))
                 #endif
-                if !items.isEmpty {
-                    GridSection(title: hasSubcategories ? "Recipes" : nil, minimum: 300, spacing: 24) {
-                        ForEach(items) { recipe in
-                            Button { selection = recipe.id } label: { RecipeCard(recipe: recipe) }
-                                .buttonStyle(.plain)
-                                .draggable(RecipeDragItem(id: recipe.id))
-                                .contextMenu { recipeMenu(recipe) }
-                        }
-                    }
-                }
+            } else if items.isEmpty {
+                ContentUnavailableView.search(text: search)
             }
-            .padding(24)
         }
-        .themedCanvas()
-        .animation(.snappy, value: items.map(\.id))
-        .overlay { emptyState }
     }
 }
 
-/// A titled, adaptive grid: folder tiles on the Recipes home, subcategories and cards in a category.
-struct GridSection<Content: View>: View {
-    let title: String?
-    let minimum: CGFloat
-    let spacing: CGFloat
-    @ViewBuilder let content: Content
+/// Collections and the category tree as filters on the recipe list.
+struct RecipeFilterMenu: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @Binding var collection: RecipeCollection
+
+    private var collections: [RecipeCollection] {
+        RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
+            .filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let title { Text(title).font(.title3.weight(.semibold)) }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: spacing)], spacing: spacing) { content }
+        Menu {
+            Picker("Filter", selection: $collection) {
+                Label(RecipeCollection.all.title, systemImage: RecipeCollection.all.symbol).tag(RecipeCollection.all)
+                ForEach(collections, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+            }
+            if !library.categoryTree.isEmpty {
+                Section("Categories") {
+                    ForEach(library.categoryTree) { CategoryFilterItem(node: $0, collection: $collection) }
+                }
+            }
+        } label: {
+            Label("Filter", systemImage: collection == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
+        }
+    }
+}
+
+private struct CategoryFilterItem: View {
+    let node: CategoryNode
+    @Binding var collection: RecipeCollection
+
+    var body: some View {
+        if node.children.isEmpty {
+            Button(node.name, systemImage: "tag") { collection = .category(node.path) }
+        } else {
+            Menu(node.name, systemImage: "folder") {
+                Button("All \(node.name)", systemImage: "tag") { collection = .category(node.path) }
+                ForEach(node.children) { CategoryFilterItem(node: $0, collection: $collection) }
+            }
         }
     }
 }
@@ -366,49 +338,10 @@ struct CategoryRow: View {
     }
 }
 
-/// A collection or category to open, as a tile.
-private struct FolderTile: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.appearance) private var appearance
-    @Environment(\.appAccent) private var accent
-    let collection: RecipeCollection
-    var symbol: String?
-
-    private var count: Int { collection.filter(library.recipes).count }
-
-    var body: some View {
-        NavigationLink(value: RecipesRoute.collection(collection)) {
-            HStack(spacing: 14) {
-                Image(systemName: symbol ?? collection.symbol)
-                    .font(.title2)
-                    .foregroundStyle(accent)
-                    .frame(width: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(collection.title).font(.headline).lineLimit(1)
-                    Text(count == 1 ? "1 recipe" : "\(count) recipes").font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .dropDestination(for: RecipeDragItem.self) { items, _ in
-            guard case .category(let path) = collection else { return false }
-            Task { for item in items { await library.addTag(item.id, to: path) } }
-            return !items.isEmpty
-        }
-    }
-}
-
 /// The top of the Recipes tab: the built-in collections, then categories to drill into.
 struct RecipesHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Binding var selection: Recipe.ID?
 
     private var collections: [RecipeCollection] {
@@ -417,21 +350,6 @@ struct RecipesHomeView: View {
     }
 
     var body: some View {
-        Group {
-            if sizeClass == .regular { grid } else { list }
-        }
-        .overlay {
-            if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
-            }
-        }
-        .themedCanvas()
-        .navigationTitle("Recipes")
-        .recipeActions(selection: $selection, listStyle: nil, showsSettings: sizeClass != .regular)
-    }
-
-    private var list: some View {
         List {
             Section {
                 ForEach(collections, id: \.self) { collection in
@@ -451,23 +369,15 @@ struct RecipesHomeView: View {
                 }
             }
         }
-    }
-
-    private var grid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                GridSection(title: nil, minimum: 240, spacing: 16) {
-                    ForEach(collections, id: \.self) { FolderTile(collection: $0) }
-                }
-                if !library.categoryTree.isEmpty {
-                    GridSection(title: "Categories", minimum: 240, spacing: 16) {
-                        ForEach(library.categoryTree) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
-                    }
-                }
+        .overlay {
+            if library.recipes.isEmpty {
+                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
+                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
             }
-            .padding(24)
         }
-        .reviewPromptInset()
+        .themedCanvas()
+        .navigationTitle("Recipes")
+        .recipeActions(selection: $selection, listStyle: nil, showsSettings: true)
     }
 }
 #endif

@@ -106,20 +106,34 @@ struct SearchTab: View {
 struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
+    @State private var collection: RecipeCollection
 
     init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
-        var path = path
-        if path.isEmpty {
-            if collection != .all { path.append(.collection(collection)) }
-            if let selection { path.append(.recipe(selection)) }
-        }
         _path = State(initialValue: path)
+        _selection = State(initialValue: selection)
+        _collection = State(initialValue: collection)
     }
 
-    /// Home, then a collection or category, then a recipe, each pushed onto one stack. On iPad the first two are grids and a recipe fills the screen.
     var body: some View {
+        Group {
+            if sizeClass == .regular { columns } else { stack }
+        }
+        .onChange(of: router.recipeID, initial: true) { _, id in
+            guard let id else { return }
+            if sizeClass == .regular {
+                selection = id
+            } else {
+                path = [.recipe(id)]
+            }
+            router.recipeID = nil
+        }
+    }
+
+    /// iPhone: home, then folders, then a recipe, each pushed onto one stack.
+    private var stack: some View {
         NavigationStack(path: $path) {
             RecipesHomeView(selection: $selection)
                 .navigationDestination(for: RecipesRoute.self) { destination($0) }
@@ -129,11 +143,23 @@ struct RecipesTab: View {
             path.append(.recipe(id))
             selection = nil
         }
-        .onChange(of: router.recipeID, initial: true) { _, id in
-            guard let id else { return }
-            path = [.recipe(id)]
-            router.recipeID = nil
+    }
+
+    /// iPad: the recipes in the chosen collection or category, and the recipe itself.
+    private var columns: some View {
+        NavigationSplitView {
+            RecipeListView(collection: $collection, selection: $selection, showsFolders: false, showsFilter: true)
+                .reviewPromptInset()
+                .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
+            if let recipe = library.recipe(id: selection) {
+                RecipeDetailView(recipe: recipe).id(recipe.id)
+            } else {
+                ContentUnavailableView("Select a recipe", systemImage: "fork.knife")
+            }
         }
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     @ViewBuilder
@@ -149,7 +175,9 @@ struct RecipesTab: View {
 
 struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [UUID] = []
+    @State private var selection: Recipe.ID?
     @State private var mode: PlanMode
     private let showsSmartPlan: Bool
 
@@ -159,13 +187,27 @@ struct PlanTab: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
-                .navigationDestination(for: UUID.self) { id in
-                    if let recipe = library.recipe(id: id) {
-                        RecipeDetailView(recipe: recipe)
-                    }
+        if sizeClass == .regular {
+            NavigationSplitView {
+                PlanView(mode: $mode, open: { selection = $0 }, showsSmartPlan: showsSmartPlan)
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 480)
+                    .toolbar(removing: .sidebarToggle)
+            } detail: {
+                if let recipe = library.recipe(id: selection) {
+                    RecipeDetailView(recipe: recipe).id(recipe.id)
+                } else {
+                    ContentUnavailableView("Select a recipe", systemImage: "calendar")
                 }
+            }
+        } else {
+            NavigationStack(path: $path) {
+                PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+                    .navigationDestination(for: UUID.self) { id in
+                        if let recipe = library.recipe(id: id) {
+                            RecipeDetailView(recipe: recipe)
+                        }
+                    }
+            }
         }
     }
 }
