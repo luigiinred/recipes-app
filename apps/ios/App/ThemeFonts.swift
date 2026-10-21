@@ -2,6 +2,18 @@
 import SwiftUI
 import UIKit
 
+/// `Color.accentColor` follows UIKit's tint, which SwiftUI's `.tint` reaches inside a navigation stack but not in a full-screen cover or a sheet.
+@MainActor
+enum ThemeTint {
+    static func apply(_ color: Color) {
+        let tint = UIColor(color)
+        UIView.appearance().tintColor = tint
+        for window in UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.windows }).flatMap({ $0 }) {
+            window.tintColor = tint
+        }
+    }
+}
+
 /// Navigation titles and tab labels are drawn by UIKit, which ignores SwiftUI's font design, so they get the chosen design here.
 @MainActor
 enum ThemeFonts {
