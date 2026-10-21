@@ -27,7 +27,7 @@ struct SmartPlanSheet: View {
                 case .options: options
                 case .working:
                     VStack(spacing: 6) {
-                        TomatoWokLoader(height: 170)
+                        MascotLoader(height: 170)
                         Text("Planning your week…").font(.system(.title3, weight: .bold))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

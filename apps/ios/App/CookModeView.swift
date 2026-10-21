@@ -39,7 +39,7 @@ struct CookModeView: View {
                             stepContent(recipe, fontSize: phone ? 28 : 36)
                         }
                     } else {
-                        MascotEmptyState(mascot: .wokEmpty, title: "Nothing to cook", message: "Start cooking from a recipe's page.")
+                        MascotEmptyState(scene: .emptyWok, title: "Nothing to cook", message: "Start cooking from a recipe's page.")
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {

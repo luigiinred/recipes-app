@@ -103,7 +103,7 @@ struct OnboardingView: View {
 
     private var share: some View {
         VStack(spacing: 22) {
-            header(mascot: .tomatoTablet, title: "Save any recipe",
+            header(character: .tomato, scene: .bookWrite, title: "Save any recipe",
                    subtitle: "Found a recipe in Safari or a video on YouTube? Share it with Recipes to import it.")
             ShareSheetMock(cover: OnboardingSources.all.first.flatMap { covers[$0.id] })
             VStack(alignment: .leading, spacing: 18) {
@@ -122,7 +122,7 @@ struct OnboardingView: View {
             header(title: "Keep it organized", subtitle: "Find your recipes anytime with favorites, categories and a plan for the week.")
             stage(decorations: [.carrot, .basil, .peaPod]) {
                 HStack(alignment: .center, spacing: 6) {
-                    MascotView(mascot: .potato, height: 190)
+                    MascotView(character: .potato, scene: .wave, height: 190)
                     CollectionStack()
                 }
             }
@@ -141,8 +141,8 @@ struct OnboardingView: View {
                 VStack(spacing: -14) {
                     CookStepCard()
                     HStack(alignment: .bottom, spacing: 18) {
-                        MascotView(mascot: .lemon, height: 130)
-                        MascotView(mascot: .chili, height: 150)
+                        MascotView(character: .lemon, scene: .idle, height: 130, phase: 0.3)
+                        MascotView(character: .chili, scene: .idle, height: 150, phase: 0.7)
                     }
                     .zIndex(1)
                 }
@@ -157,7 +157,7 @@ struct OnboardingView: View {
 
     private var add: some View {
         VStack(spacing: 24) {
-            header(mascot: .tomatoLaptop, title: "Let's add your first recipe!",
+            header(character: .potato, scene: .bookPages, title: "Let's add your first recipe!",
                    subtitle: "Tap a recipe to import it the same way, check it over, then tap the checkmark to save it.")
             VStack(spacing: 16) {
                 ForEach(OnboardingSources.all) { source in sourceCard(source) }
@@ -167,7 +167,7 @@ struct OnboardingView: View {
 
     private var tryIt: some View {
         VStack(spacing: 24) {
-            header(mascot: .tomatoGroceries, title: "Make it yours",
+            header(character: .lemon, scene: .hop, title: "Make it yours",
                    subtitle: addedRecipes.first.map { "Try two things on \($0.title). You can undo both from the app any time." }
                        ?? "Try two things on a recipe. You can undo both from the app any time.")
             if let recipe = addedRecipes.first {
@@ -215,9 +215,9 @@ struct OnboardingView: View {
 
     // MARK: Pieces
 
-    private func header(mascot: Mascot? = nil, title: String, subtitle: String) -> some View {
+    private func header(character: MascotCharacter? = nil, scene: MascotScene = .idle, title: String, subtitle: String) -> some View {
         VStack(spacing: 12) {
-            if let mascot { MascotView(mascot: mascot, height: 150) }
+            if let character { MascotView(character: character, scene: scene, height: 150) }
             Text(title)
                 .font(.system(.largeTitle, weight: .bold))
                 .multilineTextAlignment(.center)
@@ -230,18 +230,18 @@ struct OnboardingView: View {
     }
 
     /// A soft rounded panel behind the illustration, with a few ingredients sitting around its edges.
-    private func stage<Content: View>(decorations: [Mascot], @ViewBuilder content: () -> Content) -> some View {
+    private func stage<Content: View>(decorations: [Produce], @ViewBuilder content: () -> Content) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(LinearGradient(colors: [accent.opacity(0.14), accent.opacity(0.04)], startPoint: .top, endPoint: .bottom))
             GeometryReader { geometry in
-                ForEach(Array(decorations.enumerated()), id: \.offset) { index, mascot in
-                    MascotView(mascot: mascot, height: 36)
+                ForEach(Array(decorations.enumerated()), id: \.offset) { index, ingredient in
+                    ProduceView(produce: ingredient, height: 36, phase: Double(index) * 0.33)
                         .rotationEffect(.degrees(Double(index) * 37 - 30))
                         .opacity(0.9)
                         .position(
-                            x: [geometry.size.width * 0.1, geometry.size.width * 0.9, geometry.size.width * 0.14][index % 3],
-                            y: [geometry.size.height * 0.14, geometry.size.height * 0.22, geometry.size.height * 0.88][index % 3]
+                            x: [geometry.size.width * 0.09, geometry.size.width * 0.91, geometry.size.width * 0.5][index % 3],
+                            y: [geometry.size.height * 0.13, geometry.size.height * 0.09, geometry.size.height * 0.07][index % 3]
                         )
                 }
             }

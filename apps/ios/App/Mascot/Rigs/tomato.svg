@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-labelledby="t d">
+<title id="t">Tomato chef</title>
+<desc id="d">The tomato chef mascot as a rigged skeleton: root, legs, body, face, calyx, hat, arms.</desc>
+<style>[data-bone]{transform-box:view-box}</style>
+<defs>
+<radialGradient id="t-body" cx=".34" cy=".28" r=".85"><stop offset="0" stop-color="#FF5E48"/><stop offset=".55" stop-color="#E8281E"/><stop offset="1" stop-color="#C81913"/></radialGradient>
+<linearGradient id="t-leaf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5CC24A"/><stop offset="1" stop-color="#2E9A33"/></linearGradient>
+<linearGradient id="t-hat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFBF2"/><stop offset="1" stop-color="#F3E6CF"/></linearGradient>
+<linearGradient id="t-arm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3281D"/><stop offset="1" stop-color="#C01610"/></linearGradient>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<ellipse id="shadow" cx="200" cy="379" rx="104" ry="9" fill="#3a2410" opacity=".14"/>
+<g id="root" data-bone="root" data-parent="" data-pivot="200 382" style="transform-origin:200px 382px">
+<g id="leg-l" data-bone="leg-l" data-parent="root" data-pivot="163 330" style="transform-origin:163px 330px">
+<path d="M 149 326 C 146 342 138 352 132 362 C 126 373 134 383 150 383 C 169 383 183 379 183 367 C 183 352 179 340 177 326 Z" fill="#CC1A13" stroke="#8E100C" stroke-width="4.2"/>
+</g>
+<g id="leg-r" data-bone="leg-r" data-parent="root" data-pivot="237 330" style="transform-origin:237px 330px">
+<path d="M 251 326 C 254 342 262 352 268 362 C 274 373 266 383 250 383 C 231 383 217 379 217 367 C 217 352 221 340 223 326 Z" fill="#CC1A13" stroke="#8E100C" stroke-width="4.2"/>
+</g>
+
+<g id="body" data-bone="body" data-parent="root" data-pivot="200 352" style="transform-origin:200px 352px">
+<path d="M 200 160 C 242 150 322 172 324 252 C 326 318 272 352 200 352 C 128 352 74 318 76 252 C 78 172 158 150 200 160 Z" fill="url(#t-body)"/>
+
+<path d="M 200 160 C 242 150 322 172 324 252 C 326 318 272 352 200 352 C 128 352 74 318 76 252 C 78 172 158 150 200 160 Z" fill="none" stroke="#9A120E" stroke-width="4.5"/>
+<path d="M 150.9 187.2 C 154.7 192 149.2 202.5 138.8 210.7 C 128.3 218.8 116.8 221.6 113.1 216.8 C 109.3 212 114.8 201.5 125.2 193.3 C 135.7 185.2 147.2 182.4 150.9 187.2 Z" fill="#FF9A88" opacity=".75"/>
+<path d="M 106.8 238.5 C 108.5 246.1 106.7 252.9 102.9 253.7 C 99.1 254.5 94.8 249 93.2 241.5 C 91.5 233.9 93.3 227.1 97.1 226.3 C 100.9 225.5 105.2 231 106.8 238.5 Z" fill="#FF9A88" opacity=".5"/>
+<path d="M 276.7 203 C 275.3 205.4 270.3 205.1 265.5 202.3 C 260.7 199.6 258 195.4 259.3 193 C 260.7 190.6 265.7 190.9 270.5 193.7 C 275.3 196.4 278 200.6 276.7 203 Z" fill="#FF9A88" opacity=".45"/>
+<path d="M 110 316 C 140 340 200 346 260 326" fill="none" stroke="#A81711" stroke-width="7" opacity=".28"/>
+<g id="face" data-bone="face" data-parent="body" data-pivot="200 250" style="transform-origin:200px 250px">
+<g id="cheeks" opacity=".55"><ellipse cx="144" cy="262" rx="12" ry="7" fill="#FF8A7C"/><ellipse cx="256" cy="262" rx="12" ry="7" fill="#FF8A7C"/></g>
+<g id="eyes-open">
+<g id="eye-l" data-bone="eye-l" data-parent="face" data-pivot="167 238" style="transform-origin:167px 238px">
+<ellipse cx="167" cy="238" rx="7" ry="10" fill="#2B0D0B"/><ellipse cx="169" cy="234.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+<g id="eye-r" data-bone="eye-r" data-parent="face" data-pivot="233 238" style="transform-origin:233px 238px">
+<ellipse cx="233" cy="238" rx="7" ry="10" fill="#2B0D0B"/><ellipse cx="235" cy="234.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+</g>
+<g id="eyes-happy" display="none">
+<path d="M 157 242 Q 167 226 177 242" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+<path d="M 223 242 Q 233 226 243 242" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+<g id="mouth-smile" display="none">
+<path d="M 188 266 Q 200 279 212 266" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+<g id="mouth-open">
+<path d="M 185 261 C 194.0 257 206.0 257 215 261 C 212.0 284 188.0 284 185 261 Z" fill="#6E0F12" stroke="#2B0D0B" stroke-width="3.5"/>
+<path d="M 191.75 275 C 195.5 269 204.5 269 208.25 275 C 205.25 282 194.75 282 191.75 275 Z" fill="#FF6F6A"/>
+</g>
+</g>
+<g id="hat" data-bone="hat" data-parent="body" data-pivot="170 190" style="transform-origin:170px 190px">
+<path d="M 119 210.1 C 157.2 228.8 203.5 216.4 227.2 181.1" fill="none" stroke="#8E100C" stroke-width="9" opacity=".35"/>
+<path d="M 118 206.2 C 105.6 190.9 92.3 180 91 159.6 C 64.2 152.3 64.9 108.6 98.3 101.8 C 98.8 72.6 139.7 55.5 160.3 70.6 C 179.4 49 220.2 54.6 217.3 82.3 C 245.6 95.4 235.1 133.4 218.3 140 C 222.4 155.5 225.5 167.1 226.2 177.2 C 202.5 212.6 156.1 225 118 206.2 Z" fill="url(#t-hat)" stroke="#B88252" stroke-width="3.8"/>
+<path d="M 130.9 169.6 C 116.5 146.6 111.7 120.9 117.2 102.9" fill="none" stroke="#E2D2B4" stroke-width="4" opacity=".9"/>
+<path d="M 165.2 73.5 C 178.3 99 184.1 128.5 184.5 153.2" fill="none" stroke="#E2D2B4" stroke-width="4" opacity=".9"/>
+<path d="M 116.8 194.1 C 152.5 211.5 198.9 199 221.1 166.2" fill="none" stroke="#D6C3A0" stroke-width="4"/>
+</g>
+<g id="calyx" data-bone="calyx" data-parent="body" data-pivot="214 172" style="transform-origin:214px 172px">
+<path d="M 214 172 C 201.7 181.7 177.5 175.3 165.1 161.6 C 182 154.2 206.7 158.2 214 172 Z" fill="url(#t-leaf)" stroke="#1D6A24" stroke-width="3.2"/>
+<path d="M 210.1 171.2 Q 189.8 165.8 171.9 163.1" fill="none" stroke="#1D6A24" stroke-width="1.6" opacity=".55"/>
+<path d="M 214 172 C 220.8 156.8 248.5 148 268.5 152.2 C 255.8 168.3 229 179.3 214 172 Z" fill="url(#t-leaf)" stroke="#1D6A24" stroke-width="3.2"/>
+<path d="M 218.4 170.4 Q 241.6 163.2 260.9 154.9" fill="none" stroke="#1D6A24" stroke-width="1.6" opacity=".55"/>
+<path d="M 214 172 C 213 185.6 195.5 195.2 180.1 193.2 C 185 178.4 201.4 166.9 214 172 Z" fill="url(#t-leaf)" stroke="#1D6A24" stroke-width="3.2"/>
+<path d="M 211.3 173.7 Q 196.6 181.9 184.8 190.2" fill="none" stroke="#1D6A24" stroke-width="1.6" opacity=".55"/>
+<path d="M 214 172 C 227.4 168.5 243.3 182.3 247.1 197.9 C 231.1 197.9 213.8 185.8 214 172 Z" fill="url(#t-leaf)" stroke="#1D6A24" stroke-width="3.2"/>
+<path d="M 216.6 174.1 Q 230 185.6 242.5 194.2" fill="none" stroke="#1D6A24" stroke-width="1.6" opacity=".55"/>
+<path d="M 214 172 C 223.8 179.1 222.2 196.1 212.8 206 C 204.2 195.5 203.8 178.4 214 172 Z" fill="url(#t-leaf)" stroke="#1D6A24" stroke-width="3.2"/>
+<path d="M 213.9 174.7 Q 212.7 189 213 201.2" fill="none" stroke="#1D6A24" stroke-width="1.6" opacity=".55"/>
+<circle cx="214" cy="172" r="6" fill="#2E8F34" stroke="#1D6A24" stroke-width="3"/>
+</g>
+<g id="arm-l" data-bone="arm-l" data-parent="body" data-pivot="96 270" style="transform-origin:96px 270px">
+<path d="M 88.8 268.2 C 84.5 282.3 81.3 295.1 80.1 303.2 C 69 303.8 63.8 324.5 80.9 330.5 C 98.8 333.2 104 312.6 94.4 306.8 C 97.2 299 100.4 286.3 103.2 271.8 C 104.9 264.6 90.6 261.1 88.8 268.2 Z" fill="url(#t-arm)" stroke="#8E100C" stroke-width="4"/>
+</g>
+<g id="arm-r" data-bone="arm-r" data-parent="body" data-pivot="304 270" style="transform-origin:304px 270px">
+<path d="M 296.8 271.8 C 299.6 286.3 302.8 299 305.6 306.8 C 296 312.6 301.2 333.2 319.1 330.5 C 336.2 324.5 331 303.8 319.9 303.2 C 318.7 295.1 315.5 282.3 311.2 268.2 C 309.4 261.1 295.1 264.6 296.8 271.8 Z" fill="url(#t-arm)" stroke="#8E100C" stroke-width="4"/>
+</g>
+</g>
+</g>
+</g>
+</svg>

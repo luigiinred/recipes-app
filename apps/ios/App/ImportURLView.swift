@@ -20,7 +20,7 @@ struct ImportURLView: View {
                 if isLoading {
                     Section {
                         VStack(spacing: 12) {
-                            TomatoWokLoader(height: 120).frame(maxWidth: .infinity)
+                            MascotLoader(height: 120).frame(maxWidth: .infinity)
                             Text(address).font(.footnote).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                             ImportProgressView(model: progress)
                         }

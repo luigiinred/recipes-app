@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-labelledby="t d">
+<title id="t">Lemon</title>
+<desc id="d">The lemon mascot as a rigged skeleton: root, legs, body, face, leaf, arms.</desc>
+<style>[data-bone]{transform-box:view-box}</style>
+<defs>
+<radialGradient id="l-body" cx=".36" cy=".3" r=".85"><stop offset="0" stop-color="#FFE96A"/><stop offset=".55" stop-color="#FFD21F"/><stop offset="1" stop-color="#F2B30D"/></radialGradient>
+<linearGradient id="l-leaf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#63C84F"/><stop offset="1" stop-color="#2F9A36"/></linearGradient>
+<linearGradient id="l-arm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD52A"/><stop offset="1" stop-color="#F2B30D"/></linearGradient>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<ellipse id="shadow" cx="200" cy="379" rx="100" ry="9" fill="#3a2410" opacity=".14"/>
+<g id="root" data-bone="root" data-parent="" data-pivot="200 382" style="transform-origin:200px 382px">
+<g id="leg-l" data-bone="leg-l" data-parent="root" data-pivot="166 328" style="transform-origin:166px 328px">
+<path d="M 152 326 C 150 340 144 350 140 360 C 136 372 144 383 160 383 C 176 383 186 378 186 366 C 186 352 182 340 180 326 Z" fill="#F5BE12" stroke="#C98A06" stroke-width="4.2"/>
+</g>
+<g id="leg-r" data-bone="leg-r" data-parent="root" data-pivot="234 328" style="transform-origin:234px 328px">
+<path d="M 248 326 C 250 340 256 350 260 360 C 264 372 256 383 240 383 C 224 383 214 378 214 366 C 214 352 218 340 220 326 Z" fill="#F5BE12" stroke="#C98A06" stroke-width="4.2"/>
+</g>
+<g id="body" data-bone="body" data-parent="root" data-pivot="200 352" style="transform-origin:200px 352px">
+<path d="M 200 118 C 214 118 220 132 234 140 C 280 154 308 200 306 250 C 304 312 258 352 200 352 C 142 352 96 312 94 250 C 92 200 120 154 166 140 C 180 132 186 118 200 118 Z" fill="url(#l-body)"/>
+
+<path d="M 200 118 C 214 118 220 132 234 140 C 280 154 308 200 306 250 C 304 312 258 352 200 352 C 142 352 96 312 94 250 C 92 200 120 154 166 140 C 180 132 186 118 200 118 Z" fill="none" stroke="#C98A06" stroke-width="4.5"/>
+<path d="M 162.3 175.3 C 166 179.4 161.7 189.3 152.7 197.4 C 143.7 205.6 133.3 208.8 129.7 204.7 C 126 200.6 130.3 190.7 139.3 182.6 C 148.3 174.4 158.7 171.2 162.3 175.3 Z" fill="#FFF6B8" opacity=".8"/>
+<path d="M 268.1 201.1 C 266.4 203.3 262.2 202.7 258.8 199.8 C 255.4 197 254.1 193 255.9 190.9 C 257.6 188.7 261.8 189.3 265.2 192.2 C 268.6 195 269.9 199 268.1 201.1 Z" fill="#FFF6B8" opacity=".6"/>
+<path d="M 114 302 C 146 340 208 348 266 322" fill="none" stroke="#D99A08" stroke-width="7" opacity=".3"/>
+<path d="M 205 126 C 205 127.7 202.8 129 200 129 C 197.2 129 195 127.7 195 126 C 195 124.3 197.2 123 200 123 C 202.8 123 205 124.3 205 126 Z" fill="#E8A60A" opacity=".5"/>
+<g id="face" data-bone="face" data-parent="body" data-pivot="200 244" style="transform-origin:200px 244px">
+<g id="cheeks" opacity=".6"><ellipse cx="144" cy="262" rx="13" ry="8" fill="#FFA45E"/><ellipse cx="256" cy="262" rx="13" ry="8" fill="#FFA45E"/></g>
+<g id="eyes-open" display="none">
+<g id="eye-l" data-bone="eye-l" data-parent="face" data-pivot="166 238" style="transform-origin:166px 238px">
+<ellipse cx="166" cy="238" rx="6.5" ry="9" fill="#2B0D0B"/><ellipse cx="168" cy="234.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+<g id="eye-r" data-bone="eye-r" data-parent="face" data-pivot="234 238" style="transform-origin:234px 238px">
+<ellipse cx="234" cy="238" rx="6.5" ry="9" fill="#2B0D0B"/><ellipse cx="236" cy="234.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+</g>
+<g id="eyes-happy">
+<path d="M 156 242 Q 166 226 176 242" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+<path d="M 224 242 Q 234 226 244 242" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+<g id="mouth-smile">
+<path d="M 188 262 Q 200 275 212 262" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+<g id="mouth-open">
+<path d="M 185 257 C 194.0 253 206.0 253 215 257 C 212.0 280 188.0 280 185 257 Z" fill="#6E0F12" stroke="#2B0D0B" stroke-width="3.5"/>
+<path d="M 191.75 271 C 195.5 265 204.5 265 208.25 271 C 205.25 278 194.75 278 191.75 271 Z" fill="#FF6F6A"/>
+</g>
+<g id="eyes-sour" display="none">
+<path d="M 156 227 L 175 238 L 156 249" fill="none" stroke="#2B0D0B" stroke-width="5"/>
+<path d="M 244 227 L 225 238 L 244 249" fill="none" stroke="#2B0D0B" stroke-width="5"/>
+</g>
+<g id="brows" display="none">
+<path d="M 148 213 L 182 224" fill="none" stroke="#B07A05" stroke-width="5"/>
+<path d="M 252 213 L 218 224" fill="none" stroke="#B07A05" stroke-width="5"/>
+</g>
+<g id="mouth-sour" display="none">
+<path d="M 180 270 Q 187 259 194 270 Q 200 259 206 270 Q 213 259 220 270" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+</g>
+<g id="leaf" data-bone="leaf" data-parent="body" data-pivot="204 124" style="transform-origin:204px 124px">
+<path d="M 204 124 C 200.7 88.5 240.3 61.4 279.6 64.9 C 273.6 103.9 237.6 135.8 204 124 Z" fill="url(#l-leaf)" stroke="#1F7228" stroke-width="3.6"/>
+<path d="M 210.1 119.3 Q 243 96 269.1 73.2" fill="none" stroke="#1F7228" stroke-width="2.2" opacity=".6"/>
+</g>
+<g id="arm-l" data-bone="arm-l" data-parent="body" data-pivot="102 252" style="transform-origin:102px 252px">
+<path d="M 106.4 246.3 C 95.6 236.8 85.5 228.9 78.7 224.7 C 82.6 214.5 66.2 201.7 54.1 214.6 C 44.5 229.4 60.9 242.2 69.8 236 C 75.6 241.6 85.7 249.4 97.6 257.7 C 103.2 262.1 112.1 250.8 106.4 246.3 Z" fill="url(#l-arm)" stroke="#C98A06" stroke-width="4"/>
+</g>
+<g id="arm-r" data-bone="arm-r" data-parent="body" data-pivot="298 252" style="transform-origin:298px 252px">
+<path d="M 302.4 257.7 C 314.3 249.4 324.4 241.6 330.2 236 C 339.1 242.2 355.5 229.4 345.9 214.6 C 333.8 201.7 317.4 214.5 321.3 224.7 C 314.5 228.9 304.4 236.8 293.6 246.3 C 287.9 250.8 296.8 262.1 302.4 257.7 Z" fill="url(#l-arm)" stroke="#C98A06" stroke-width="4"/>
+</g>
+</g>
+</g>
+</g>
+</svg>

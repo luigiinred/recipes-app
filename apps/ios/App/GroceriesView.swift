@@ -34,9 +34,9 @@ struct GroceriesView: View {
         .animation(.snappy, value: toBuy.map(\.id) + completed.map(\.id))
         .overlay {
             if layout == .completed, completed.isEmpty {
-                MascotEmptyState(mascot: .tomatoHug, title: "Nothing completed", message: "Things you check off end up here.")
+                MascotEmptyState(scene: .idle, title: "Nothing completed", message: "Things you check off end up here.")
             } else if layout == .toBuy, toBuy.isEmpty {
-                MascotEmptyState(mascot: .tomatoGroceries, title: "Nothing to buy", message: "Add ingredients from any recipe.")
+                MascotEmptyState(scene: .hop, title: "Nothing to buy", message: "Add ingredients from any recipe.")
             }
         }
         .modifier(GroceriesChrome(embedded: embedded, title: layout == .completed ? "Completed" : "Groceries", showsMenu: layout != .completed))
