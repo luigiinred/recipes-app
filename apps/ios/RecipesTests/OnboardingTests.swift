@@ -47,6 +47,12 @@ struct OnboardingTests {
     @Test("share sheet explainer")
     func share() { snapshot(.share) }
 
+    @Test("organize")
+    func organize() { snapshot(.organize) }
+
+    @Test("cook")
+    func cook() { snapshot(.cook) }
+
     @Test("add: nothing imported yet")
     func addEmpty() { snapshot(.add) }
 

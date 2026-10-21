@@ -3,7 +3,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     enum Step: Int, CaseIterable {
-        case welcome, share, add, tryIt, discover
+        case welcome, share, organize, cook, add, tryIt, discover
     }
 
     @EnvironmentObject private var library: RecipeLibrary
@@ -13,6 +13,7 @@ struct OnboardingView: View {
     @State private var step: Step
     @State private var reviewing: ScanDraft?
     @State private var importing: OnboardingSource?
+    @State private var importTask: Task<Void, Never>?
     @State private var failures: [OnboardingSource.ID: String] = [:]
     @State private var previews: [OnboardingSource.ID: ImportResult] = [:]
     @State private var covers: [OnboardingSource.ID: CGImage] = [:]
@@ -48,7 +49,7 @@ struct OnboardingView: View {
             .scrollBounceBehavior(.basedOnSize)
             footer
         }
-        .background(.background)
+        .paperBackground()
         .animation(.snappy, value: step)
         .task { await loadPreviews() }
         #if os(macOS)
@@ -70,6 +71,8 @@ struct OnboardingView: View {
         switch step {
         case .welcome: welcome
         case .share: share
+        case .organize: organize
+        case .cook: cook
         case .add: add
         case .tryIt: tryIt
         case .discover: discover
@@ -79,10 +82,17 @@ struct OnboardingView: View {
     // MARK: Pages
 
     private var welcome: some View {
-        VStack(spacing: 28) {
-            header(symbol: "book.closed.fill", title: "Welcome to Recipes",
-                   subtitle: "Collect recipes from anywhere, plan your week, and cook without losing your place.")
-            VStack(alignment: .leading, spacing: 22) {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                (Text("Good food happens ") + Text("here.").foregroundStyle(Theme.accent))
+                    .font(.system(size: 40, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Save, organize, and cook the recipes you love.")
+                    .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+            stage(decorations: [.basil, .garlic, .broccoli]) { MascotCluster(height: 220) }
+            VStack(alignment: .leading, spacing: 18) {
                 feature("globe", "Import from anywhere", "Paste a link from a recipe site or a YouTube video, or share one straight from Safari.")
                 feature("doc.viewfinder", "Scan a cookbook page", "Read a page with the camera, or import a photo or PDF.")
                 feature("square.and.pencil", "Write your own", "Ingredients and steps are kept in one tidy format, however a recipe arrives.")
@@ -91,8 +101,8 @@ struct OnboardingView: View {
     }
 
     private var share: some View {
-        VStack(spacing: 24) {
-            header(symbol: "square.and.arrow.up", title: "Share to add recipes",
+        VStack(spacing: 22) {
+            header(mascot: .tomatoTablet, title: "Save any recipe",
                    subtitle: "Found a recipe in Safari or a video on YouTube? Share it with Recipes to import it.")
             ShareSheetMock(cover: OnboardingSources.all.first.flatMap { covers[$0.id] })
             VStack(alignment: .leading, spacing: 18) {
@@ -106,9 +116,47 @@ struct OnboardingView: View {
         }
     }
 
+    private var organize: some View {
+        VStack(spacing: 24) {
+            header(title: "Keep it organized", subtitle: "Find your recipes anytime with favorites, categories and a plan for the week.")
+            stage(decorations: [.carrot, .basil, .peaPod]) {
+                HStack(alignment: .center, spacing: 6) {
+                    MascotView(mascot: .potato, height: 190)
+                    CollectionStack()
+                }
+            }
+            VStack(alignment: .leading, spacing: 18) {
+                feature("heart", "Favorites or stars", "Mark what you love, or rate recipes from one to five stars.")
+                feature("tag", "Categories", "File recipes in nested categories like Dinner/Pasta.")
+                feature("text.line.first.and.arrowtriangle.forward", "Up Next", "Queue what you want to cook soon, and plan it on a day when you're ready.")
+            }
+        }
+    }
+
+    private var cook: some View {
+        VStack(spacing: 24) {
+            header(title: "Cook with confidence", subtitle: "Big step-by-step text, timers found for you, and the screen stays awake.")
+            stage(decorations: [.garlic, .redPepper, .basil]) {
+                VStack(spacing: -14) {
+                    CookStepCard()
+                    HStack(alignment: .bottom, spacing: 18) {
+                        MascotView(mascot: .lemon, height: 130)
+                        MascotView(mascot: .chili, height: 150)
+                    }
+                    .zIndex(1)
+                }
+            }
+            VStack(alignment: .leading, spacing: 18) {
+                feature("timer", "Timers in the steps", "Tap a time like “10 minutes” to start a timer.")
+                feature("checklist.checked", "Ingredients close by", "A floating button keeps the ingredient list one tap away.")
+                feature("arrow.left.arrow.right", "Unit conversions", "Press and hold an ingredient to see it in other units.")
+            }
+        }
+    }
+
     private var add: some View {
         VStack(spacing: 24) {
-            header(symbol: "plus.circle.fill", title: "Try it on a real recipe",
+            header(mascot: .tomatoLaptop, title: "Let's add your first recipe!",
                    subtitle: "Tap a recipe to import it the same way, check it over, then tap the checkmark to save it.")
             VStack(spacing: 16) {
                 ForEach(OnboardingSources.all) { source in sourceCard(source) }
@@ -118,7 +166,7 @@ struct OnboardingView: View {
 
     private var tryIt: some View {
         VStack(spacing: 24) {
-            header(symbol: "sparkles", title: "Make it yours",
+            header(mascot: .tomatoGroceries, title: "Make it yours",
                    subtitle: addedRecipes.first.map { "Try two things on \($0.title). You can undo both from the app any time." }
                        ?? "Try two things on a recipe. You can undo both from the app any time.")
             if let recipe = addedRecipes.first {
@@ -146,8 +194,15 @@ struct OnboardingView: View {
 
     private var discover: some View {
         VStack(spacing: 28) {
-            header(symbol: "wand.and.stars", title: "There's more to find",
-                   subtitle: "A few things worth knowing about as you settle in.")
+            VStack(spacing: 12) {
+                MascotCluster(height: 150)
+                Text("You're all set!")
+                    .font(.system(.largeTitle, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+                Text("A few things worth knowing about as you settle in.")
+                    .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
             VStack(alignment: .leading, spacing: 22) {
                 feature("frying.pan", "Cook mode", "Tap Cook on a recipe for big step-by-step text. Timers in the steps are found for you, and the screen stays awake.")
                 feature("calendar", "The planner", "Drag recipes into meals for the week, or tap Plan on a recipe.")
@@ -159,12 +214,9 @@ struct OnboardingView: View {
 
     // MARK: Pieces
 
-    private func header(symbol: String, title: String, subtitle: String) -> some View {
+    private func header(mascot: Mascot? = nil, title: String, subtitle: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 52))
-                .foregroundStyle(Theme.accent)
-                .accessibilityHidden(true)
+            if let mascot { MascotView(mascot: mascot, height: 150) }
             Text(title)
                 .font(.system(.largeTitle, weight: .bold))
                 .multilineTextAlignment(.center)
@@ -174,6 +226,27 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
+    }
+
+    /// A soft rounded panel behind the illustration, with a few ingredients sitting around its edges.
+    private func stage<Content: View>(decorations: [Mascot], @ViewBuilder content: () -> Content) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(LinearGradient(colors: [Theme.accent.opacity(0.14), Theme.accent.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+            GeometryReader { geometry in
+                ForEach(Array(decorations.enumerated()), id: \.offset) { index, mascot in
+                    MascotView(mascot: mascot, height: 36)
+                        .rotationEffect(.degrees(Double(index) * 37 - 30))
+                        .opacity(0.9)
+                        .position(
+                            x: [geometry.size.width * 0.1, geometry.size.width * 0.9, geometry.size.width * 0.14][index % 3],
+                            y: [geometry.size.height * 0.14, geometry.size.height * 0.22, geometry.size.height * 0.88][index % 3]
+                        )
+                }
+            }
+            content().padding(.vertical, 24).padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func feature(_ symbol: String, _ title: String, _ detail: String) -> some View {
@@ -238,6 +311,8 @@ struct OnboardingView: View {
             }
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -286,17 +361,21 @@ struct OnboardingView: View {
     }
 
     private func importCard(_ source: OnboardingSource) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Importing \(source.title)").font(.headline)
-            ImportProgressView(model: progress)
+        ScrollView {
+            ImportLoadingView(title: "Importing recipe…", subtitle: source.title, model: progress, cancel: cancelImport)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
         }
-        .padding(20)
-        .frame(maxWidth: 360, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .padding(24)
+        .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.black.opacity(0.15))
+        .paperBackground()
         .transition(.opacity)
+    }
+
+    private func cancelImport() {
+        importTask?.cancel()
+        importTask = nil
+        importing = nil
     }
 
     private func startImport(_ source: OnboardingSource) {
@@ -308,14 +387,15 @@ struct OnboardingView: View {
         importing = source
         failures[source.id] = nil
         progress.reset()
-        Task {
+        importTask = Task {
             do {
                 let result = try await RecipeImporter.importResult(from: source.url, progress: progress.report)
+                guard !Task.isCancelled else { return }
                 reviewing = draft(from: result)
             } catch {
-                failures[source.id] = error.localizedDescription
+                if !Task.isCancelled { failures[source.id] = error.localizedDescription }
             }
-            importing = nil
+            if !Task.isCancelled { importing = nil }
         }
     }
 
@@ -334,18 +414,16 @@ struct OnboardingView: View {
         VStack(spacing: 12) {
             HStack(spacing: 8) {
                 ForEach(Step.allCases, id: \.self) { item in
-                    Circle()
+                    Capsule()
                         .fill(item == step ? Theme.accent : Color.secondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
+                        .frame(width: item == step ? 22 : 8, height: 8)
                 }
             }
             .accessibilityHidden(true)
-            Button(action: advance) {
-                Text(primaryTitle).frame(maxWidth: 400)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(step == .add && addedRecipes.isEmpty)
+            Button(action: advance) { Text(primaryTitle) }
+                .buttonStyle(PaperButtonStyle())
+                .frame(maxWidth: 400)
+                .disabled(step == .add && addedRecipes.isEmpty)
             if step == .add && addedRecipes.isEmpty {
                 Text("Add at least one recipe to continue.").font(.footnote).foregroundStyle(.secondary)
             }
@@ -359,13 +437,14 @@ struct OnboardingView: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .animation(.snappy, value: step)
     }
 
     private var primaryTitle: String {
         switch step {
         case .welcome: "Get Started"
-        case .share, .add, .tryIt: "Continue"
+        case .share, .organize, .cook: "Next"
+        case .add, .tryIt: "Continue"
         case .discover: "Start Cooking"
         }
     }
@@ -397,6 +476,52 @@ private struct TryCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+/// Collections as a tilted stack of cards.
+private struct CollectionStack: View {
+    private static let items: [(name: String, symbol: String, color: Color)] = [
+        ("Favorites", "heart.fill", Color(red: 0.93, green: 0.36, blue: 0.33)),
+        ("Weeknight", "fork.knife", Color(red: 0.36, green: 0.55, blue: 0.86)),
+        ("Breakfast", "sun.max.fill", Color(red: 0.93, green: 0.72, blue: 0.20)),
+        ("Desserts", "birthday.cake.fill", Color(red: 0.84, green: 0.45, blue: 0.68)),
+    ]
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
+                HStack(spacing: 8) {
+                    Image(systemName: item.symbol)
+                    Text(item.name).font(.system(.subheadline, weight: .semibold))
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .frame(width: 150)
+                .background(item.color.gradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .rotationEffect(.degrees(index.isMultiple(of: 2) ? -2.5 : 2))
+                .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A small copy of cook mode's step with its timer.
+private struct CookStepCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Step 3 of 5").font(.caption).foregroundStyle(.secondary)
+            (Text("Simmer for ") + Text("\u{23F2}\u{FE0E} 10 minutes").foregroundStyle(Theme.accent) + Text(" until thickened."))
+                .font(.system(.title3, weight: .medium))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
+        .padding(.horizontal, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
