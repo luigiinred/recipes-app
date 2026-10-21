@@ -57,6 +57,7 @@ final class ShareViewController: PlatformViewController {
     #if os(iOS)
     override func viewDidLoad() {
         super.viewDidLoad()
+        UIView.appearance().tintColor = UIColor(Theme.defaultAccent)
         let controller = UIHostingController(rootView: makeView())
         addChild(controller)
         controller.view.frame = view.bounds

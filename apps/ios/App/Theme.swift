@@ -137,6 +137,7 @@ private struct AppThemeModifier: ViewModifier {
             .preferredColorScheme(appearance.colorScheme)
             #if os(iOS) && !SHARE_EXTENSION
             .onChange(of: fontRaw, initial: true) { _, raw in ThemeFonts.apply(FontStyle(rawValue: raw) ?? .serif) }
+            .onChange(of: accentHex, initial: true) { _, hex in ThemeTint.apply(Color(hex: hex) ?? Theme.defaultAccent) }
             #endif
     }
 }
