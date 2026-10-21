@@ -234,6 +234,7 @@ extension View {
             .environmentObject(SampleData.cookSession())
             .environmentObject(SampleData.timers())
             .environmentObject(AppRouter())
+            .environmentObject(MealieSyncController(previewing: .disconnected))
             .environment(\.referenceDate, SampleData.now)
             .defaultAppStorage(SampleData.defaults)
             .tint(Theme.accent)

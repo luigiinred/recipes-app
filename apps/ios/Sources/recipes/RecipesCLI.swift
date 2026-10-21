@@ -9,10 +9,10 @@ struct RecipesCLI: AsyncParsableCommand {
         abstract: "Read and create recipes in the Recipes app library.",
         discussion: """
         The library is the iCloud Drive folder the Recipes app syncs between Mac and iPhone. \
-        Override it with --dir or RECIPES_DIR, and use `recipes sync` to mirror it with a self-hosted server. \
+        Override it with --dir or RECIPES_DIR, and use `recipes sync` to mirror it with a self-hosted server, or `recipes mealie` to sync with Mealie. \
         Run `recipes schema` for the JSON format.
         """,
-        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Transcript.self, Timestamps.self, Image.self, PlanCommand.self, GroceriesCommand.self, FeedsCommand.self, Scan.self, Mark.self, Delete.self, Export.self, Sections.self, AICheck.self, SyncCommand.self, Path.self, Schema.self]
+        subcommands: [List.self, Show.self, Search.self, Add.self, Import.self, Transcript.self, Timestamps.self, Image.self, PlanCommand.self, GroceriesCommand.self, FeedsCommand.self, Scan.self, Mark.self, Delete.self, Export.self, Sections.self, AICheck.self, SyncCommand.self, MealieCommand.self, Path.self, Schema.self]
     )
 }
 

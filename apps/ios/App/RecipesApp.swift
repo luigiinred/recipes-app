@@ -7,6 +7,8 @@ struct RecipesApp: App {
     @StateObject private var cook = CookSession()
     @StateObject private var timers = TimerCenter()
     @StateObject private var router = AppRouter.shared
+    @StateObject private var mealie = MealieSyncController()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -17,11 +19,17 @@ struct RecipesApp: App {
                 .environmentObject(cook)
                 .environmentObject(timers)
                 .environmentObject(router)
+                .environmentObject(mealie)
                 .tint(Theme.accent)
                 #if os(macOS)
                 .sizedFromEnvironment()
                 #endif
                 .task { await library.run() }
+                .task { await mealie.run() }
+                .onChange(of: library.recipes) { mealie.request() }
+                .onChange(of: library.mealPlan) { mealie.request() }
+                .onChange(of: library.groceries) { mealie.request() }
+                .onChange(of: scenePhase) { if scenePhase == .active { mealie.request() } }
                 #if os(iOS)
                 .task { await TimerLiveActivities.endAll() }
                 #endif
@@ -33,6 +41,7 @@ struct RecipesApp: App {
         Settings {
             SettingsView(inSheet: false)
                 .environmentObject(library)
+                .environmentObject(mealie)
                 .tint(Theme.accent)
         }
         #endif

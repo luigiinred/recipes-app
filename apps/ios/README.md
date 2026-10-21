@@ -2,7 +2,7 @@
 
 The SwiftUI app, share extension, `RecipeKit` package and `recipes` command-line tool. Part of the [Recipes monorepo](../../README.md); everything here is relative to `apps/ios`.
 
-A recipe manager synced through iCloud Drive, with a command-line tool for agents. The CLI can also mirror a library with a self-hosted [server](../server/README.md) (`recipes sync`).
+A recipe manager synced through iCloud Drive, with a command-line tool for agents. The CLI can also mirror a library with a self-hosted [server](../server/README.md) (`recipes sync`). The app and CLI can also sync with a [Mealie](../../docs/mealie.md) server (Settings, Data & Developer, Mealie; `recipes mealie`).
 
 ## Features
 
