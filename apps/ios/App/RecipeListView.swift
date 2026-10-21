@@ -198,7 +198,12 @@ private struct RecipeActionsModifier: ViewModifier {
         content
         .overlay {
             if isScanning {
-                ProgressView("Reading recipe…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 4) {
+                    TomatoWokLoader(height: 120)
+                    Text("Reading recipe…").font(.headline)
+                }
+                .padding(20)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
         }
         .toolbar {

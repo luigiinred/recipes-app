@@ -18,7 +18,8 @@ struct ImportURLView: View {
             Form {
                 if isLoading {
                     Section {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(spacing: 12) {
+                            TomatoWokLoader(height: 120).frame(maxWidth: .infinity)
                             Text(address).font(.footnote).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                             ImportProgressView(model: progress)
                         }

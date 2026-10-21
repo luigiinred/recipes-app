@@ -25,7 +25,12 @@ struct SmartPlanSheet: View {
             Group {
                 switch phase {
                 case .options: options
-                case .working: ProgressView("Planning your week…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .working:
+                    VStack(spacing: 6) {
+                        TomatoWokLoader(height: 170)
+                        Text("Planning your week…").font(.system(.title3, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .review: review
                 }
             }
