@@ -13,7 +13,7 @@ final class MealieSyncController: ObservableObject {
     }
 
     @Published private(set) var status: Status
-    @Published private(set) var username: String?
+    @Published private(set) var connection: MealieCredentials.Connection?
 
     private let defaults: UserDefaults
     private var pokeRequested = false
@@ -24,50 +24,66 @@ final class MealieSyncController: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         previewAddress = nil
+        previewUsername = nil
         status = .disconnected
-        username = defaults.string(forKey: AppSettings.Key.mealieUser)
-        if isConnected { status = .idle }
+        connection = MealieCredentials.load()
+            ?? MealieCredentials.migrateLegacy(
+                server: defaults.string(forKey: AppSettings.Key.mealieServer),
+                username: defaults.string(forKey: AppSettings.Key.mealieUser)
+            )
+        defaults.removeObject(forKey: AppSettings.Key.mealieServer)
+        defaults.removeObject(forKey: AppSettings.Key.mealieUser)
+        if connection != nil { status = .idle }
     }
 
     /// For previews and snapshots, which show a fixed state without touching the network or Keychain.
     init(previewing status: Status, address: String? = nil, username: String? = nil) {
         defaults = .standard
         previewAddress = address
+        previewUsername = username
         self.status = status
-        self.username = username
     }
 
     private let previewAddress: String?
+    private let previewUsername: String?
 
-    var address: String? { previewAddress ?? defaults.string(forKey: AppSettings.Key.mealieServer) }
-
-    var isConnected: Bool {
-        guard let address else { return false }
-        return previewAddress != nil || MealieCredentials.token(for: address) != nil
-    }
+    var address: String? { previewAddress ?? connection?.server }
+    var username: String? { previewUsername ?? connection?.username }
+    var isConnected: Bool { previewAddress != nil || connection != nil }
 
     // MARK: - Connecting
 
-    /// Checks the address and token against the server, then keeps them and starts syncing.
+    /// Checks the address and token against the server, then keeps them in the iCloud Keychain and starts syncing.
     func connect(address: String, token: String) async throws {
         guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
         let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
         let user = try await MealieClient(server: url, token: token).currentUser()
-        MealieCredentials.setToken(token, for: url.absoluteString)
-        defaults.set(url.absoluteString, forKey: AppSettings.Key.mealieServer)
-        defaults.set(user.username, forKey: AppSettings.Key.mealieUser)
-        username = user.username
+        let paired = MealieCredentials.Connection(server: url.absoluteString, username: user.username, token: token)
+        MealieCredentials.save(paired)
+        connection = paired
         status = .idle
         request()
     }
 
-    /// Stops syncing and forgets the token. Recipes already copied either way stay where they are.
+    /// Stops syncing and forgets the token on every device. Recipes already copied either way stay where they are.
     func disconnect() {
-        if let address { MealieCredentials.setToken(nil, for: address) }
-        defaults.removeObject(forKey: AppSettings.Key.mealieServer)
-        defaults.removeObject(forKey: AppSettings.Key.mealieUser)
-        username = nil
+        MealieCredentials.clear()
+        connection = nil
         status = .disconnected
+    }
+
+    /// Picks up a pairing made or removed on another device.
+    func refresh() {
+        guard previewAddress == nil else { return }
+        let stored = MealieCredentials.load()
+        guard stored != connection else { return }
+        connection = stored
+        if stored == nil {
+            status = .disconnected
+        } else {
+            if status == .disconnected { status = .idle }
+            request()
+        }
     }
 
     // MARK: - Syncing
@@ -84,6 +100,7 @@ final class MealieSyncController: ObservableObject {
         defer { isRunning = false }
         var waited = Self.interval
         while !Task.isCancelled {
+            if !isConnected || waited >= Self.interval { refresh() }
             if isConnected, pokeRequested || waited >= Self.interval {
                 pokeRequested = false
                 await syncNow()
@@ -97,10 +114,11 @@ final class MealieSyncController: ObservableObject {
     }
 
     func syncNow(allowMassDeletion: Bool = false) async {
-        guard let address, let url = MealieClient.normalizedServer(address), let token = MealieCredentials.token(for: address) else {
+        guard let connection, let url = MealieClient.normalizedServer(connection.server) else {
             status = .disconnected
             return
         }
+        let token = connection.token
         if status == .syncing { return }
         status = .syncing
         let resolved = await Task.detached { RecipeLocation.resolveForApp() }.value

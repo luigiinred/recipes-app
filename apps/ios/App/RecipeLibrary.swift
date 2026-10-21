@@ -265,6 +265,21 @@ final class RecipeLibrary: ObservableObject {
         await save(changed)
     }
 
+    /// Logs a time the recipe was cooked. Cooking it takes it out of Up Next.
+    func logMade(_ recipe: Recipe, on date: Date = Date(), note: String = "") async {
+        var changed = self.recipe(id: recipe.id) ?? recipe
+        changed.timeline.append(TimelineEvent(date: date, note: note.trimmingCharacters(in: .whitespacesAndNewlines)))
+        changed.wantToCook = false
+        changed.queuedAt = nil
+        await save(changed)
+    }
+
+    func removeEvent(_ event: TimelineEvent, from recipe: Recipe) async {
+        var changed = self.recipe(id: recipe.id) ?? recipe
+        changed.timeline.removeAll { $0.id == event.id }
+        await save(changed)
+    }
+
     func add(_ feed: Feed) async {
         await perform { try $0.feeds.save(feed) }
     }

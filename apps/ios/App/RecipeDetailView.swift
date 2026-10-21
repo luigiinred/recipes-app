@@ -9,7 +9,6 @@ struct RecipeDetailView: View {
     var previewSave: (() -> Void)?
     var previewImage: Data?
 
-    @State private var confirmingDelete = false
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
     @StateObject private var player = YouTubePlayerController()
@@ -19,11 +18,11 @@ struct RecipeDetailView: View {
     @State private var scrollRequest = 0
     @State private var scrolled: CGFloat = 0
     @State private var topInset: CGFloat = 0
-    @State private var headerOffset: CGFloat = 0
     @State private var sidePaneScrolled = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
+    @State private var showingTimeline = false
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
 
@@ -37,10 +36,11 @@ struct RecipeDetailView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .background(.background)
+        .themedCanvas()
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }
         }
-        .navigationTitle(hasArtwork ? "" : recipe.title)
+        .navigationTitle("")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -48,22 +48,19 @@ struct RecipeDetailView: View {
             if let previewSave {
                 ToolbarItem { Button("Save Recipe", systemImage: "plus.circle.fill", action: previewSave) }
             } else {
-                ToolbarItemGroup {
-                    if ratingStyle == .favorites {
-                        Button {
-                            Task { await library.setFavorite(recipe, !recipe.isFavorite) }
-                        } label: {
-                            Label("Favorite", systemImage: recipe.isFavorite ? "heart.fill" : "heart")
-                        }
-                    }
+                ToolbarItem {
                     Menu {
+                        Button(recipe.isFavorite ? "Remove Favorite" : "Favorite", systemImage: recipe.isFavorite ? "heart.slash" : "heart") {
+                            Task { await library.setFavorite(recipe, !recipe.isFavorite) }
+                        }
+                        RatingMenu(recipe: recipe)
                         Button(recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next", systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward") {
                             Task { await library.setQueued(recipe, !recipe.wantToCook) }
                         }
-                        if supportsImagePlayground {
-                            Button(library.hasImage(recipe.id) ? "Create a New Photo…" : "Create a Photo…", systemImage: "apple.image.playground") {
-                                generatingImage = true
-                            }
+                        Button("Timeline", systemImage: "clock.arrow.circlepath") { showingTimeline = true }
+                        Divider()
+                        if supportsImagePlayground, !library.hasImage(recipe.id) {
+                            Button("Create a Photo…", systemImage: "apple.image.playground") { generatingImage = true }
                         }
                         Button("Print…", systemImage: "printer") { RecipePrinter.print(recipe) }
                         ShareLink(item: recipe.markdown)
@@ -75,16 +72,14 @@ struct RecipeDetailView: View {
                         }
                         Divider()
                         Button("Edit", systemImage: "pencil") { editing = true }
-                        Menu {
-                            Button("Delete Recipe…", role: .destructive) { confirmingDelete = true }
-                        } label: { Text("Delete") }
                     } label: { Label("More", systemImage: "ellipsis.circle") }
                 }
             }
         }
         .sheet(isPresented: $editing) {
-            RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
+            RecipeEditorView(recipe: recipe, onDelete: { dismiss() }) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
+        .sheet(isPresented: $showingTimeline) { RecipeTimelineSheet(recipeID: recipe.id) }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {
             Button("OK") { timestampMessage = nil }
         } message: {
@@ -95,16 +90,6 @@ struct RecipeDetailView: View {
         }
         .sheet(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: recipe) }
         .sheet(isPresented: $addingToCalendar) { AddToCalendarSheet(recipe: recipe) }
-        .confirmationDialog("Delete “\(recipe.title)”?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-            Button("Delete Recipe", role: .destructive) {
-                Task {
-                    await library.delete(recipe)
-                    dismiss()
-                }
-            }
-        } message: {
-            Text("This can't be undone. The recipe and its photo are removed from all your devices.")
-        }
     }
 
     private var oneColumn: some View {
@@ -114,7 +99,7 @@ struct RecipeDetailView: View {
                     if recipe.youTubeVideoID != nil {
                         video.padding([.horizontal, .top], 24)
                     } else if hasArtwork {
-                        Color.clear.frame(height: CollapsingRecipeHeader<EmptyView, EmptyView>.photoHeight)
+                        titleBanner
                     }
                     VStack(alignment: .leading, spacing: 24) {
                         header(showsTitle: !hasArtwork)
@@ -135,35 +120,27 @@ struct RecipeDetailView: View {
                 .textSelection(.enabled)
             }
             .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-            .trackingHeaderScroll($headerOffset, active: hasArtwork)
-            .overlay(alignment: .top) {
-                if hasArtwork {
-                    CollapsingRecipeHeader(title: recipe.title, topInset: topInset, offset: headerOffset) {
-                        artwork
-                    } actions: {
-                        headerActions
-                    }
-                }
-            }
             .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
         }
     }
 
-    @ViewBuilder
-    private var headerActions: some View {
-        if previewSave == nil {
-            if !recipe.isIdea {
-                HeaderActionButton(title: "Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
-                    .disabled(recipe.steps.isEmpty)
-                HeaderActionButton(title: "Add to Groceries", systemImage: "checklist") { addingToGroceries = true }
-                    .disabled(recipe.ingredients.isEmpty)
+    /// The title at the top of the page over the photo, which reaches up under the status bar.
+    private var titleBanner: some View {
+        Text(recipe.title)
+            .font(.system(.largeTitle, weight: .bold))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+            .lineLimit(4)
+            .padding(24)
+            .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+            .background {
+                ZStack {
+                    Color.clear.overlay { artwork }.clipped()
+                    LinearGradient(colors: [.black.opacity(0.55), .black.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                }
             }
-            HeaderActionButton(title: recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next",
-                               systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
-                Task { await library.setQueued(recipe, !recipe.wantToCook) }
-            }
-            HeaderActionButton(title: "Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
-        }
+            .backgroundExtensionEffect()
+            .accessibilityAddTraits(.isHeader)
     }
 
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
@@ -245,10 +222,10 @@ struct RecipeDetailView: View {
     private func header(showsTitle: Bool) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             if showsTitle {
-                Text(recipe.title).font(.system(.largeTitle, design: .serif, weight: .bold))
+                Text(recipe.title).font(.system(.largeTitle, weight: .bold))
             }
             statsRow
-            if ratingStyle == .stars, previewSave == nil {
+            if previewSave == nil, ratingStyle == .stars || recipe.rating != nil {
                 StarRatingView(rating: recipe.rating) { value in Task { await library.setRating(recipe, value) } }
             }
             if previewSave == nil { actionTiles }
@@ -361,6 +338,9 @@ struct RecipeDetailView: View {
                         }
                         .padding(12)
                         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .textSelection(.disabled)
+                        .conversionMenu(for: text)
                     }
                 }
             }
@@ -393,7 +373,7 @@ struct RecipeDetailView: View {
                             }
                         }
                         Text(text)
-                            .font(.system(.body, design: .serif))
+                            .font(.system(.body))
                             .multilineTextAlignment(.leading)
                         StepIngredientChips(recipe: recipe, step: index)
                         if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
@@ -460,15 +440,6 @@ struct AddToCalendarSheet: View {
 }
 
 private extension View {
-    /// Reports how far a scroll view has moved past its resting position, but only when the recipe has a video.
-    func trackingHeaderScroll(_ offset: Binding<CGFloat>, active: Bool) -> some View {
-        onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
-            active ? geometry.contentOffset.y + geometry.contentInsets.top : 0
-        } action: { _, value in
-            offset.wrappedValue = value
-        }
-    }
-
     func trackingVideoScroll(_ scrolled: Binding<CGFloat>, active: Bool) -> some View {
         onScrollGeometryChange(for: CGFloat.self) { [active] geometry in
             active ? max(0, geometry.contentOffset.y + geometry.contentInsets.top) : 0

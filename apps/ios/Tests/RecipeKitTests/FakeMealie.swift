@@ -12,6 +12,8 @@ final class FakeMealie: MealieAPI, @unchecked Sendable {
     private var ratingByRecipe: [String: MealieRating] = [:]
     private var plan: [Int: MealieObject] = [:]
     private var nextPlanID = 1
+    private var timelineEvents: [String: MealieObject] = [:]
+    private(set) var lastMade: [String: Date] = [:]
     private var lists: [MealieShoppingList] = []
     private var items: [String: [String: MealieObject]] = [:]
     var userID = "user-1"
@@ -80,6 +82,35 @@ final class FakeMealie: MealieAPI, @unchecked Sendable {
 
     func rating(of name: String) -> MealieRating? {
         lock.withLock { recipes.values.first { $0.string("name") == name }?.string("id").flatMap { ratingByRecipe[$0] } }
+    }
+
+    func addTimelineEvent(recipe name: String, message: String, date: Date, type: String = "info") {
+        lock.withLock {
+            guard let recipeID = recipes.values.first(where: { $0.string("name") == name })?.string("id") else { return }
+            let id = UUID().uuidString.lowercased()
+            timelineEvents[id] = [
+                "id": id, "recipeId": recipeID, "subject": "Made it", "eventType": type, "eventMessage": message,
+                "timestamp": MealieDate.format(date),
+            ]
+        }
+    }
+
+    func removeTimelineEvents(of name: String) {
+        lock.withLock {
+            guard let recipeID = recipes.values.first(where: { $0.string("name") == name })?.string("id") else { return }
+            timelineEvents = timelineEvents.filter { $0.value.string("recipeId") != recipeID }
+        }
+    }
+
+    /// The messages on a recipe's timeline, oldest first.
+    func timelineMessages(of name: String, type: String = "info") -> [String] {
+        lock.withLock {
+            guard let recipeID = recipes.values.first(where: { $0.string("name") == name })?.string("id") else { return [] }
+            return timelineEvents.values
+                .filter { $0.string("recipeId") == recipeID && $0.string("eventType") == type }
+                .sorted { $0.string("timestamp")! < $1.string("timestamp")! }
+                .map { $0.string("eventMessage") ?? "" }
+        }
     }
 
     func addShoppingItem(note: String, checked: Bool = false) {
@@ -192,6 +223,28 @@ final class FakeMealie: MealieAPI, @unchecked Sendable {
         lock.withLock {
             guard let key = recipes.first(where: { $0.value.string("slug") == slug })?.key else { return }
             ratingByRecipe[key] = MealieRating(rating: rating.flatMap { $0 > 0 ? $0 : nil }, isFavorite: isFavorite)
+            recipes[key]?["updatedAt"] = now()
+        }
+    }
+
+    func timelineEvents() async throws -> [MealieObject] { lock.withLock { Array(timelineEvents.values) } }
+
+    func createTimelineEvent(_ body: MealieObject) async throws -> MealieObject {
+        lock.withLock {
+            var event = body
+            let id = UUID().uuidString.lowercased()
+            event["id"] = id
+            timelineEvents[id] = event
+            return event
+        }
+    }
+
+    func deleteTimelineEvent(id: String) async throws { _ = lock.withLock { timelineEvents.removeValue(forKey: id) } }
+
+    func setLastMade(slug: String, date: Date) async throws {
+        lock.withLock {
+            guard let key = recipes.first(where: { $0.value.string("slug") == slug })?.key else { return }
+            lastMade[key] = date
             recipes[key]?["updatedAt"] = now()
         }
     }

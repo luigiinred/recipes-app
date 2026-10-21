@@ -54,17 +54,13 @@ struct StarRatingView: View {
 /// The liked-recipe and queue actions shared by context menus.
 struct RecipeQuickActions: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     let recipe: Recipe
 
     var body: some View {
-        if (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites {
-            Button(recipe.isFavorite ? "Remove Favorite" : "Favorite", systemImage: recipe.isFavorite ? "heart.slash" : "heart") {
-                Task { await library.setFavorite(recipe, !recipe.isFavorite) }
-            }
-        } else {
-            RatingMenu(recipe: recipe)
+        Button(recipe.isFavorite ? "Remove Favorite" : "Favorite", systemImage: recipe.isFavorite ? "heart.slash" : "heart") {
+            Task { await library.setFavorite(recipe, !recipe.isFavorite) }
         }
+        RatingMenu(recipe: recipe)
         Button(recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next", systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward") {
             Task { await library.setQueued(recipe, !recipe.wantToCook) }
         }

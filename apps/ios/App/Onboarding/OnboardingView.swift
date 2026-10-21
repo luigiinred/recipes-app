@@ -166,7 +166,7 @@ struct OnboardingView: View {
                 .foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.system(.largeTitle, design: .serif, weight: .bold))
+                .font(.system(.largeTitle, weight: .bold))
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
@@ -226,7 +226,7 @@ struct OnboardingView: View {
                         .padding(10)
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(source.title).font(.system(.title3, design: .serif, weight: .semibold)).foregroundStyle(.primary)
+                    Text(source.title).font(.system(.title3, weight: .semibold)).foregroundStyle(.primary)
                     Text(source.site).font(.caption.weight(.medium)).foregroundStyle(Theme.accent)
                     if let failure = failures[source.id] {
                         Text(failure).font(.caption).foregroundStyle(.red).lineLimit(2)

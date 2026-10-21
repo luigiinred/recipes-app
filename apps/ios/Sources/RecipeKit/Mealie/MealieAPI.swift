@@ -62,6 +62,11 @@ public protocol MealieAPI: Sendable {
     func ratings() async throws -> [String: MealieRating]
     func setRating(userID: String, slug: String, rating: Double?, isFavorite: Bool) async throws
 
+    func timelineEvents() async throws -> [MealieObject]
+    func createTimelineEvent(_ body: MealieObject) async throws -> MealieObject
+    func deleteTimelineEvent(id: String) async throws
+    func setLastMade(slug: String, date: Date) async throws
+
     func mealPlanEntries() async throws -> [MealieObject]
     func createMealPlanEntry(_ body: MealieObject) async throws -> MealieObject
     func updateMealPlanEntry(id: Int, _ body: MealieObject) async throws -> MealieObject
@@ -187,6 +192,25 @@ public struct MealieClient: MealieAPI {
         _ = try await send("POST", "users/\(userID)/ratings/\(slug)", body: try JSONSerialization.data(withJSONObject: body))
     }
 
+    // MARK: - Timeline
+
+    public func timelineEvents() async throws -> [MealieObject] {
+        try await paged("recipes/timeline/events")
+    }
+
+    public func createTimelineEvent(_ body: MealieObject) async throws -> MealieObject {
+        try await object("POST", "recipes/timeline/events", body: body)
+    }
+
+    public func deleteTimelineEvent(id: String) async throws {
+        _ = try await send("DELETE", "recipes/timeline/events/\(id)", allowing: [404])
+    }
+
+    public func setLastMade(slug: String, date: Date) async throws {
+        let body: MealieObject = ["timestamp": MealieDate.format(date)]
+        _ = try await send("PATCH", "recipes/\(slug)/last-made", body: try JSONSerialization.data(withJSONObject: body))
+    }
+
     // MARK: - Meal plan
 
     public func mealPlanEntries() async throws -> [MealieObject] {
@@ -308,6 +332,12 @@ public struct MealieClient: MealieAPI {
 }
 
 enum MealieDate {
+    static func format(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+
     /// Mealie writes `…09.569421Z` in one place and `…09.569421+00:00` in another; both parse to the same millisecond.
     static func parse(_ text: String) -> Date? {
         var text = text.replacingOccurrences(of: "+00:00", with: "Z")

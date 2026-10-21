@@ -6,7 +6,7 @@ The sync code is `MealieSync` in `apps/ios/Sources/RecipeKit/Mealie`, shared by 
 
 ## Connecting
 
-In Mealie, open your profile, choose **API Tokens** and create one. In the app, go to Settings, Data & Developer, Mealie, and enter the server address and token. The token is kept in the Keychain. Use `https://`; plain `http://` only works for servers on your local network.
+In Mealie, open your profile, choose **API Tokens** and create one. In the app, go to Settings, Mealie, and enter the server address and token. The address and token are kept in one iCloud Keychain item, so pairing one device pairs every device signed in to the same iCloud account, and disconnecting on one disconnects them all. Which things sync (planned meals, groceries, the shopping list name) is still chosen per device. Use `https://`; plain `http://` only works for servers on your local network.
 
 From a terminal:
 
@@ -28,8 +28,11 @@ recipes mealie            # --skip-meal-plan, --skip-groceries, --list "Name", -
 | Notes | a note titled "Notes" |
 | Star rating, favorite | your rating and favorite (per user) |
 | Main photo | recipe image |
+| Timeline (the times you cooked it, with notes) | the recipe's timeline: "info" and "comment" events, and its last-made date |
 | Planned meals, ideas | meal plan entries (breakfast, lunch, dinner, snack) |
 | Groceries | one shopping list, named in Settings (default "Recipes") |
+
+Mealie's own system events (recipe created, updated) stay in Mealie. An event is matched by its time and note, so a recipe already in both places doesn't gain duplicates, and deleting an event on one side deletes it on the other. Editing an event's note after it syncs isn't carried across.
 
 Step timestamps, the Up Next queue and the recipe's photo URL have no place in Mealie, so they are stored in the recipe's `extras` under `recipesApp`. That is also what lets every device give a recipe the same id. Step photos stay on the device; Mealie has no per-step photos.
 

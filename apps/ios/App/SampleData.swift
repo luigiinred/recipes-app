@@ -51,6 +51,10 @@ enum SampleData {
                 "Fry the onion, garlic and peppers in the oil, then stir in the tomato paste.",
                 "Add everything to the pot with the tomatoes, corn and broth and simmer for 15 minutes."],
         tags: ["Dinner/Mains"], isFavorite: true, wantToCook: true,
+        timeline: [
+            TimelineEvent(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000E1")!, date: created.addingTimeInterval(-86_400 * 9), note: "Added an extra can of beans. Better."),
+            TimelineEvent(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000E2")!, date: created.addingTimeInterval(-86_400 * 40)),
+        ],
         createdAt: created.addingTimeInterval(400), updatedAt: created
     )
 
@@ -213,7 +217,7 @@ enum SampleData {
     }
 
     static func cookSession() -> CookSession {
-        CookSession(queue: [shakshuka.id, chili.id], current: shakshuka.id, stepIndex: [shakshuka.id: 2])
+        CookSession(current: shakshuka.id, stepIndex: [shakshuka.id: 2])
     }
 
     static func timers() -> TimerCenter {
@@ -236,8 +240,8 @@ extension View {
             .environmentObject(AppRouter())
             .environmentObject(MealieSyncController(previewing: .disconnected))
             .environment(\.referenceDate, SampleData.now)
+            .appTheme()
             .defaultAppStorage(SampleData.defaults)
-            .tint(Theme.accent)
     }
 }
 

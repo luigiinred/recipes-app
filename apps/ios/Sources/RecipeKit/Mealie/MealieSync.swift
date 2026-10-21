@@ -38,12 +38,13 @@ public struct MealieSync: Sendable {
         public var photos = Counts()
         public var mealPlan = Counts()
         public var groceries = Counts()
+        public var timeline = Counts()
         /// Items Mealie refused or that changed mid-pass; the next pass tries them again.
         public var problems: [String] = []
 
         public init() {}
 
-        public var changedAnything: Bool { recipes.changedAnything || photos.changedAnything || mealPlan.changedAnything || groceries.changedAnything }
+        public var changedAnything: Bool { recipes.changedAnything || photos.changedAnything || mealPlan.changedAnything || groceries.changedAnything || timeline.changedAnything }
     }
 
     struct RecipeLink: Codable, Equatable {
@@ -70,6 +71,8 @@ public struct MealieSync: Sendable {
         var recipes: [String: RecipeLink] = [:]
         var mealPlan: [String: HashLink] = [:]
         var groceries: [String: HashLink] = [:]
+        /// Timeline event ids here to the Mealie events they match. Optional so older state files still load.
+        var timelineLinks: [String: String]?
     }
 
     let library: Library
@@ -102,6 +105,7 @@ public struct MealieSync: Sendable {
         var report = Report()
         do {
             try await syncRecipes(&state, user: user, report: &report)
+            try await syncTimeline(&state, user: user, report: &report)
             if options.syncMealPlan { try await syncMealPlan(&state, report: &report) }
             if options.syncGroceries { try await syncGroceries(&state, report: &report) }
         } catch {
@@ -114,7 +118,7 @@ public struct MealieSync: Sendable {
 
     // MARK: - Recipes
 
-    private struct LocalRecipe {
+    struct LocalRecipe {
         var recipe: Recipe
         var hash: String
     }
@@ -351,13 +355,13 @@ public struct MealieSync: Sendable {
 
     // MARK: - Disk
 
-    private struct Scan {
+    struct Scan {
         var recipes: [UUID: LocalRecipe] = [:]
         var placeholders: Set<UUID> = []
     }
 
     /// Files iCloud hasn't downloaded yet are reported as placeholders, not as missing.
-    private func readLocalRecipes() throws -> Scan {
+    func readLocalRecipes() throws -> Scan {
         let directory = library.recipes.directory
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var scan = Scan()
@@ -372,7 +376,7 @@ public struct MealieSync: Sendable {
         return scan
     }
 
-    private func readLocalRecipe(_ id: UUID) -> LocalRecipe? {
+    func readLocalRecipe(_ id: UUID) -> LocalRecipe? {
         readRecipe(at: library.recipes.fileURL(for: id))
     }
 
@@ -381,7 +385,7 @@ public struct MealieSync: Sendable {
         return LocalRecipe(recipe: recipe, hash: ServerSync.sha256(data))
     }
 
-    private static func stamp(of recipe: MealieObject) -> Double {
+    static func stamp(of recipe: MealieObject) -> Double {
         (recipe.string("updatedAt").flatMap(MealieDate.parse) ?? .distantPast).timeIntervalSince1970
     }
 

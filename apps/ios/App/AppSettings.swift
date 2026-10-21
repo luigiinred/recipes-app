@@ -20,6 +20,9 @@ enum AppSettings {
         static let mealieList = "mealieShoppingList"
         static let mealieSyncPlan = "mealieSyncMealPlan"
         static let mealieSyncGroceries = "mealieSyncGroceries"
+        static let appearance = "appearance"
+        static let fontStyle = "fontStyle"
+        static let accentColor = "accentColorHex"
     }
 
     enum WeekStart: String, CaseIterable {

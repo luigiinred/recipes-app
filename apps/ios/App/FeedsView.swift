@@ -41,7 +41,7 @@ struct FeedEntryRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.title).font(.system(.headline, design: .serif)).lineLimit(3)
+                Text(entry.title).font(.system(.headline)).lineLimit(3)
                 if !entry.summary.isEmpty {
                     Text(entry.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }

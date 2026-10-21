@@ -20,7 +20,7 @@ struct RecipesApp: App {
                 .environmentObject(timers)
                 .environmentObject(router)
                 .environmentObject(mealie)
-                .tint(Theme.accent)
+                .appTheme()
                 #if os(macOS)
                 .sizedFromEnvironment()
                 #endif
@@ -29,7 +29,7 @@ struct RecipesApp: App {
                 .onChange(of: library.recipes) { mealie.request() }
                 .onChange(of: library.mealPlan) { mealie.request() }
                 .onChange(of: library.groceries) { mealie.request() }
-                .onChange(of: scenePhase) { if scenePhase == .active { mealie.request() } }
+                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request() } }
                 #if os(iOS)
                 .task { await TimerLiveActivities.endAll() }
                 #endif
@@ -42,7 +42,7 @@ struct RecipesApp: App {
             SettingsView(inSheet: false)
                 .environmentObject(library)
                 .environmentObject(mealie)
-                .tint(Theme.accent)
+                .appTheme()
         }
         #endif
     }

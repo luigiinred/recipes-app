@@ -96,7 +96,7 @@ struct SmartPlanSheet: View {
                         HStack(spacing: 12) {
                             Image(systemName: suggestion.meal.symbol).foregroundStyle(Theme.accent).frame(width: 24)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(library.recipe(id: suggestion.recipeID)?.title ?? "Recipe").font(.system(.body, design: .serif))
+                                Text(library.recipe(id: suggestion.recipeID)?.title ?? "Recipe").font(.system(.body))
                                 Text(suggestion.meal.title).font(.caption).foregroundStyle(.secondary)
                             }
                         }
