@@ -21,6 +21,12 @@ export const ingredientSectionSchema = z.object({
   start: nonNegativeInt,
 });
 
+export const timelineEventSchema = z.object({
+  id: uuidSchema,
+  date: dateSchema,
+  note: z.string().default(""),
+});
+
 /** One recipe as stored in `Recipes/<id>.json`. Lenient like the Swift decoder: only `title` is required. */
 export const recipeSchema = z.object({
   id: uuidSchema,
@@ -42,6 +48,7 @@ export const recipeSchema = z.object({
   rating: z.number().int().nullish(),
   wantToCook: z.boolean().default(false),
   queuedAt: dateSchema.nullish(),
+  timeline: z.array(timelineEventSchema).default([]),
   createdAt: dateSchema,
   updatedAt: dateSchema,
 });

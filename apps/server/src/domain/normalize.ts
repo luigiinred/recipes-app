@@ -108,6 +108,7 @@ export function normalizeRecipe(
     rating,
     wantToCook,
     queuedAt: wantToCook ? (input.queuedAt ?? existing?.queuedAt ?? isoDate(now)) : undefined,
+    timeline: input.timeline,
     createdAt: existing?.createdAt ?? input.createdAt ?? isoDate(now),
     updatedAt: isoDate(now),
   };
