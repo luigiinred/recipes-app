@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<title>red pepper</title>
+<defs>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<g id="sway" data-bone="sway" data-parent="" data-pivot="50 96" style="transform-origin:50px 96px">
+<path d="M 50 30 C 70 20 90 34 88 58 C 87 80 68 92 50 90 C 32 92 13 80 12 58 C 10 34 30 20 50 30 Z" fill="#E03324" stroke="#8E100C" stroke-width="2.8"/>
+<path d="M 50 32 C 40 52 40 74 50 90" fill="none" stroke="#B8231A" stroke-width="2.2" opacity=".7"/>
+<path d="M 50 32 C 60 52 60 74 50 90" fill="none" stroke="#B8231A" stroke-width="2.2" opacity=".7"/>
+<path d="M 34.8 53.3 C 33.1 59.7 29.6 64.3 26.9 63.6 C 24.2 62.9 23.5 57.1 25.2 50.7 C 26.9 44.3 30.4 39.7 33.1 40.4 C 35.8 41.1 36.5 46.9 34.8 53.3 Z" fill="#FF9A88" opacity=".7"/>
+<path d="M 44 30 C 44 20 46 14 54 10 C 58 8 62 12 56 16 C 54 20 56 28 56 30 Z" fill="#3FA63A" stroke="#1F6E22" stroke-width="2.4"/>
+</g>
+</g>
+</svg>

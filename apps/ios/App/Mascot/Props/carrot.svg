@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<title>carrot</title>
+<defs>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<g id="sway" data-bone="sway" data-parent="" data-pivot="50 96" style="transform-origin:50px 96px">
+<path d="M 56 22 C 46.5 22.3 39.7 11.2 41.1 0.7 C 51.5 3 59.6 13.2 56 22 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.2"/>
+<path d="M 56 22 C 48 16.8 48.8 3.8 56 -4 C 63.2 3.8 64 16.8 56 22 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.2"/>
+<path d="M 56 22 C 52.4 13.2 60.5 3 70.9 0.7 C 72.3 11.2 65.5 22.3 56 22 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.2"/>
+<path d="M 49 17.1 C 37.5 33.5 25.2 68.3 19.7 88.5 C 35.4 74.7 61.3 48.4 71 30.9 C 68.9 24.8 55.3 16.4 49 17.1 Z" fill="#F5851F" stroke="#B85A0E" stroke-width="2.8"/>
+<path d="M 42.8 34.5 L 51.6 41.2" fill="none" stroke="#C25A0A" stroke-width="2" opacity=".7"/>
+<path d="M 36.3 46.9 L 45.1 53.6" fill="none" stroke="#C25A0A" stroke-width="2" opacity=".7"/>
+<path d="M 29.7 59.3 L 38.5 66" fill="none" stroke="#C25A0A" stroke-width="2" opacity=".7"/>
+<path d="M 46.2 41.3 C 43.6 45.6 40.5 48.4 39.3 47.6 C 38.1 46.9 39.3 42.9 42 38.7 C 44.6 34.4 47.7 31.6 48.9 32.4 C 50.1 33.1 48.9 37.1 46.2 41.3 Z" fill="#FFB35C" opacity=".7"/>
+</g>
+</g>
+</svg>

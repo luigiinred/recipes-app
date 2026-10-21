@@ -125,6 +125,7 @@ func assertPageSnapshots<Page: View>(
     column: UInt = #column
 ) {
     guard isPinnedOSVersion() else { return }
+    MascotCast.deterministic = true
     #if os(iOS)
     UIView.setAnimationsEnabled(false)
     #endif

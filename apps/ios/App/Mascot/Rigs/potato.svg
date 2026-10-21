@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-labelledby="t d">
+<title id="t">Potato</title>
+<desc id="d">The potato mascot as a rigged skeleton: root, legs, body, face, arms.</desc>
+<style>[data-bone]{transform-box:view-box}</style>
+<defs>
+<radialGradient id="p-body" cx=".36" cy=".3" r=".85"><stop offset="0" stop-color="#EBA55A"/><stop offset=".55" stop-color="#D58A3B"/><stop offset="1" stop-color="#BC6E27"/></radialGradient>
+<linearGradient id="p-arm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C7782E"/><stop offset="1" stop-color="#A95F20"/></linearGradient>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<ellipse id="shadow" cx="200" cy="379" rx="96" ry="9" fill="#3a2410" opacity=".14"/>
+<g id="root" data-bone="root" data-parent="" data-pivot="200 382" style="transform-origin:200px 382px">
+<g id="leg-l" data-bone="leg-l" data-parent="root" data-pivot="166 332" style="transform-origin:166px 332px">
+<path d="M 152 330 C 150 344 144 352 140 362 C 136 374 146 383 160 383 C 176 383 186 378 186 366 C 186 352 182 342 180 330 Z" fill="#A9601F" stroke="#7C441A" stroke-width="4.2"/>
+</g>
+<g id="leg-r" data-bone="leg-r" data-parent="root" data-pivot="234 332" style="transform-origin:234px 332px">
+<path d="M 248 330 C 250 344 256 352 260 362 C 264 374 254 383 240 383 C 224 383 214 378 214 366 C 214 352 218 342 220 330 Z" fill="#A9601F" stroke="#7C441A" stroke-width="4.2"/>
+</g>
+<g id="body" data-bone="body" data-parent="root" data-pivot="200 356" style="transform-origin:200px 356px">
+<path d="M 300 244 C 302.4 258.9 302.9 277.4 298.3 291.1 C 293.7 304.7 282.3 316.6 272.3 325.8 C 262.3 335 250 341 238 346.3 C 225.9 351.7 213.1 356.9 200 358 C 186.9 359.1 172.3 357.5 159.5 353.1 C 146.6 348.6 131.5 342.1 122.9 331.2 C 114.4 320.4 110.8 302.5 108.2 288 C 105.6 273.4 107.1 259 107.2 244 C 107.3 229 105 212.5 108.7 197.8 C 112.4 183.2 119.9 165.5 129.5 155.9 C 139.1 146.3 154.4 145.3 166.1 140.2 C 177.9 135.1 188.6 125.6 200 125.2 C 211.4 124.8 223.1 132.5 234.6 137.9 C 246.1 143.3 260.8 147.2 269 157.8 C 277.3 168.4 279 187.1 284.2 201.5 C 289.3 215.8 297.6 229.1 300 244 Z" fill="url(#p-body)"/>
+
+<path d="M 300 244 C 302.4 258.9 302.9 277.4 298.3 291.1 C 293.7 304.7 282.3 316.6 272.3 325.8 C 262.3 335 250 341 238 346.3 C 225.9 351.7 213.1 356.9 200 358 C 186.9 359.1 172.3 357.5 159.5 353.1 C 146.6 348.6 131.5 342.1 122.9 331.2 C 114.4 320.4 110.8 302.5 108.2 288 C 105.6 273.4 107.1 259 107.2 244 C 107.3 229 105 212.5 108.7 197.8 C 112.4 183.2 119.9 165.5 129.5 155.9 C 139.1 146.3 154.4 145.3 166.1 140.2 C 177.9 135.1 188.6 125.6 200 125.2 C 211.4 124.8 223.1 132.5 234.6 137.9 C 246.1 143.3 260.8 147.2 269 157.8 C 277.3 168.4 279 187.1 284.2 201.5 C 289.3 215.8 297.6 229.1 300 244 Z" fill="none" stroke="#8A4D1D" stroke-width="4.5"/>
+<path d="M 160.3 176.2 C 161.7 179.9 158.1 184.5 152.4 186.6 C 146.7 188.7 141 187.4 139.7 183.8 C 138.3 180.1 141.9 175.5 147.6 173.4 C 153.3 171.3 159 172.6 160.3 176.2 Z" fill="#B96A28" opacity=".45"/>
+<path d="M 255.5 170.7 C 254.6 173.3 250.4 174.2 246.3 172.7 C 242.1 171.2 239.5 167.9 240.5 165.3 C 241.4 162.7 245.6 161.8 249.7 163.3 C 253.9 164.8 256.5 168.1 255.5 170.7 Z" fill="#B96A28" opacity=".45"/>
+<path d="M 247.8 307.1 C 247.1 310.9 241.3 313 234.8 311.9 C 228.3 310.7 223.5 306.7 224.2 302.9 C 224.9 299.1 230.7 297 237.2 298.1 C 243.7 299.3 248.5 303.3 247.8 307.1 Z" fill="#B96A28" opacity=".45"/>
+<path d="M 167.9 316.6 C 168.4 319.3 165.2 322.2 160.9 322.9 C 156.5 323.7 152.6 322.1 152.1 319.4 C 151.6 316.7 154.8 313.8 159.1 313.1 C 163.5 312.3 167.4 313.9 167.9 316.6 Z" fill="#B96A28" opacity=".45"/>
+<path d="M 268 232 C 268 234.2 265.3 236 262 236 C 258.7 236 256 234.2 256 232 C 256 229.8 258.7 228 262 228 C 265.3 228 268 229.8 268 232 Z" fill="#B96A28" opacity=".45"/>
+<path d="M 279.3 295.3 C 276.2 294 275.8 288 278.3 281.9 C 280.8 275.8 285.4 271.8 288.4 273.1 C 291.5 274.4 291.9 280.3 289.4 286.5 C 286.9 292.6 282.3 296.5 279.3 295.3 Z" fill="#F4B672" opacity=".5"/>
+<path d="M 125 310.7 C 127.4 308.4 133.1 310.3 137.8 315 C 142.5 319.7 144.4 325.4 142 327.7 C 139.7 330 134 328.1 129.3 323.5 C 124.6 318.8 122.7 313.1 125 310.7 Z" fill="#F4B672" opacity=".5"/>
+<path d="M 148 159.9 C 150.3 162.2 148.4 167.9 143.7 172.6 C 139 177.3 133.3 179.2 131 176.9 C 128.6 174.5 130.5 168.8 135.2 164.1 C 139.9 159.5 145.6 157.6 148 159.9 Z" fill="#F4B672" opacity=".5"/>
+<path d="M 267.5 178.7 C 265.2 181.1 259.5 179.2 254.8 174.5 C 250.1 169.8 248.2 164.1 250.5 161.8 C 252.9 159.4 258.6 161.3 263.3 166 C 268 170.7 269.9 176.4 267.5 178.7 Z" fill="#F4B672" opacity=".5"/>
+<path d="M 243.6 338.6 Q 237.8 345.3 228.9 344.7" fill="none" stroke="#9A5420" stroke-width="3" opacity=".35"/>
+<path d="M 112.2 252 Q 108.2 244 112.2 236" fill="none" stroke="#9A5420" stroke-width="3" opacity=".35"/>
+<path d="M 160.3 148 Q 166.2 141.3 175.1 141.9" fill="none" stroke="#9A5420" stroke-width="3" opacity=".35"/>
+<path d="M 276.7 196.3 Q 283.4 202.2 282.8 211.1" fill="none" stroke="#9A5420" stroke-width="3" opacity=".35"/>
+<path d="M 160.9 178.6 C 164.6 182.7 160.9 192 152.7 199.4 C 144.5 206.8 134.8 209.5 131.1 205.4 C 127.4 201.3 131.1 192 139.3 184.6 C 147.5 177.2 157.2 174.5 160.9 178.6 Z" fill="#FFD29A" opacity=".6"/>
+<path d="M 118 300 C 150 340 210 348 262 322" fill="none" stroke="#9A5420" stroke-width="7" opacity=".3"/>
+<g id="face" data-bone="face" data-parent="body" data-pivot="200 238" style="transform-origin:200px 238px">
+<g id="cheeks" opacity=".6"><ellipse cx="150" cy="254" rx="13" ry="8" fill="#F29A78"/><ellipse cx="250" cy="254" rx="13" ry="8" fill="#F29A78"/></g>
+<g id="eyes-open">
+<g id="eye-l" data-bone="eye-l" data-parent="face" data-pivot="166 232" style="transform-origin:166px 232px">
+<ellipse cx="166" cy="232" rx="6.5" ry="9" fill="#2A1408"/><ellipse cx="168" cy="228.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+<g id="eye-r" data-bone="eye-r" data-parent="face" data-pivot="234 232" style="transform-origin:234px 232px">
+<ellipse cx="234" cy="232" rx="6.5" ry="9" fill="#2A1408"/><ellipse cx="236" cy="228.5" rx="2.2" ry="2.8" fill="#fff" opacity=".85"/>
+</g>
+</g>
+<g id="eyes-happy" display="none">
+<path d="M 156 236 Q 166 220 176 236" fill="none" stroke="#2A1408" stroke-width="4.5"/>
+<path d="M 224 236 Q 234 220 244 236" fill="none" stroke="#2A1408" stroke-width="4.5"/>
+</g>
+<g id="mouth-smile" display="none">
+<path d="M 189 250 Q 200 263 211 250" fill="none" stroke="#2B0D0B" stroke-width="4.5"/>
+</g>
+<g id="mouth-open">
+<path d="M 186 245 C 194.4 241 205.6 241 214 245 C 211.2 268 188.8 268 186 245 Z" fill="#5E1A10" stroke="#2B0D0B" stroke-width="3.5"/>
+<path d="M 192.3 259 C 195.8 253 204.2 253 207.7 259 C 204.9 266 195.1 266 192.3 259 Z" fill="#FF6F6A"/>
+</g>
+</g>
+<g id="arm-l" data-bone="arm-l" data-parent="body" data-pivot="110 262" style="transform-origin:110px 262px">
+<path d="M 103.1 260.8 C 99.9 274.5 97.7 286.8 97.1 294.6 C 86.6 295.9 83.1 315.9 99.7 320.4 C 116.9 321.8 120.4 301.9 111 297 C 113.1 289.5 115.2 277.2 116.9 263.2 C 118.1 256.3 104.3 253.9 103.1 260.8 Z" fill="url(#p-arm)" stroke="#7C441A" stroke-width="4"/>
+</g>
+<g id="arm-r" data-bone="arm-r" data-parent="body" data-pivot="290 262" style="transform-origin:290px 262px">
+<path d="M 283.1 263.2 C 284.8 277.2 286.9 289.5 289 297 C 279.6 301.9 283.1 321.8 300.3 320.4 C 316.9 315.9 313.4 295.9 302.9 294.6 C 302.3 286.8 300.1 274.5 296.9 260.8 C 295.7 253.9 281.9 256.3 283.1 263.2 Z" fill="url(#p-arm)" stroke="#7C441A" stroke-width="4"/>
+</g>
+</g>
+</g>
+</g>
+</svg>

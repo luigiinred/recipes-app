@@ -88,7 +88,7 @@ struct SearchTab: View {
             .themedCanvas()
             .overlay {
                 if query.isEmpty {
-                    MascotEmptyState(mascot: .tomatoLaptop, title: "Search Recipes",
+                    MascotEmptyState(scene: .bookPages, title: "Search Recipes",
                                      message: "Find a recipe by name, ingredient, or category.")
                 } else if results.isEmpty {
                     ContentUnavailableView.search(text: query)

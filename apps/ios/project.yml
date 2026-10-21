@@ -86,7 +86,7 @@ targets:
       - App/AppSettings.swift
       - App/Theme.swift
       - App/RecipeLink.swift
-      - App/Mascot.swift
+      - App/Mascot
       - App/MascotStyle.swift
       - App/Assets.xcassets
     dependencies:

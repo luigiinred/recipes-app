@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<title>basil</title>
+<defs>
+
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<g id="sway" data-bone="sway" data-parent="" data-pivot="50 96" style="transform-origin:50px 96px">
+<path d="M 50 94 C 50 80 50 70 50 60" fill="none" stroke="#2E8F34" stroke-width="4"/>
+<path d="M 50 64 C 33 53.6 34.7 27.6 50 12 C 65.3 27.6 67 53.6 50 64 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.6"/>
+<path d="M 50 59.8 Q 51 38 50 19.3" fill="none" stroke="#1F6E22" stroke-width="1.4" opacity=".55"/>
+<path d="M 50 70 C 36.9 77.5 21.1 66.8 17.1 51 C 32.8 46.6 49.9 54.9 50 70 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.6"/>
+<path d="M 47.4 68.5 Q 33.9 59.8 21.7 53.7" fill="none" stroke="#1F6E22" stroke-width="1.4" opacity=".55"/>
+<path d="M 50 70 C 50.1 54.9 67.2 46.6 82.9 51 C 78.9 66.8 63.1 77.5 50 70 Z" fill="#4DB846" stroke="#1F6E22" stroke-width="2.6"/>
+<path d="M 52.6 68.5 Q 66.8 61.2 78.3 53.7" fill="none" stroke="#1F6E22" stroke-width="1.4" opacity=".55"/>
+</g>
+</g>
+</svg>

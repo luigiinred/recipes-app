@@ -77,7 +77,7 @@ struct QueueView: View {
         .overlay {
             if queue.isEmpty {
                 MascotEmptyState(
-                    mascot: .tomatoBooks, title: "Nothing in Up Next",
+                    scene: .bookWrite, title: "Nothing in Up Next",
                     message: "Swipe a recipe left in your library, or tap Add, to line up what you want to cook soon."
                 ) {
                     Button("Add Recipes") { adding = true }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)

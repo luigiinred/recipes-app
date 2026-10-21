@@ -92,7 +92,7 @@ struct ShareView: View {
                 }
             case .saving:
                 VStack(spacing: 8) {
-                    TomatoWokLoader(height: 150)
+                    MascotLoader(height: 150)
                     Text("Saving…").font(.system(.title3, weight: .bold))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,7 +119,7 @@ struct ShareView: View {
                 .sensoryFeedback(.success, trigger: recipe.id)
             case .failed(let message):
                 VStack(spacing: 12) {
-                    MascotView(mascot: .tomatoTablet, height: 130)
+                    MascotView(character: .lemon, scene: .sour, height: 130)
                     Text("Couldn't import that").font(.system(.title3, weight: .bold))
                     Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Button("Done", action: cancel)

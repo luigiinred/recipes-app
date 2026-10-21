@@ -52,16 +52,25 @@ struct PaperButtonStyle: ButtonStyle {
     }
 }
 
-/// A mascot with a message, for screens with nothing on them yet.
+/// A character with a message, for screens with nothing on them yet. A different one each time it appears.
 struct MascotEmptyState<Actions: View>: View {
-    let mascot: Mascot
+    let scene: MascotScene
     let title: String
     var message: String?
     @ViewBuilder var actions: Actions
+    @State private var character: MascotCharacter
+
+    init(scene: MascotScene, character: MascotCharacter? = nil, title: String, message: String? = nil, @ViewBuilder actions: () -> Actions) {
+        self.scene = scene
+        self.title = title
+        self.message = message
+        self.actions = actions()
+        _character = State(initialValue: character ?? MascotCast.next())
+    }
 
     var body: some View {
         VStack(spacing: 10) {
-            MascotView(mascot: mascot, height: 130)
+            MascotView(character: character, scene: scene, height: 130)
             Text(title).font(.system(.title3, weight: .bold)).multilineTextAlignment(.center)
             if let message {
                 Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -76,8 +85,8 @@ struct MascotEmptyState<Actions: View>: View {
 }
 
 extension MascotEmptyState where Actions == EmptyView {
-    init(mascot: Mascot, title: String, message: String? = nil) {
-        self.init(mascot: mascot, title: title, message: message) { EmptyView() }
+    init(scene: MascotScene, character: MascotCharacter? = nil, title: String, message: String? = nil) {
+        self.init(scene: scene, character: character, title: title, message: message) { EmptyView() }
     }
 }
 
@@ -87,30 +96,31 @@ struct MascotCluster: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: -height * 0.12) {
-            MascotView(mascot: .potato, height: height * 0.62)
-            MascotView(mascot: .tomatoWave, height: height)
+            MascotView(character: .potato, scene: .idle, height: height * 0.62, phase: 0.35)
+            MascotView(character: .tomato, scene: .wave, height: height)
                 .zIndex(1)
             VStack(spacing: -height * 0.06) {
-                MascotView(mascot: .lemon, height: height * 0.5)
-                MascotView(mascot: .chili, height: height * 0.5)
+                MascotView(character: .lemon, scene: .idle, height: height * 0.5, phase: 0.6)
+                MascotView(character: .chili, scene: .idle, height: height * 0.5, phase: 0.15)
             }
         }
     }
 }
 
-/// The tomato tossing veggies with what it is doing underneath: import steps, a title and a way out.
+/// A character tossing veggies with what it is doing underneath: import steps, a title and a way out.
 struct ImportLoadingView: View {
     let title: String
     var subtitle: String?
     @ObservedObject var model: ImportProgressModel
     var cancel: (() -> Void)?
     var mascotHeight: CGFloat = 170
-    /// Holds one wok frame for previews and snapshots.
-    var mascotFrame: Int?
+    /// Who is cooking, and where in the loop to hold them, for previews and snapshots.
+    var character: MascotCharacter?
+    var mascotFrozenAt: Double?
 
     var body: some View {
         VStack(spacing: 18) {
-            TomatoWokLoader(height: mascotHeight, frame: mascotFrame)
+            MascotLoader(height: mascotHeight, character: character, frozenAt: mascotFrozenAt)
             VStack(spacing: 6) {
                 Text(title).font(.system(.title2, weight: .bold)).multilineTextAlignment(.center)
                 if let subtitle {
