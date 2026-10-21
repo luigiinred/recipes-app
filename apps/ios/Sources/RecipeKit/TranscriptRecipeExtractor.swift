@@ -22,12 +22,37 @@ public enum TranscriptRecipeExtractor {
         #endif
     }
 
-    private static let instructions = """
-        You turn the spoken captions of a cooking video into a written recipe. \
-        Only use what the cook says. Do not invent ingredients, quantities or steps.
+    /// What the text came from.
+    public enum Material: Sendable {
+        case captions, webPage
 
-        \(RecipeStandards.extractionRules)
-        """
+        fileprivate var instructions: String {
+            switch self {
+            case .captions: """
+                You turn the spoken captions of a cooking video into a written recipe. \
+                Only use what the cook says. Do not invent ingredients, quantities or steps.
+
+                \(RecipeStandards.extractionRules)
+                """
+            case .webPage: """
+                You find the recipe in the text of a web page and write it out. The page may also hold \
+                navigation, comments and ads: ignore them. Only use what the page says. \
+                Do not invent ingredients, quantities or steps.
+
+                \(RecipeStandards.extractionRules)
+                """
+            }
+        }
+
+        fileprivate var labels: (title: String, body: String) {
+            switch self {
+            case .captions: ("Video title", "Captions")
+            case .webPage: ("Page title", "Page text")
+            }
+        }
+    }
+
+    private static let instructions = Material.captions.instructions
 
     public enum Outcome: Sendable {
         case extracted(Extracted)
@@ -43,17 +68,17 @@ public enum TranscriptRecipeExtractor {
     }
 
     /// Like `extract`, but says why when there is no recipe. A long transcript that overflows the model's window is retried shorter.
-    public static func run(title: String, transcript: String) async -> Outcome {
+    public static func run(title: String, transcript: String, material: Material = .captions) async -> Outcome {
         let status = AppleIntelligence.status
         guard status.isAvailable else { return .unavailable(status) }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
-            var failure = "The captions couldn't be read."
+            var failure = "The text couldn't be read."
             for limit in [7000, 3500] {
-                let session = LanguageModelSession(instructions: instructions)
+                let session = LanguageModelSession(instructions: material.instructions)
                 do {
                     let response = try await session.respond(
-                        to: "Video title: \(title)\n\nCaptions:\n\(String(transcript.prefix(limit)))",
+                        to: "\(material.labels.title): \(title)\n\n\(material.labels.body):\n\(String(transcript.prefix(limit)))",
                         generating: GeneratedRecipe.self
                     )
                     let content = response.content
@@ -66,12 +91,12 @@ public enum TranscriptRecipeExtractor {
                 } catch let error as LanguageModelSession.GenerationError {
                     switch error {
                     case .exceededContextWindowSize:
-                        failure = "The video's captions are too long for the on-device model."
+                        failure = "The text is too long for the on-device model."
                         continue
                     case .guardrailViolation:
-                        return .failed("Apple Intelligence declined to read these captions.")
+                        return .failed("Apple Intelligence declined to read this text.")
                     case .unsupportedLanguageOrLocale:
-                        return .failed("Apple Intelligence doesn't support this video's language.")
+                        return .failed("Apple Intelligence doesn't support this language.")
                     case .assetsUnavailable:
                         return .unavailable(.modelNotReady)
                     default:

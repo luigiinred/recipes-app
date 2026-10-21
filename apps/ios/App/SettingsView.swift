@@ -23,6 +23,7 @@ struct SettingsView: View {
         Group {
             if splitsPages { split } else { stack }
         }
+        .appTheme()
         #if os(iOS)
         .fullScreenCover(isPresented: $showingTour) { OnboardingView { showingTour = false } }
         #else

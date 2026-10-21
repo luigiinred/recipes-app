@@ -59,6 +59,7 @@ enum Appearance: String, CaseIterable, Identifiable {
     /// The page color for the themes that bring their own; the others use the system's.
     var canvas: Color? {
         switch self {
+        case .dark: Color(white: 0.15)
         case .black: .black
         case .sepia: Color(red: 0.957, green: 0.925, blue: 0.847)
         default: nil
@@ -68,6 +69,7 @@ enum Appearance: String, CaseIterable, Identifiable {
     /// Cards, rows and fields sitting on the canvas.
     var surface: Color? {
         switch self {
+        case .dark: Color(white: 0.21)
         case .black: Color(white: 0.09)
         case .sepia: Color(red: 0.984, green: 0.965, blue: 0.918)
         default: nil

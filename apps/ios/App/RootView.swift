@@ -106,34 +106,20 @@ struct SearchTab: View {
 struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
-    @State private var collection: RecipeCollection
 
     init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
+        var path = path
+        if path.isEmpty {
+            if collection != .all { path.append(.collection(collection)) }
+            if let selection { path.append(.recipe(selection)) }
+        }
         _path = State(initialValue: path)
-        _selection = State(initialValue: selection)
-        _collection = State(initialValue: collection)
     }
 
+    /// Home, then a collection or category, then a recipe, each pushed onto one stack. On iPad the first two are grids and a recipe fills the screen.
     var body: some View {
-        Group {
-            if sizeClass == .regular { columns } else { stack }
-        }
-        .onChange(of: router.recipeID, initial: true) { _, id in
-            guard let id else { return }
-            if sizeClass == .regular {
-                selection = id
-            } else {
-                path = [.recipe(id)]
-            }
-            router.recipeID = nil
-        }
-    }
-
-    /// iPhone: home, then folders, then a recipe, each pushed onto one stack.
-    private var stack: some View {
         NavigationStack(path: $path) {
             RecipesHomeView(selection: $selection)
                 .navigationDestination(for: RecipesRoute.self) { destination($0) }
@@ -143,23 +129,11 @@ struct RecipesTab: View {
             path.append(.recipe(id))
             selection = nil
         }
-    }
-
-    /// iPad: the recipes in the chosen collection or category, and the recipe itself.
-    private var columns: some View {
-        NavigationSplitView {
-            RecipeListView(collection: $collection, selection: $selection, showsFolders: false, showsFilter: true)
-                .reviewPromptInset()
-                .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
-                .toolbar(removing: .sidebarToggle)
-        } detail: {
-            if let recipe = library.recipe(id: selection) {
-                RecipeDetailView(recipe: recipe).id(recipe.id)
-            } else {
-                ContentUnavailableView("Select a recipe", systemImage: "fork.knife")
-            }
+        .onChange(of: router.recipeID, initial: true) { _, id in
+            guard let id else { return }
+            path = [.recipe(id)]
+            router.recipeID = nil
         }
-        .ignoresSafeArea(.container, edges: .top)
     }
 
     @ViewBuilder
@@ -175,9 +149,7 @@ struct RecipesTab: View {
 
 struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var path: [UUID] = []
-    @State private var selection: Recipe.ID?
     @State private var mode: PlanMode
     private let showsSmartPlan: Bool
 
@@ -187,27 +159,13 @@ struct PlanTab: View {
     }
 
     var body: some View {
-        if sizeClass == .regular {
-            NavigationSplitView {
-                PlanView(mode: $mode, open: { selection = $0 }, showsSmartPlan: showsSmartPlan)
-                    .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 480)
-                    .toolbar(removing: .sidebarToggle)
-            } detail: {
-                if let recipe = library.recipe(id: selection) {
-                    RecipeDetailView(recipe: recipe).id(recipe.id)
-                } else {
-                    ContentUnavailableView("Select a recipe", systemImage: "calendar")
-                }
-            }
-        } else {
-            NavigationStack(path: $path) {
-                PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
-                    .navigationDestination(for: UUID.self) { id in
-                        if let recipe = library.recipe(id: id) {
-                            RecipeDetailView(recipe: recipe)
-                        }
+        NavigationStack(path: $path) {
+            PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+                .navigationDestination(for: UUID.self) { id in
+                    if let recipe = library.recipe(id: id) {
+                        RecipeDetailView(recipe: recipe)
                     }
-            }
+                }
         }
     }
 }
@@ -218,26 +176,36 @@ struct GroceriesTab: View {
     var body: some View {
         NavigationStack {
             if sizeClass == .regular {
-                HStack(spacing: 0) {
-                    GroceriesView(layout: .toBuy, embedded: true)
-                    Divider()
-                    GroceriesView(layout: .completed, embedded: true)
-                }
-                .navigationTitle("Groceries")
-                .toolbar { GroceriesMenu() }
+                GroceriesBoard()
             } else {
                 GroceriesView(layout: .combined)
             }
         }
     }
 }
-#else
+#endif
+
+/// To buy beside completed, for screens wide enough to show both.
+struct GroceriesBoard: View {
+    var body: some View {
+        HStack(spacing: 0) {
+            GroceriesView(layout: .toBuy, embedded: true)
+            Divider()
+            GroceriesView(layout: .completed, embedded: true)
+        }
+        .navigationTitle("Groceries")
+        .toolbar { GroceriesMenu() }
+    }
+}
+
+#if os(macOS)
 struct RootView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
 
     @State private var section: AppSection?
+    @State private var path: [Recipe.ID]
     @State private var selection: Recipe.ID?
     @State private var entrySelection: FeedEntry.ID?
     @State private var collection: RecipeCollection
@@ -247,7 +215,7 @@ struct RootView: View {
     init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil, entrySelection: FeedEntry.ID? = nil, planMode: PlanMode = .queue) {
         _planMode = State(initialValue: planMode)
         _section = State(initialValue: section)
-        _selection = State(initialValue: selection)
+        _path = State(initialValue: selection.map { [$0] } ?? [])
         _entrySelection = State(initialValue: entrySelection)
         if case .recipes(let collection) = section {
             _collection = State(initialValue: collection)
@@ -256,47 +224,56 @@ struct RootView: View {
         }
     }
 
+    /// The sidebar picks a section; a recipe opened from it fills the rest of the window.
     var body: some View {
         NavigationSplitView {
             SidebarView(section: $section, addingFeed: $addingFeed)
-        } content: {
-            switch section ?? .recipes(.all) {
-            case .recipes:
-                RecipeListView(collection: $collection, selection: $selection)
-            case .feed(let id):
-                if let feed = library.feeds.first(where: { $0.id == id }) {
-                    FeedEntriesList(feed: feed, selection: $entrySelection).id(feed.id)
-                }
-            case .plan:
-                PlanView(mode: $planMode, open: { selection = $0 })
-            case .groceries:
-                GroceriesView(layout: .toBuy)
-            }
         } detail: {
-            switch section ?? .recipes(.all) {
-            case .groceries:
-                GroceriesView(layout: .completed)
-            case .feed(let id):
-                FeedDetail(feedID: id, entryID: entrySelection)
-            default:
-                if let recipe = library.recipe(id: selection) {
-                    RecipeDetailView(recipe: recipe).id(recipe.id)
-                } else {
-                    ContentUnavailableView("Select a recipe", systemImage: "fork.knife")
-                }
+            NavigationStack(path: $path) {
+                sectionRoot
+                    .navigationDestination(for: Recipe.ID.self) { id in
+                        if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+                    }
             }
         }
         .onChange(of: section) { _, new in
             if case .recipes(let newCollection) = new { collection = newCollection }
             entrySelection = nil
+            path = []
+        }
+        .onChange(of: selection) { _, id in
+            guard let id else { return }
+            path.append(id)
+            selection = nil
         }
         .sheet(isPresented: $addingFeed) { AddFeedSheet() }
         .cookModeCover(cook)
         .onChange(of: router.recipeID, initial: true) { _, id in
             guard let id else { return }
             section = .recipes(.all)
-            selection = id
+            path = [id]
             router.recipeID = nil
+        }
+    }
+
+    @ViewBuilder
+    private var sectionRoot: some View {
+        switch section ?? .recipes(.all) {
+        case .recipes:
+            RecipeListView(collection: $collection, selection: $selection)
+        case .feed(let id):
+            if let feed = library.feeds.first(where: { $0.id == id }) {
+                HStack(spacing: 0) {
+                    FeedEntriesList(feed: feed, selection: $entrySelection).frame(width: 320)
+                    Divider()
+                    FeedDetail(feedID: id, entryID: entrySelection)
+                }
+                .id(feed.id)
+            }
+        case .plan:
+            PlanView(mode: $planMode, open: { path.append($0) })
+        case .groceries:
+            GroceriesBoard()
         }
     }
 }

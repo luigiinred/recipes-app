@@ -33,6 +33,11 @@ struct ThemeSnapshotTests {
         with(.black) { assertPageSnapshots(of: GroceriesView(layout: .combined)) }
     }
 
+    @Test("dark, lighter than pitch black")
+    func dark() {
+        with(.dark) { assertPageSnapshots(of: GroceriesView(layout: .combined)) }
+    }
+
     @Test("sepia")
     func sepia() {
         with(.sepia) { assertPageSnapshots(of: GroceriesView(layout: .combined), coverage: .sheet) }

@@ -12,6 +12,7 @@ struct ImportURLView: View {
     @State private var isLoading = false
     @StateObject private var progress = ImportProgressModel()
     @State private var errorMessage: String?
+    @State private var offersAppleIntelligence = false
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,7 @@ struct ImportURLView: View {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red)
                 }
+                if offersAppleIntelligence { appleIntelligenceRow }
                 }
             }
             .formStyle(.grouped)
@@ -61,7 +63,23 @@ struct ImportURLView: View {
         #endif
     }
 
-    private func importRecipe() {
+    private var appleIntelligenceRow: some View {
+        let status = AppleIntelligence.status
+        return Section {
+            Button { importRecipe(usingAppleIntelligence: true) } label: {
+                Label("Try with Apple Intelligence", systemImage: "apple.intelligence")
+            }
+            .disabled(!status.isAvailable)
+        } footer: {
+            Text(status.isAvailable
+                 ? "Reads the page's text on this device and writes the recipe out for you to check."
+                 : status.explanation)
+        }
+    }
+
+    private func importRecipe() { importRecipe(usingAppleIntelligence: false) }
+
+    private func importRecipe(usingAppleIntelligence: Bool) {
         guard !isLoading else { return }
         var text = address.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.contains("://") { text = "https://" + text }
@@ -71,10 +89,13 @@ struct ImportURLView: View {
         }
         isLoading = true
         errorMessage = nil
+        offersAppleIntelligence = false
         progress.reset()
         Task {
             do {
-                let result = try await RecipeImporter.importResult(from: url, progress: progress.report)
+                let result = usingAppleIntelligence
+                    ? try await RecipeImporter.importResultWithAppleIntelligence(from: url, progress: progress.report)
+                    : try await RecipeImporter.importResult(from: url, progress: progress.report)
                 if !reviewImports, result.isComplete, let saved = await library.add(result) {
                     dismiss()
                     onSaved(saved)
@@ -84,6 +105,8 @@ struct ImportURLView: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
+                offersAppleIntelligence = (error as? RecipeError) == .invalid(RecipeImporter.noRecipeMessage)
+                    || (usingAppleIntelligence && YouTubeImporter.videoID(from: url) == nil)
                 isLoading = false
             }
         }

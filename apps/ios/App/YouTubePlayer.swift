@@ -121,19 +121,30 @@ struct YouTubeEmbed: View {
     var startAt = 0
     /// How far the page has scrolled past its resting position; the video shrinks and pins to the top, playing or not.
     var scrolled: CGFloat = 0
+    /// The height of the scroll view the page sits in, so the pinned video can dock at the bottom.
+    var viewportHeight: CGFloat = 0
     /// A small player without the "Open in YouTube" row.
     var isCompact = false
     @State private var width: CGFloat = 0
     @State private var aspect: Double = 16 / 9
+    @State private var corner = MiniCorner.topTrailing
+    @State private var drag = CGSize.zero
 
     private static let maxHeight: CGFloat = 560
     private static let compactMaxHeight: CGFloat = 150
     private static let pinMargin: CGFloat = 8
     private static let shrinkDistance: CGFloat = 160
+    private static let pageInset: CGFloat = 24
 
     private var miniScale: CGFloat {
         guard width > 0 else { return 1 }
         return min(1, (width < 500 ? 168 : 280) / width)
+    }
+
+    /// How far the pinned video sits below the top edge once it has docked at the bottom of the screen.
+    private var bottomDock: CGFloat {
+        guard viewportHeight > 0, width > 0 else { return 0 }
+        return viewportHeight - min(width / aspect, Self.maxHeight) * miniScale - 2 * Self.pinMargin - Self.pageInset
     }
 
     var body: some View {
@@ -153,8 +164,10 @@ struct YouTubeEmbed: View {
             .frame(maxWidth: .infinity)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .task(id: videoID) { aspect = await Self.ratio(for: videoID) }
-            .scaleEffect(1 - (1 - miniScale) * progress, anchor: .topTrailing)
-            .offset(y: max(0, scrolled - Self.pinMargin))
+            .overlay(alignment: .top) { if progress >= 1, !isCompact { dragHandle } }
+            .scaleEffect(1 - (1 - miniScale) * progress, anchor: corner.isLeading ? .topLeading : .topTrailing)
+            .offset(y: max(0, scrolled - Self.pinMargin + (corner.isBottom ? (bottomDock + Self.pinMargin) * progress : 0)))
+            .offset(drag)
             .shadow(color: .black.opacity(isCompact ? 0.25 : 0.3 * progress), radius: isCompact ? 8 : 10 * progress, y: 4)
 
             if let message = controller.errorMessage {
@@ -166,6 +179,29 @@ struct YouTubeEmbed: View {
                     .foregroundStyle(Theme.accent)
             }
         }
+    }
+
+    /// Web views swallow touches, so the pinned video is moved by a handle along its top edge.
+    private var dragHandle: some View {
+        Color.clear
+            .frame(height: 56)
+            .overlay(alignment: .top) {
+                Capsule().fill(.white.opacity(0.7)).frame(width: 56, height: 6).padding(.top, 10)
+                    .shadow(color: .black.opacity(0.4), radius: 2)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { drag = $0.translation }
+                    .onEnded { value in
+                        let end = value.predictedEndTranslation
+                        withAnimation(.spring(duration: 0.35)) {
+                            corner = corner.moved(by: end)
+                            drag = .zero
+                        }
+                    }
+            )
+            .accessibilityLabel("Move video")
     }
 
     @MainActor private static var known: [String: Double] = [:]
@@ -193,5 +229,25 @@ struct YouTubeEmbed: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play video")
+    }
+}
+
+/// Where the pinned video docks while the page scrolls.
+private enum MiniCorner {
+    case topLeading, topTrailing, bottomLeading, bottomTrailing
+
+    var isLeading: Bool { self == .topLeading || self == .bottomLeading }
+    var isBottom: Bool { self == .bottomLeading || self == .bottomTrailing }
+
+    /// A swipe of more than a short flick sends the video to the side or edge it points at.
+    func moved(by swipe: CGSize) -> MiniCorner {
+        let leading = swipe.width < -60 ? true : swipe.width > 60 ? false : isLeading
+        let bottom = swipe.height > 60 ? true : swipe.height < -60 ? false : isBottom
+        switch (leading, bottom) {
+        case (true, false): return .topLeading
+        case (false, false): return .topTrailing
+        case (true, true): return .bottomLeading
+        case (false, true): return .bottomTrailing
+        }
     }
 }
