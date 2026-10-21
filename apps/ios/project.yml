@@ -15,7 +15,7 @@ settings:
     RECIPES_ICLOUD_CONTAINER: ${RECIPES_ICLOUD_CONTAINER}
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.1"
-    CURRENT_PROJECT_VERSION: "10"
+    CURRENT_PROJECT_VERSION: "11"
 targets:
   Recipes:
     type: application
