@@ -34,6 +34,7 @@ struct PlanView: View {
 }
 
 struct QueueView: View {
+    @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     let open: (UUID) -> Void
@@ -51,7 +52,7 @@ struct QueueView: View {
                     .themedRow()
                     .swipeActions(edge: .leading) {
                         Button { planning = recipe } label: { Label("Plan", systemImage: "calendar.badge.plus") }
-                            .tint(Theme.accent)
+                            .tint(accent)
                     }
                     .swipeActions(edge: .trailing) {
                         Button { madeIt(recipe) } label: { Label("Made It", systemImage: "checkmark.circle") }
@@ -75,12 +76,11 @@ struct QueueView: View {
         .animation(.snappy, value: queue.map(\.id))
         .overlay {
             if queue.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing in Up Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                } description: {
-                    Text("Swipe a recipe left in your library, or tap Add, to line up what you want to cook soon.")
-                } actions: {
-                    Button("Add Recipes") { adding = true }.buttonStyle(.borderedProminent)
+                MascotEmptyState(
+                    mascot: .tomatoBooks, title: "Nothing in Up Next",
+                    message: "Swipe a recipe left in your library, or tap Add, to line up what you want to cook soon."
+                ) {
+                    Button("Add Recipes") { adding = true }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)
                 }
             }
         }

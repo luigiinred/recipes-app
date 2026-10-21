@@ -96,7 +96,7 @@ struct MyWeekView: View {
             }
             Spacer()
         }
-        .foregroundStyle(isToday ? Theme.accent : .primary)
+        .foregroundStyle(isToday ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.primary))
         .textCase(nil)
     }
 

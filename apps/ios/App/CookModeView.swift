@@ -5,6 +5,7 @@ import UIKit
 #endif
 
 struct CookModeView: View {
+    @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var session: CookSession
     @EnvironmentObject private var timers: TimerCenter
@@ -38,8 +39,7 @@ struct CookModeView: View {
                             stepContent(recipe, fontSize: phone ? 28 : 36)
                         }
                     } else {
-                        ContentUnavailableView("Nothing to cook", systemImage: "flame",
-                                               description: Text("Add a recipe to start cooking."))
+                        MascotEmptyState(mascot: .wokEmpty, title: "Nothing to cook", message: "Start cooking from a recipe's page.")
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {
@@ -125,7 +125,6 @@ struct CookModeView: View {
                     .font(.system(size: fontSize))
                     .lineSpacing(fontSize * 0.25)
                     .fixedSize(horizontal: false, vertical: true)
-                    .tint(Theme.accent)
                     .textRenderer(TimerPillRenderer())
                     .environment(\.openURL, OpenURLAction { url in
                         guard url.scheme == Self.timerScheme,
@@ -169,10 +168,10 @@ struct CookModeView: View {
             case .timer(let seconds, let label):
                 var pill = AttributedString("\u{00A0}\u{23F2}\u{FE0E}\u{00A0}\(label.replacingOccurrences(of: " ", with: "\u{00A0}"))\u{00A0}")
                 pill.link = URL(string: "\(Self.timerScheme)://start?seconds=\(seconds)")
-                pill.foregroundColor = Theme.accent
+                pill.foregroundColor = accent
                 parts.append(Text(pill).customAttribute(TimerPill()))
             case .ingredient:
-                parts.append(Text(String(text[range])).fontWeight(.semibold).foregroundColor(Theme.accent))
+                parts.append(Text(String(text[range])).fontWeight(.semibold).foregroundStyle(Theme.accent))
             }
             cursor = range.upperBound
         }
@@ -217,7 +216,7 @@ private struct TimerPillRenderer: TextRenderer {
             let pill = line.filter { $0[TimerPill.self] != nil }.map(\.typographicBounds.rect)
             if let first = pill.first {
                 let rect = pill.dropFirst().reduce(first) { $0.union($1) }.insetBy(dx: 0, dy: -2)
-                context.fill(Path(roundedRect: rect, cornerRadius: rect.height / 2), with: .color(Theme.accent.opacity(0.14)))
+                context.fill(Path(roundedRect: rect, cornerRadius: rect.height / 2), with: .color(context.environment.appAccent.opacity(0.14)))
             }
             for run in line { context.draw(run) }
         }
@@ -295,6 +294,7 @@ struct TimerStrip: View {
 }
 
 private struct TimerChip: View {
+    @Environment(\.appAccent) private var accent
     let timer: CookTimer
     let remaining: Int
     let dismiss: () -> Void
@@ -315,7 +315,7 @@ private struct TimerChip: View {
         }
         .foregroundStyle(done ? .white : .primary)
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .glassEffect(done ? .regular.tint(Theme.accent) : .regular, in: Capsule())
+        .glassEffect(done ? .regular.tint(accent) : .regular, in: Capsule())
     }
 }
 
@@ -333,7 +333,7 @@ struct IngredientChecklist: View {
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
+                                    .foregroundStyle(checked.contains(index) ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                                 IngredientLine(text: text).font(.system(.title3)).strikethrough(checked.contains(index))
                                 Spacer()
                             }

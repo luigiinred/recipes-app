@@ -19,6 +19,7 @@ extension AppSettings {
 }
 
 struct StarRatingView: View {
+    @Environment(\.appAccent) private var accent
     let rating: Int?
     var size: CGFloat = 22
     var onChange: ((Int?) -> Void)?
@@ -29,7 +30,7 @@ struct StarRatingView: View {
                 let filled = star <= (rating ?? 0)
                 Image(systemName: filled ? "star.fill" : "star")
                     .font(.system(size: size))
-                    .foregroundStyle(filled ? Theme.accent : Color.secondary.opacity(0.5))
+                    .foregroundStyle(filled ? accent : Color.secondary.opacity(0.5))
                     .contentShape(Rectangle())
                     .onTapGesture { onChange?(rating == star ? nil : star) }
                     .symbolEffect(.bounce, value: rating == star)
@@ -70,6 +71,7 @@ struct RecipeQuickActions: View {
 /// Swipe a recipe row left for Up Next, Favorite and, when turned on in Settings, Delete. The buttons stay open until tapped.
 /// Inside a category, Remove Tag takes the recipe out of it.
 struct RecipeSwipeActions: ViewModifier {
+    @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showsDelete = false
@@ -96,7 +98,7 @@ struct RecipeSwipeActions: ViewModifier {
                     } label: {
                         Label(recipe.isFavorite ? "Unfavorite" : "Favorite", systemImage: recipe.isFavorite ? "heart.slash" : "heart")
                     }
-                    .tint(Theme.accent)
+                    .tint(accent)
                 }
                 Button {
                     Task { await library.setQueued(recipe, !recipe.wantToCook) }

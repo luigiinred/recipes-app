@@ -564,7 +564,7 @@ struct UnitMenu: View {
             }
         } label: {
             Text(unit?.abbreviation ?? "unit")
-                .foregroundStyle(unit == nil ? Color.secondary : Theme.accent)
+                .foregroundStyle(unit == nil ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(Theme.accent))
                 .frame(minWidth: 54)
         }
         #if os(macOS)

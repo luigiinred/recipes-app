@@ -118,13 +118,13 @@ struct RecipeListView: View {
         .animation(.snappy, value: items.map(\.id))
         .overlay {
             if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+                MascotEmptyState(mascot: .tomatoWave, title: "No recipes yet",
+                                 message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
             } else if items.isEmpty, search.isEmpty {
                 #if os(iOS)
-                if subcategories.isEmpty { ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet.")) }
+                if subcategories.isEmpty { MascotEmptyState(mascot: .tomatoSpoon, title: collection.title, message: "No recipes here yet.") }
                 #else
-                ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet."))
+                MascotEmptyState(mascot: .tomatoSpoon, title: collection.title, message: "No recipes here yet.")
                 #endif
             } else if items.isEmpty {
                 ContentUnavailableView.search(text: search)
@@ -198,7 +198,12 @@ private struct RecipeActionsModifier: ViewModifier {
         content
         .overlay {
             if isScanning {
-                ProgressView("Reading recipe…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 4) {
+                    TomatoWokLoader(height: 120)
+                    Text("Reading recipe…").font(.headline)
+                }
+                .padding(20)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
         }
         .toolbar {
@@ -371,8 +376,8 @@ struct RecipesHomeView: View {
         }
         .overlay {
             if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+                MascotEmptyState(mascot: .tomatoWave, title: "No recipes yet",
+                                 message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
             }
         }
         .themedCanvas()
@@ -437,6 +442,7 @@ struct RecipeMeta: View {
 
 struct RecipeCard: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.appAccent) private var accent
     let recipe: Recipe
 
     private var hasPhoto: Bool { library.hasImage(recipe.id) }
@@ -468,7 +474,7 @@ struct RecipeCard: View {
             if hasPhoto {
                 RecipeImageView(recipe: recipe)
             } else {
-                LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                LinearGradient(colors: [accent, accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 Image(systemName: "fork.knife")
                     .font(.system(size: 56)).foregroundStyle(.white.opacity(0.22))
             }

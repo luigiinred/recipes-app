@@ -6,6 +6,7 @@ final class ShareModel: ObservableObject {
     enum State { case loading, review, saving, saved(Recipe, note: String?), failed(String) }
 
     @Published var state = State.loading
+    @Published private(set) var host: String?
     let progress = ImportProgressModel()
 
     private(set) var result: ImportResult?
@@ -17,6 +18,7 @@ final class ShareModel: ObservableObject {
             state = .failed("No web page to import.")
             return
         }
+        host = url.host?.replacingOccurrences(of: "www.", with: "")
         do {
             let result = try await RecipeImporter.importResult(from: url, progress: progress.report)
             let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
@@ -69,12 +71,11 @@ struct ShareView: View {
         Group {
             switch model.state {
             case .loading:
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Reading recipe…").font(.headline)
-                    ImportProgressView(model: model.progress)
+                ScrollView {
+                    ImportLoadingView(title: "Reading recipe…", subtitle: model.host, model: model.progress, cancel: cancel)
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 320)
-                .padding(20)
+                .scrollBounceBehavior(.basedOnSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .review:
                 if let result = model.result {
@@ -90,36 +91,48 @@ struct ShareView: View {
                     .transition(.opacity)
                 }
             case .saving:
-                VStack(spacing: 12) { ProgressView(); Text("Saving…") }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 8) {
+                    TomatoWokLoader(height: 150)
+                    Text("Saving…").font(.system(.title3, weight: .bold))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .saved(let recipe, let note):
                 VStack(spacing: 14) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(.green)
-                        .symbolEffect(.bounce, value: recipe.id)
-                    Text("Saved \"\(recipe.title)\"").multilineTextAlignment(.center).font(.headline)
+                    MascotCluster(height: 150)
+                    Text("Recipe added!").font(.system(.title, weight: .bold))
+                    Text("\(recipe.title) has been added to your cookbook.")
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Text(note ?? "It will sync to your other devices through iCloud.")
                         .font(.caption).foregroundStyle(note == nil ? Color.secondary : Color.orange).multilineTextAlignment(.center)
-                    HStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         Button { openApp(RecipeLink.url(for: recipe.id)) } label: { Label("Open in Recipes", systemImage: "arrow.up.forward.app") }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(PaperButtonStyle())
                             .keyboardShortcut(.defaultAction)
                         Button("Done", action: finish)
-                            .buttonStyle(.bordered)
+                            .buttonStyle(PaperButtonStyle(prominent: false))
                     }
+                    .frame(maxWidth: 320)
+                    .padding(.top, 6)
                 }
-                .padding(20)
+                .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .sensoryFeedback(.success, trigger: recipe.id)
             case .failed(let message):
                 VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 44)).foregroundStyle(.orange)
-                    Text(message).multilineTextAlignment(.center)
-                    Button("Done", action: cancel).buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    MascotView(mascot: .tomatoTablet, height: 130)
+                    Text("Couldn't import that").font(.system(.title3, weight: .bold))
+                    Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Button("Done", action: cancel)
+                        .buttonStyle(PaperButtonStyle())
+                        .keyboardShortcut(.defaultAction)
+                        .frame(maxWidth: 320)
+                        .padding(.top, 6)
                 }
-                .padding(20)
+                .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .paperBackground()
         .animation(.snappy, value: model.state.tag)
         .tint(Theme.defaultAccent)
         .task { await model.load(url: await loadURL()) }

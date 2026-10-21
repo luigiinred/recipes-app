@@ -371,7 +371,7 @@ private struct IntelligenceSettingsPage: View {
     private func statusRow(_ title: String, ready: Bool) -> some View {
         LabeledContent {
             Label(ready ? "Ready" : "Not available", systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
-                .foregroundStyle(ready ? Theme.accent : Color.secondary)
+                .foregroundStyle(ready ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary))
         } label: {
             Text(title)
         }
