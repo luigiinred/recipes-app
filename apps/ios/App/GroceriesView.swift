@@ -69,7 +69,7 @@ struct GroceriesView: View {
             HStack(spacing: 12) {
                 Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(item.isChecked ? Theme.accent : .secondary)
+                    .foregroundStyle(item.isChecked ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(.system(.body, weight: .medium))
                     if !item.quantity.isEmpty {
@@ -109,7 +109,7 @@ struct AddToGroceriesSheet: View {
                     HStack(spacing: 12) {
                         Image(systemName: skipped.contains(index) ? "circle" : "checkmark.circle.fill")
                             .font(.title3)
-                            .foregroundStyle(skipped.contains(index) ? Color.secondary : Theme.accent)
+                            .foregroundStyle(skipped.contains(index) ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(Theme.accent))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(parts.name).font(.system(.body, weight: .medium))
                             if !parts.quantity.isEmpty {

@@ -442,6 +442,7 @@ struct RecipeMeta: View {
 
 struct RecipeCard: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.appAccent) private var accent
     let recipe: Recipe
 
     private var hasPhoto: Bool { library.hasImage(recipe.id) }
@@ -473,7 +474,7 @@ struct RecipeCard: View {
             if hasPhoto {
                 RecipeImageView(recipe: recipe)
             } else {
-                LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                LinearGradient(colors: [accent, accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 Image(systemName: "fork.knife")
                     .font(.system(size: 56)).foregroundStyle(.white.opacity(0.22))
             }

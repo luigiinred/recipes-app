@@ -34,6 +34,7 @@ struct PlanView: View {
 }
 
 struct QueueView: View {
+    @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     let open: (UUID) -> Void
@@ -51,7 +52,7 @@ struct QueueView: View {
                     .themedRow()
                     .swipeActions(edge: .leading) {
                         Button { planning = recipe } label: { Label("Plan", systemImage: "calendar.badge.plus") }
-                            .tint(Theme.accent)
+                            .tint(accent)
                     }
                     .swipeActions(edge: .trailing) {
                         Button { madeIt(recipe) } label: { Label("Made It", systemImage: "checkmark.circle") }

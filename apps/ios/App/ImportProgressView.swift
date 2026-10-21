@@ -76,7 +76,7 @@ struct ImportProgressView: View {
         switch state {
         case .waiting: Image(systemName: "circle").foregroundStyle(.tertiary)
         case .running: ProgressView().controlSize(.small)
-        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor).symbolEffect(.bounce, value: state)
+        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent).symbolEffect(.bounce, value: state)
         case .skipped: Image(systemName: "minus.circle").foregroundStyle(.tertiary)
         }
     }

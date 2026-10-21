@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RecipeImageView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.appAccent) private var accent
     let recipe: Recipe
 
     @State private var loaded: CGImage?
@@ -11,7 +12,7 @@ struct RecipeImageView: View {
         let image = library.cachedThumbnail(for: recipe.id) ?? loaded
         ZStack {
             LinearGradient(
-                colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)],
+                colors: [accent.opacity(0.22), accent.opacity(0.08)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
             Image(systemName: "fork.knife").font(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))

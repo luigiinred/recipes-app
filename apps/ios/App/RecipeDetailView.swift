@@ -3,6 +3,7 @@ import RecipeKit
 import SwiftUI
 
 struct RecipeDetailView: View {
+    @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     let recipe: Recipe
@@ -297,9 +298,9 @@ struct RecipeDetailView: View {
                 Text(title).font(.caption.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(prominent ? Color.white : Theme.accent)
+            .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
             .glassEffect(
-                prominent ? .regular.tint(Theme.accent).interactive() : .regular.tint(Theme.accent.opacity(0.1)).interactive(),
+                prominent ? .regular.tint(accent).interactive() : .regular.tint(accent.opacity(0.1)).interactive(),
                 in: RoundedRectangle(cornerRadius: 18)
             )
         }
