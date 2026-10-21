@@ -86,6 +86,8 @@ targets:
       - App/AppSettings.swift
       - App/Theme.swift
       - App/RecipeLink.swift
+      - App/Mascot.swift
+      - App/Assets.xcassets
     dependencies:
       - package: RecipeKit
         product: RecipeKit
