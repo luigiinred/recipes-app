@@ -118,13 +118,13 @@ struct RecipeListView: View {
         .animation(.snappy, value: items.map(\.id))
         .overlay {
             if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+                MascotEmptyState(mascot: .tomatoWave, title: "No recipes yet",
+                                 message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
             } else if items.isEmpty, search.isEmpty {
                 #if os(iOS)
-                if subcategories.isEmpty { ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet.")) }
+                if subcategories.isEmpty { MascotEmptyState(mascot: .tomatoSpoon, title: collection.title, message: "No recipes here yet.") }
                 #else
-                ContentUnavailableView(collection.title, systemImage: collection.symbol, description: Text("No recipes here yet."))
+                MascotEmptyState(mascot: .tomatoSpoon, title: collection.title, message: "No recipes here yet.")
                 #endif
             } else if items.isEmpty {
                 ContentUnavailableView.search(text: search)
@@ -376,8 +376,8 @@ struct RecipesHomeView: View {
         }
         .overlay {
             if library.recipes.isEmpty {
-                ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
-                                       description: Text("Tap + to add one, or use the recipes command-line tool."))
+                MascotEmptyState(mascot: .tomatoWave, title: "No recipes yet",
+                                 message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
             }
         }
         .themedCanvas()

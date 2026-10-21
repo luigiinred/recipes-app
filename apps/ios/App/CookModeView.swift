@@ -38,8 +38,7 @@ struct CookModeView: View {
                             stepContent(recipe, fontSize: phone ? 28 : 36)
                         }
                     } else {
-                        ContentUnavailableView("Nothing to cook", systemImage: "flame",
-                                               description: Text("Add a recipe to start cooking."))
+                        MascotEmptyState(mascot: .wokEmpty, title: "Nothing to cook", message: "Start cooking from a recipe's page.")
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {

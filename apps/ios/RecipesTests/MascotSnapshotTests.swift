@@ -16,8 +16,8 @@ struct MascotSnapshotTests {
     func importLoading() {
         let model = ImportProgressModel()
         model.apply(.plan(["Fetching the page", "Parsing recipe details", "Finding ingredients", "Adding to your cookbook"]))
-        model.apply(.began(0)); model.apply(.finished(0)); model.apply(.began(1)); model.apply(.finished(1)); model.apply(.began(2))
-        let page = ImportLoadingView(title: "Importing recipe…", subtitle: "allrecipes.com", model: model, cancel: {})
+        model.apply(.finished(0)); model.apply(.finished(1))
+        let page = ImportLoadingView(title: "Importing recipe…", subtitle: "allrecipes.com", model: model, cancel: {}, mascotFrame: 2)
         assertPageSnapshots(of: page.paperBackground(), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .screen)
     }
 

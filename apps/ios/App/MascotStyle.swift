@@ -105,10 +105,12 @@ struct ImportLoadingView: View {
     @ObservedObject var model: ImportProgressModel
     var cancel: (() -> Void)?
     var mascotHeight: CGFloat = 170
+    /// Holds one wok frame for previews and snapshots.
+    var mascotFrame: Int?
 
     var body: some View {
         VStack(spacing: 18) {
-            TomatoWokLoader(height: mascotHeight)
+            TomatoWokLoader(height: mascotHeight, frame: mascotFrame)
             VStack(spacing: 6) {
                 Text(title).font(.system(.title2, weight: .bold)).multilineTextAlignment(.center)
                 if let subtitle {
