@@ -50,6 +50,7 @@ final class ImportProgressModel: ObservableObject {
 
 struct ImportProgressView: View {
     @ObservedObject var model: ImportProgressModel
+    @Environment(\.appAccent) private var accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -76,7 +77,7 @@ struct ImportProgressView: View {
         switch state {
         case .waiting: Image(systemName: "circle").foregroundStyle(.tertiary)
         case .running: ProgressView().controlSize(.small)
-        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent).symbolEffect(.bounce, value: state)
+        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(accent).symbolEffect(.bounce, value: state)
         case .skipped: Image(systemName: "minus.circle").foregroundStyle(.tertiary)
         }
     }

@@ -19,6 +19,7 @@ extension AppSettings {
 }
 
 struct StarRatingView: View {
+    @Environment(\.appAccent) private var accent
     let rating: Int?
     var size: CGFloat = 22
     var onChange: ((Int?) -> Void)?
@@ -29,7 +30,7 @@ struct StarRatingView: View {
                 let filled = star <= (rating ?? 0)
                 Image(systemName: filled ? "star.fill" : "star")
                     .font(.system(size: size))
-                    .foregroundStyle(filled ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary.opacity(0.5)))
+                    .foregroundStyle(filled ? accent : Color.secondary.opacity(0.5))
                     .contentShape(Rectangle())
                     .onTapGesture { onChange?(rating == star ? nil : star) }
                     .symbolEffect(.bounce, value: rating == star)

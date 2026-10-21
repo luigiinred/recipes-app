@@ -37,7 +37,7 @@ struct PaperButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(.headline, weight: .semibold))
             .frame(maxWidth: .infinity, minHeight: 50)
-            .foregroundStyle(prominent ? Color.white : Theme.accent)
+            .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
             .background {
                 if prominent {
                     RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.accent)

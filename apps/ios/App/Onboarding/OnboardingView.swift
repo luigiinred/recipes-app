@@ -2,6 +2,7 @@ import RecipeKit
 import SwiftUI
 
 struct OnboardingView: View {
+    @Environment(\.appAccent) private var accent
     enum Step: Int, CaseIterable {
         case welcome, share, organize, cook, add, tryIt, discover
     }
@@ -232,7 +233,7 @@ struct OnboardingView: View {
     private func stage<Content: View>(decorations: [Mascot], @ViewBuilder content: () -> Content) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [Theme.accent.opacity(0.14), Theme.accent.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+                .fill(LinearGradient(colors: [accent.opacity(0.14), accent.opacity(0.04)], startPoint: .top, endPoint: .bottom))
             GeometryReader { geometry in
                 ForEach(Array(decorations.enumerated()), id: \.offset) { index, mascot in
                     MascotView(mascot: mascot, height: 36)
@@ -294,7 +295,7 @@ struct OnboardingView: View {
                     Image(systemName: saved != nil ? "checkmark.circle.fill" : "arrow.down.circle.fill")
                         .font(.title)
                         .symbolRenderingMode(.palette)
-                        .foregroundStyle(saved != nil ? Color.white : Color.white, saved != nil ? Theme.accent : Color.black.opacity(0.45))
+                        .foregroundStyle(Color.white, saved != nil ? accent : Color.black.opacity(0.45))
                         .symbolEffect(.bounce, value: saved != nil)
                         .padding(10)
                 }
@@ -326,7 +327,7 @@ struct OnboardingView: View {
             RecipeImageView(recipe: saved)
         } else {
             ZStack {
-                LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                LinearGradient(colors: [accent.opacity(0.22), accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 if let cover = covers[source.id] {
                     Image(decorative: cover, scale: 1).resizable().scaledToFill().transition(.opacity)
                 } else if isLoadingPreviews, previews[source.id] == nil {
@@ -415,7 +416,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 ForEach(Step.allCases, id: \.self) { item in
                     Capsule()
-                        .fill(item == step ? Theme.accent : Color.secondary.opacity(0.3))
+                        .fill(item == step ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary.opacity(0.3)))
                         .frame(width: item == step ? 22 : 8, height: 8)
                 }
             }
@@ -527,13 +528,14 @@ private struct CookStepCard: View {
 
 /// A stand-in for Safari's share sheet with Save to Recipes highlighted.
 private struct ShareSheetMock: View {
+    @Environment(\.appAccent) private var accent
     let cover: CGImage?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 ZStack {
-                    LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(colors: [accent.opacity(0.22), accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     if let cover { Image(decorative: cover, scale: 1).resizable().scaledToFill() }
                 }
                 .frame(width: 56, height: 56)
@@ -551,7 +553,7 @@ private struct ShareSheetMock: View {
                 appIcon("message.fill", "Messages", .green)
                 appIcon("envelope.fill", "Mail", .blue)
                 appIcon("note.text", "Notes", .yellow)
-                appIcon("fork.knife", "Save to Recipes", Theme.accent, highlighted: true)
+                appIcon("fork.knife", "Save to Recipes", accent, highlighted: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 16)
@@ -575,7 +577,7 @@ private struct ShareSheetMock: View {
                 }
             Text(name)
                 .font(.caption2.weight(highlighted ? .semibold : .regular))
-                .foregroundStyle(highlighted ? Theme.accent : .secondary)
+                .foregroundStyle(highlighted ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
