@@ -2,6 +2,7 @@ import RecipeKit
 import SwiftUI
 
 struct OnboardingView: View {
+    @Environment(\.appAccent) private var accent
     enum Step: Int, CaseIterable {
         case welcome, share, add, tryIt, discover
     }
@@ -221,7 +222,7 @@ struct OnboardingView: View {
                     Image(systemName: saved != nil ? "checkmark.circle.fill" : "arrow.down.circle.fill")
                         .font(.title)
                         .symbolRenderingMode(.palette)
-                        .foregroundStyle(saved != nil ? Color.white : Color.white, saved != nil ? Theme.accent : Color.black.opacity(0.45))
+                        .foregroundStyle(Color.white, saved != nil ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.black.opacity(0.45)))
                         .symbolEffect(.bounce, value: saved != nil)
                         .padding(10)
                 }
@@ -251,7 +252,7 @@ struct OnboardingView: View {
             RecipeImageView(recipe: saved)
         } else {
             ZStack {
-                LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                LinearGradient(colors: [accent.opacity(0.22), accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 if let cover = covers[source.id] {
                     Image(decorative: cover, scale: 1).resizable().scaledToFill().transition(.opacity)
                 } else if isLoadingPreviews, previews[source.id] == nil {
@@ -335,7 +336,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 ForEach(Step.allCases, id: \.self) { item in
                     Circle()
-                        .fill(item == step ? Theme.accent : Color.secondary.opacity(0.3))
+                        .fill(item == step ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary.opacity(0.3)))
                         .frame(width: 8, height: 8)
                 }
             }
@@ -402,13 +403,14 @@ private struct TryCard: View {
 
 /// A stand-in for Safari's share sheet with Save to Recipes highlighted.
 private struct ShareSheetMock: View {
+    @Environment(\.appAccent) private var accent
     let cover: CGImage?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 ZStack {
-                    LinearGradient(colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(colors: [accent.opacity(0.22), accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     if let cover { Image(decorative: cover, scale: 1).resizable().scaledToFill() }
                 }
                 .frame(width: 56, height: 56)
@@ -426,7 +428,7 @@ private struct ShareSheetMock: View {
                 appIcon("message.fill", "Messages", .green)
                 appIcon("envelope.fill", "Mail", .blue)
                 appIcon("note.text", "Notes", .yellow)
-                appIcon("fork.knife", "Save to Recipes", Theme.accent, highlighted: true)
+                appIcon("fork.knife", "Save to Recipes", accent, highlighted: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 16)
@@ -450,7 +452,7 @@ private struct ShareSheetMock: View {
                 }
             Text(name)
                 .font(.caption2.weight(highlighted ? .semibold : .regular))
-                .foregroundStyle(highlighted ? Theme.accent : .secondary)
+                .foregroundStyle(highlighted ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

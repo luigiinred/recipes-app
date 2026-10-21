@@ -12,12 +12,22 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
     }
 
-    @Test("iPad: Recipes sidebar with nothing selected")
+    @Test("iPad: Recipes home as a grid of collections and categories")
     func iPadRecipesHome() {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .iPad)
     }
 
-    @Test("iPad: a category picked in the sidebar, its recipes, and a recipe beside them")
+    @Test("iPad: a category's recipes as a grid")
+    func iPadCategoryGrid() {
+        assertPageSnapshots(of: RootView(tab: .recipes, recipesCollection: .category("Dinner")), inNavigationStack: false, coverage: .iPad)
+    }
+
+    @Test("iPad: a category holding recipes shows photo cards")
+    func iPadRecipeCards() {
+        assertPageSnapshots(of: RootView(tab: .recipes, recipesCollection: .category("Dinner/Mains")), inNavigationStack: false, coverage: .iPad)
+    }
+
+    @Test("iPad: a recipe opened full screen from its category")
     func iPadRecipeSelected() {
         assertPageSnapshots(
             of: RootView(tab: .recipes, recipeSelection: SampleData.chili.id, recipesCollection: .category("Dinner")),
@@ -25,7 +35,7 @@ struct AppScreenSnapshotTests {
         )
     }
 
-    @Test("iPad: Plan, My Week beside the open recipe")
+    @Test("iPad: Plan, My Week")
     func iPadPlan() {
         assertPageSnapshots(of: RootView(tab: .plan, planMode: .week), inNavigationStack: false, coverage: .iPad)
     }

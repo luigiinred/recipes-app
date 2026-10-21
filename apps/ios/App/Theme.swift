@@ -1,10 +1,26 @@
 import SwiftUI
 
 enum Theme {
-    /// The tint applied at the root, so changing the accent color in Settings recolors everything that uses it.
-    static let accent = Color.accentColor
+    /// The accent chosen in Settings, resolved from the environment wherever it is drawn, so sheets, covers and the Mac follow it too.
+    static let accent = AccentStyle()
     static let defaultAccentHex = "DB4738"
     static var defaultAccent: Color { Color(hex: defaultAccentHex) ?? .red }
+}
+
+private struct AppAccentKey: EnvironmentKey {
+    static let defaultValue = Color(hex: Theme.defaultAccentHex) ?? .red
+}
+
+extension EnvironmentValues {
+    /// The accent color as a `Color`, for the few places a style won't do (gradients, glass, swipe actions).
+    var appAccent: Color {
+        get { self[AppAccentKey.self] }
+        set { self[AppAccentKey.self] = newValue }
+    }
+}
+
+struct AccentStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color { environment.appAccent }
 }
 
 enum Appearance: String, CaseIterable, Identifiable {
@@ -130,9 +146,11 @@ private struct AppThemeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let appearance = Appearance(rawValue: appearanceRaw) ?? .system
+        let accent = Color(hex: accentHex) ?? Theme.defaultAccent
         content
             .environment(\.appearance, appearance)
-            .tint(Color(hex: accentHex) ?? Theme.defaultAccent)
+            .environment(\.appAccent, accent)
+            .tint(accent)
             .fontDesign((FontStyle(rawValue: fontRaw) ?? .serif).design)
             .preferredColorScheme(appearance.colorScheme)
             #if os(iOS) && !SHARE_EXTENSION
