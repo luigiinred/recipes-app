@@ -43,6 +43,8 @@ struct MyWeekView: View {
                 }
             }
             .listStyle(.plain)
+            .themedCanvas()
+            .animation(.snappy, value: library.mealPlan.map(\.id))
         }
         .onAppear { jumpToToday() }
         .toolbar {
@@ -105,7 +107,7 @@ struct MyWeekView: View {
             HStack(spacing: 12) {
                 Image(systemName: entry.meal.symbol).foregroundStyle(Theme.accent).frame(width: 24)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(entry.title).font(.system(.body, design: .serif))
+                    Text(entry.title).font(.system(.body))
                     Text(entry.meal.title).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -113,6 +115,7 @@ struct MyWeekView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .themedRow()
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { Task { await library.remove(entry) } } label: { Label("Remove", systemImage: "trash") }
         }
@@ -147,6 +150,7 @@ struct MyWeekView: View {
                 .foregroundStyle(Theme.accent)
         }
         .buttonStyle(.plain)
+        .themedRow()
         .accessibilityLabel("Add meal on \(day.formatted(.dateTime.weekday(.wide)))")
     }
 

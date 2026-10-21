@@ -48,15 +48,19 @@ struct QueueView: View {
             ForEach(queue) { recipe in
                 Button { open(recipe.id) } label: { RecipeRow(recipe: recipe) }
                     .buttonStyle(.plain)
+                    .themedRow()
                     .swipeActions(edge: .leading) {
                         Button { planning = recipe } label: { Label("Plan", systemImage: "calendar.badge.plus") }
                             .tint(Theme.accent)
                     }
                     .swipeActions(edge: .trailing) {
+                        Button { madeIt(recipe) } label: { Label("Made It", systemImage: "checkmark.circle") }
+                            .tint(.green)
                         Button { remove(recipe) } label: { Label("Remove", systemImage: "minus.circle") }
                             .tint(.orange)
                     }
                     .contextMenu {
+                        Button("Made It", systemImage: "checkmark.circle") { madeIt(recipe) }
                         Button("Plan…", systemImage: "calendar.badge.plus") { planning = recipe }
                         Button("Cook", systemImage: "frying.pan") { cook.start(recipe) }
                             .disabled(recipe.steps.isEmpty)
@@ -67,6 +71,7 @@ struct QueueView: View {
             .onMove { source, destination in Task { await library.moveQueued(from: source, to: destination) } }
         }
         .listStyle(.plain)
+        .themedCanvas()
         .animation(.snappy, value: queue.map(\.id))
         .overlay {
             if queue.isEmpty {
@@ -93,6 +98,10 @@ struct QueueView: View {
 
     private func remove(_ recipe: Recipe) {
         Task { await library.setQueued(recipe, false) }
+    }
+
+    private func madeIt(_ recipe: Recipe) {
+        Task { await library.logMade(recipe) }
     }
 }
 

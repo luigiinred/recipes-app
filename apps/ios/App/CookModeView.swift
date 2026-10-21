@@ -11,12 +11,12 @@ struct CookModeView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingIngredients = false
-    @State private var addingRecipe = false
-    @State private var addingTimer = false
 
     private var recipe: Recipe? { library.recipe(id: session.current) }
 
     private static let margin: CGFloat = 20
+    /// Room at the bottom of a step so its last line can scroll clear of the floating buttons.
+    private static let floatingControlsClearance: CGFloat = 96
     private static let timerScheme = "recipes-timer"
 
     var body: some View {
@@ -48,8 +48,8 @@ struct CookModeView: View {
                             .id(recipe.id)
                     }
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if let recipe { controls(recipe, wide: wide, short: short) }
+                .overlay(alignment: .bottom) {
+                    if let recipe { controls(recipe, wide: wide) }
                 }
                 .toolbar { toolbarContent }
             }
@@ -58,12 +58,11 @@ struct CookModeView: View {
             #endif
         }
         .background(.background)
+        .themedCanvas()
         .keepsScreenAwake()
         .sheet(isPresented: $showingIngredients) {
             if let recipe { IngredientsSheet(recipe: recipe) }
         }
-        .sheet(isPresented: $addingTimer) { AddTimerSheet(defaultLabel: recipe?.title ?? "Timer") }
-        .sheet(isPresented: $addingRecipe) { CookRecipePicker() }
         #if os(macOS)
         .frame(minWidth: 760, minHeight: 600)
         #endif
@@ -76,25 +75,6 @@ struct CookModeView: View {
                 .accessibilityLabel("Close Cook Mode")
         }
         ToolbarItem(placement: .principal) { titleView }
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button { addingTimer = true } label: { Label("Add Timer", systemImage: "timer") }
-            Menu {
-                if session.queue.count > 1 {
-                    ForEach(session.queue, id: \.self) { id in
-                        if let queued = library.recipe(id: id) {
-                            Button { session.current = id } label: {
-                                Label(queued.title, systemImage: id == session.current ? "checkmark" : "")
-                            }
-                        }
-                    }
-                    Divider()
-                }
-                Button("Add Recipe…", systemImage: "plus") { addingRecipe = true }
-                if let id = session.current {
-                    Button("Remove from Cook Mode", systemImage: "minus.circle", role: .destructive) { session.remove(id) }
-                }
-            } label: { Label("More", systemImage: "ellipsis") }
-        }
     }
 
     private var titleView: some View {
@@ -160,7 +140,7 @@ struct CookModeView: View {
             }
             .padding(.horizontal, Self.margin)
             .padding(.top, 12)
-            .padding(.bottom, 20)
+            .padding(.bottom, Self.floatingControlsClearance)
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
@@ -201,7 +181,7 @@ struct CookModeView: View {
     }
 
     @ViewBuilder
-    private func controls(_ recipe: Recipe, wide: Bool, short: Bool) -> some View {
+    private func controls(_ recipe: Recipe, wide: Bool) -> some View {
         let showsTimers = !timers.timers.isEmpty
         if showsTimers || !wide {
             ZStack(alignment: .bottomTrailing) {
@@ -323,7 +303,7 @@ private struct TimerChip: View {
         let done = remaining == 0
         HStack(spacing: 8) {
             Text(done ? "Done" : formatTimer(remaining))
-                .font(.system(.headline, design: .rounded, weight: .semibold)).monospacedDigit()
+                .font(.system(.headline, weight: .semibold)).monospacedDigit()
             Text(timer.label)
                 .font(.caption).lineLimit(1)
                 .foregroundStyle(done ? .white.opacity(0.85) : .secondary)
@@ -336,50 +316,6 @@ private struct TimerChip: View {
         .foregroundStyle(done ? .white : .primary)
         .padding(.horizontal, 14).padding(.vertical, 8)
         .glassEffect(done ? .regular.tint(Theme.accent) : .regular, in: Capsule())
-    }
-}
-
-struct AddTimerSheet: View {
-    @EnvironmentObject private var timers: TimerCenter
-    @Environment(\.dismiss) private var dismiss
-    let defaultLabel: String
-
-    @State private var label = ""
-    @State private var minutes = 10
-    @State private var seconds = 0
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Label", text: $label, prompt: Text(defaultLabel))
-                Stepper("Minutes: \(minutes)", value: $minutes, in: 0...600)
-                Stepper("Seconds: \(seconds)", value: $seconds, in: 0...59, step: 5)
-                Section {
-                    HStack {
-                        ForEach([1, 5, 10, 15, 30], id: \.self) { preset in
-                            Button("\(preset)m") { minutes = preset; seconds = 0 }.buttonStyle(.bordered)
-                        }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            .navigationTitle("New Timer")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { CancelButton() }
-                ToolbarItem(placement: .confirmationAction) {
-                    ConfirmButton(title: "Start", isDisabled: minutes == 0 && seconds == 0) {
-                        timers.start(label: label.isEmpty ? defaultLabel : label, seconds: minutes * 60 + seconds)
-                        dismiss()
-                    }
-                }
-            }
-        }
-        #if os(macOS)
-        .frame(minWidth: 400, minHeight: 320)
-        #endif
     }
 }
 
@@ -398,12 +334,13 @@ struct IngredientChecklist: View {
                             HStack(spacing: 12) {
                                 Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(checked.contains(index) ? Theme.accent : .secondary)
-                                IngredientLine(text: text).font(.system(.title3, design: .serif)).strikethrough(checked.contains(index))
+                                IngredientLine(text: text).font(.system(.title3)).strikethrough(checked.contains(index))
                                 Spacer()
                             }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .conversionMenu(for: text)
                     }
                 }
             }
@@ -423,7 +360,8 @@ struct CookStepIngredients: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("FOR THIS STEP").font(.caption.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary)
                 ForEach(used, id: \.self) { index in
-                    IngredientLine(text: recipe.ingredients[index]).font(.system(.title3, design: .serif))
+                    IngredientLine(text: recipe.ingredients[index]).font(.system(.title3))
+                        .conversionMenu(for: recipe.ingredients[index])
                 }
             }
             .padding(14)
@@ -445,36 +383,6 @@ struct IngredientsSheet: View {
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .toolbar { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
-        }
-        #if os(macOS)
-        .frame(minWidth: 420, minHeight: 480)
-        #endif
-    }
-}
-
-struct CookRecipePicker: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @EnvironmentObject private var session: CookSession
-    @Environment(\.dismiss) private var dismiss
-    @State private var search = ""
-
-    var body: some View {
-        NavigationStack {
-            List(library.recipes.filter { $0.matches(search) && !$0.steps.isEmpty }) { recipe in
-                Button {
-                    session.start(recipe)
-                    dismiss()
-                } label: {
-                    Text(recipe.title).font(.system(.body, design: .serif))
-                }
-                .buttonStyle(.plain)
-            }
-            .persistentSearch(text: $search, prompt: "Search recipes")
-            .navigationTitle("Add to Cook Mode")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar { ToolbarItem(placement: .cancellationAction) { CancelButton() } }
         }
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 480)

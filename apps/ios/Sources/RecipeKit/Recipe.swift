@@ -11,6 +11,19 @@ public struct IngredientSection: Codable, Hashable, Sendable {
     }
 }
 
+/// One entry in a recipe's timeline: a time you cooked it, with an optional note about how it went.
+public struct TimelineEvent: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var date: Date
+    public var note: String
+
+    public init(id: UUID = UUID(), date: Date = Date(), note: String = "") {
+        self.id = id
+        self.date = date
+        self.note = note
+    }
+}
+
 public struct Recipe: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var title: String
@@ -37,6 +50,8 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
     public var wantToCook: Bool
     /// When the recipe joined the queue, so the queue stays in the order things were added.
     public var queuedAt: Date?
+    /// The times the recipe was cooked, in the order they were logged.
+    public var timeline: [TimelineEvent]
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -60,6 +75,7 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         rating: Int? = nil,
         wantToCook: Bool = false,
         queuedAt: Date? = nil,
+        timeline: [TimelineEvent] = [],
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -82,6 +98,7 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         self.rating = rating
         self.wantToCook = wantToCook
         self.queuedAt = queuedAt
+        self.timeline = timeline
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -108,9 +125,13 @@ public struct Recipe: Codable, Identifiable, Hashable, Sendable {
         rating = try c.decodeIfPresent(Int.self, forKey: .rating)
         wantToCook = try c.decodeIfPresent(Bool.self, forKey: .wantToCook) ?? false
         queuedAt = try c.decodeIfPresent(Date.self, forKey: .queuedAt)
+        timeline = try c.decodeIfPresent([TimelineEvent].self, forKey: .timeline) ?? []
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? now
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? now
     }
+
+    /// The most recent time the recipe was cooked.
+    public var lastMade: Date? { timeline.map(\.date).max() }
 
     public func timestamp(forStep index: Int) -> Int? {
         stepTimestamps.indices.contains(index) ? stepTimestamps[index] : nil

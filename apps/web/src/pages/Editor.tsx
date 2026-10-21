@@ -159,7 +159,7 @@ function Editor({
     if (link && !safeHref(link)) return setError("The source should be a web address starting with http:// or https://.");
 
     const input: RecipeInput = {
-      ...(recipe ? { id: recipe.id, createdAt: recipe.createdAt, isFavorite: recipe.isFavorite, rating: recipe.rating, wantToCook: recipe.wantToCook, queuedAt: recipe.queuedAt, imageURL: recipe.imageURL } : { imageURL: imported?.draft?.imageURL }),
+      ...(recipe ? { id: recipe.id, createdAt: recipe.createdAt, isFavorite: recipe.isFavorite, rating: recipe.rating, wantToCook: recipe.wantToCook, queuedAt: recipe.queuedAt, timeline: recipe.timeline, imageURL: recipe.imageURL } : { imageURL: imported?.draft?.imageURL }),
       title: draft.title,
       summary: draft.summary,
       servings: numberOrNull(draft.servings),

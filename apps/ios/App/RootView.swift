@@ -81,9 +81,11 @@ struct SearchTab: View {
         NavigationStack(path: $path) {
             List(results) { recipe in
                 NavigationLink(value: recipe.id) { RecipeRow(recipe: recipe) }
+                    .themedRow()
                     .recipeSwipeActions(for: recipe)
             }
             .listStyle(.plain)
+            .themedCanvas()
             .overlay {
                 if query.isEmpty {
                     ContentUnavailableView("Search Recipes", systemImage: "magnifyingglass",
@@ -315,7 +317,7 @@ struct SidebarView: View {
                 ForEach(RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites), id: \.self) { row($0) }
                 ForEach(library.categoryTree) { categoryRows($0) }
             } header: {
-                Text("Recipes").font(.system(.title2, design: .serif, weight: .bold)).foregroundStyle(.primary)
+                Text("Recipes").font(.system(.title2, weight: .bold)).foregroundStyle(.primary)
             }
             if AppFeatures.feeds {
             Section("Feeds") {

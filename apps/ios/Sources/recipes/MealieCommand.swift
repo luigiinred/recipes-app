@@ -47,7 +47,7 @@ struct MealieCommand: AsyncParsableCommand {
             return
         }
         print("Synced \(root.root.path) with \(url.absoluteString)")
-        for (name, counts) in [("recipes", report.recipes), ("photos", report.photos), ("meal plan", report.mealPlan), ("groceries", report.groceries)] {
+        for (name, counts) in [("recipes", report.recipes), ("photos", report.photos), ("meal plan", report.mealPlan), ("groceries", report.groceries), ("timeline", report.timeline)] {
             print("  \(name): sent \(counts.sent), received \(counts.received), deleted in Mealie \(counts.deletedInMealie), deleted here \(counts.deletedHere)")
             if counts.conflicts > 0 { print("    \(counts.conflicts) edited on both sides (the later edit was kept)") }
         }

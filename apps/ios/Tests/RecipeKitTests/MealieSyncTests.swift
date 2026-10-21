@@ -280,4 +280,76 @@ final class MealieSyncTests: XCTestCase {
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
+
+    // MARK: - Timeline
+
+    private let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+
+    func testCookedItEventsGoToMealiesTimelineAndSetLastMade() async throws {
+        var recipe = Recipe(title: "Pasta", steps: ["Boil."])
+        recipe.timeline = [TimelineEvent(date: earlier, note: "Needed salt")]
+        try save(recipe)
+        let report = try await makeSync().sync()
+        XCTAssertEqual(report.timeline.sent, 1)
+        XCTAssertEqual(mealie.timelineMessages(of: "Pasta"), ["Needed salt"])
+        XCTAssertEqual(mealie.lastMade.values.first, earlier)
+    }
+
+    func testEventsLoggedInMealieComeBackAndMealieSystemEventsDoNot() async throws {
+        try save(Recipe(title: "Pasta", steps: ["Boil."]))
+        let sync = makeSync()
+        try await sync.sync()
+        mealie.addTimelineEvent(recipe: "Pasta", message: "Great with garlic", date: earlier)
+        mealie.addTimelineEvent(recipe: "Pasta", message: "Recipe created", date: earlier, type: "system")
+        let report = try await sync.sync()
+        XCTAssertEqual(report.timeline.received, 1)
+        XCTAssertEqual(try recipes().first?.timeline.map(\.note), ["Great with garlic"])
+        XCTAssertEqual(try recipes().first?.timeline.first?.date, earlier)
+    }
+
+    func testTimelineSyncSettlesWithoutDuplicatesOrRepeatedRecipePushes() async throws {
+        var recipe = Recipe(title: "Pasta", steps: ["Boil."])
+        recipe.timeline = [TimelineEvent(date: earlier, note: "First")]
+        try save(recipe)
+        mealie.add(name: "Stew", steps: ["Simmer."])
+        mealie.addTimelineEvent(recipe: "Stew", message: "Hearty", date: earlier)
+        let sync = makeSync()
+        try await sync.sync()
+        try await sync.sync()
+        let report = try await sync.sync()
+        XCTAssertFalse(report.changedAnything, "\(report)")
+        XCTAssertEqual(mealie.timelineMessages(of: "Pasta"), ["First"])
+        XCTAssertEqual(try recipes().first { $0.title == "Stew" }?.timeline.count, 1)
+    }
+
+    func testAnEventAlreadyInBothPlacesIsNotDuplicated() async throws {
+        var recipe = Recipe(title: "Pasta", steps: ["Boil."])
+        recipe.timeline = [TimelineEvent(date: earlier, note: "Same night")]
+        try save(recipe)
+        mealie.add(name: "Pasta", steps: ["Boil."])
+        mealie.addTimelineEvent(recipe: "Pasta", message: "Same night", date: earlier)
+        try await makeSync().sync()
+        XCTAssertEqual(mealie.timelineMessages(of: "Pasta"), ["Same night"])
+        XCTAssertEqual(try recipes().first?.timeline.count, 1)
+    }
+
+    func testDeletingAnEventOnOneSideDeletesItOnTheOther() async throws {
+        var recipe = Recipe(title: "Pasta", steps: ["Boil."])
+        recipe.timeline = [TimelineEvent(date: earlier, note: "One"), TimelineEvent(date: earlier.addingTimeInterval(86_400), note: "Two")]
+        let saved = try save(recipe)
+        let sync = makeSync()
+        try await sync.sync()
+
+        var trimmed = try XCTUnwrap(try recipes().first)
+        trimmed.timeline.removeAll { $0.note == "One" }
+        try save(trimmed)
+        var report = try await sync.sync()
+        XCTAssertEqual(report.timeline.deletedInMealie, 1)
+        XCTAssertEqual(mealie.timelineMessages(of: "Pasta"), ["Two"])
+
+        mealie.removeTimelineEvents(of: "Pasta")
+        report = try await sync.sync()
+        XCTAssertEqual(report.timeline.deletedHere, 1)
+        XCTAssertEqual(try recipes().first { $0.id == saved.id }?.timeline, [])
+    }
 }

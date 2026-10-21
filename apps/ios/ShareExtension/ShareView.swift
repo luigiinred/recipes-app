@@ -121,7 +121,7 @@ struct ShareView: View {
             }
         }
         .animation(.snappy, value: model.state.tag)
-        .tint(Theme.accent)
+        .tint(Theme.defaultAccent)
         .task { await model.load(url: await loadURL()) }
     }
 }

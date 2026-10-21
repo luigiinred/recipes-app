@@ -18,6 +18,7 @@ struct MealieSettingsPage: View {
             if mealie.isConnected { connected } else { signIn }
         }
         .formStyle(.grouped)
+        .themedCanvas()
         .navigationTitle("Mealie")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -47,7 +48,7 @@ struct MealieSettingsPage: View {
         } header: {
             Text("Connect")
         } footer: {
-            Text("Sync your recipes, photos, planned meals and groceries with your own Mealie server. In Mealie, open your profile, choose API Tokens, and create one. Use https:// unless the server is on your home network.")
+            Text("Sync your recipes, photos, timelines, planned meals and groceries with your own Mealie server. In Mealie, open your profile, choose API Tokens, and create one. Use https:// unless the server is on your home network.")
         }
         Section {
             Button {
@@ -100,7 +101,7 @@ struct MealieSettingsPage: View {
             if case .synced(_, let problems) = mealie.status, !problems.isEmpty {
                 Text(problems.prefix(3).joined(separator: "\n"))
             } else {
-                Text("Recipes and photos always sync. Edits made in Mealie appear here within a couple of minutes.")
+                Text("Recipes, photos and timelines always sync. Edits made in Mealie appear here within a couple of minutes.")
             }
         }
         Section {

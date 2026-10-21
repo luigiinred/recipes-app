@@ -3,7 +3,7 @@ import RecipeKit
 import SwiftUI
 
 enum SettingsPage: Hashable {
-    case recipes, planner, cooking, groceries, intelligence, data
+    case recipes, planner, cooking, groceries, theme, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -37,6 +37,7 @@ struct SettingsView: View {
         NavigationStack {
             Form { rows }
                 .formStyle(.grouped)
+                .themedCanvas()
                 .navigationTitle("Settings")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
@@ -51,6 +52,7 @@ struct SettingsView: View {
     private var split: some View {
         NavigationSplitView {
             List(selection: $page) { rows }
+                .themedCanvas()
                 .navigationTitle("Settings")
                 .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
                 #if os(iOS)
@@ -70,6 +72,14 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
             NavigationLink(value: SettingsPage.groceries) { Label("Groceries", systemImage: "checklist") }
+        }
+        Section {
+            NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
+        }
+        Section {
+            NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
+        } header: {
+            Text("Sync")
         }
         Section {
             NavigationLink(value: SettingsPage.intelligence) { Label("Apple Intelligence", systemImage: "sparkles") }
@@ -113,6 +123,8 @@ struct SettingsView: View {
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
+        case .theme: ThemeSettingsPage()
+        case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
         }
@@ -137,7 +149,7 @@ private struct RecipesSettingsPage: View {
             } header: {
                 Text("Browsing")
             } footer: {
-                Text("Favorites are a heart on the recipes you love. Star ratings give each recipe one to five stars, and Top Rated lists the 4 and 5 star ones. Switching never deletes either.")
+                Text("Favorites are a heart on the recipes you love. Star ratings give each recipe one to five stars, and Top Rated lists the 4 and 5 star ones. Both are always in a recipe’s ⋯ menu, and switching never deletes either.")
             }
             Section {
                 Toggle("Show Delete", isOn: $showDeleteSwipe)
@@ -237,6 +249,102 @@ private struct GroceriesSettingsPage: View {
     }
 }
 
+struct ThemeSettingsPage: View {
+    @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
+    @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
+    @Environment(\.self) private var environment
+
+    private var customAccent: Binding<Color> {
+        Binding(
+            get: { Color(hex: accentHex) ?? Theme.defaultAccent },
+            set: { accentHex = $0.hex(in: environment) }
+        )
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                preview
+            }
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(Appearance.allCases) { Label($0.title, systemImage: $0.symbol).tag($0.rawValue) }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page.")
+            }
+            Section {
+                Picker("Font", selection: $fontStyle) {
+                    ForEach(FontStyle.allCases) { style in
+                        Text(style.title).fontDesign(style.design).tag(style.rawValue)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("Font")
+            } footer: {
+                Text("Used for recipes, lists and settings throughout the app. Text size still follows your device's settings.")
+            }
+            Section {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
+                    ForEach(AccentPreset.all) { preset in
+                        Button { accentHex = preset.hex } label: {
+                            Circle()
+                                .fill(preset.color)
+                                .frame(width: 36, height: 36)
+                                .overlay {
+                                    if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
+                                        Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.white)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(preset.name)
+                        .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
+                    }
+                }
+                .padding(.vertical, 4)
+                ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
+                Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
+                    .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
+            } header: {
+                Text("Accent color")
+            } footer: {
+                Text("Buttons, links, highlights and ratings.")
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Theme")
+    }
+
+    private var preview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sunday Sauce").font(.system(.title2, weight: .bold))
+            IngredientLine(text: "2 tbsp olive oil, plus more for serving")
+            Text("Simmer for 20 minutes, stirring now and then.").foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Label("Cook", systemImage: "frying.pan")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Theme.accent, in: Capsule())
+                    .foregroundStyle(.white)
+                Label("4.5", systemImage: "star.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct IntelligenceSettingsPage: View {
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     let override: (status: AppleIntelligence.Status, imagePlayground: Bool)?
@@ -295,13 +403,6 @@ private struct DataSettingsPage: View {
                 Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, and splits steps that were pasted as one block.")
             }
             Section {
-                NavigationLink { MealieSettingsPage() } label: { Label("Mealie", systemImage: "server.rack") }
-            } header: {
-                Text("Sync")
-            } footer: {
-                Text("Keep your recipes, planned meals and groceries in step with your own Mealie server.")
-            }
-            Section {
                 Button { Task { await prepareExport() } } label: {
                     Label("Export all data as JSON", systemImage: "square.and.arrow.up")
                 }
@@ -351,7 +452,8 @@ private struct DataSettingsPage: View {
 
 private extension View {
     func settingsPage(_ title: String) -> some View {
-        navigationTitle(title)
+        themedCanvas()
+            .navigationTitle(title)
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif

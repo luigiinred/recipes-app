@@ -13,8 +13,11 @@ struct RecipeEditorView: View {
     let onSave: (Recipe, ImageChange, StepImageChanges) -> Void
     /// Set where the editor isn't in a sheet it can dismiss, such as the share extension.
     var onCancel: (() -> Void)?
+    /// Called after the recipe is deleted from here, so the page behind the editor can close.
+    var onDelete: (() -> Void)?
 
     @EnvironmentObject private var library: RecipeLibrary
+    @State private var confirmingDelete = false
     @State private var pickedItem: PhotosPickerItem?
     @State private var imageChange = ImageChange.unchanged
 
@@ -40,10 +43,11 @@ struct RecipeEditorView: View {
 
     init(
         recipe: Recipe, scannedText: String? = nil, scannedTextTitle: String = "Scanned text", notice: String? = nil,
-        initialImage: Data? = nil, initialStepImages: [Data?] = [], onCancel: (() -> Void)? = nil,
+        initialImage: Data? = nil, initialStepImages: [Data?] = [], onCancel: (() -> Void)? = nil, onDelete: (() -> Void)? = nil,
         onSave: @escaping (Recipe, ImageChange, StepImageChanges) -> Void
     ) {
         self.onCancel = onCancel
+        self.onDelete = onDelete
         original = recipe
         self.scannedText = scannedText
         self.scannedTextTitle = scannedTextTitle
@@ -134,11 +138,8 @@ struct RecipeEditorView: View {
                     addButton("Add Step") { steps.append(newLine()) }
                 }
                 Section {
-                    if (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .favorites {
-                        Toggle(isOn: $isFavorite) { Label("Favorite", systemImage: "heart") }
-                    } else {
-                        LabeledContent { StarRatingView(rating: rating) { rating = $0 } } label: { Label("Rating", systemImage: "star") }
-                    }
+                    Toggle(isOn: $isFavorite) { Label("Favorite", systemImage: "heart") }
+                    LabeledContent { StarRatingView(rating: rating) { rating = $0 } } label: { Label("Rating", systemImage: "star") }
                     Toggle(isOn: $wantToCook) { Label("Up Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
                 }
                 Section {
@@ -167,6 +168,21 @@ struct RecipeEditorView: View {
                         Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
                     }
                 }
+                if isSaved {
+                    Section {
+                        Button("Delete Recipe…", role: .destructive) { confirmingDelete = true }
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .confirmationDialog("Delete “\(original.title)”?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete Recipe", role: .destructive) {
+                    Task { await library.delete(original) }
+                    onDelete?()
+                    if let onCancel { onCancel() } else { dismiss() }
+                }
+            } message: {
+                Text("This can't be undone. The recipe and its photo are removed from all your devices.")
             }
             .navigationTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
             #if os(iOS)
@@ -210,6 +226,9 @@ struct RecipeEditorView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(Theme.accent)
     }
+
+    /// Only a recipe that is already in the library can be deleted; a new or imported draft is simply cancelled.
+    private var isSaved: Bool { library.recipe(id: original.id) != nil }
 
     private var isVideoRecipe: Bool {
         URL(string: source).flatMap(YouTubeImporter.videoID(from:)) != nil

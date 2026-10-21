@@ -19,6 +19,7 @@ struct GroceriesView: View {
                 section(embedded ? "To Buy" : nil) {
                     TextField("Add item", text: $newItem)
                         .onSubmit(addItem)
+                        .themedRow()
                     ForEach(toBuy) { row($0) }
                 }
             }
@@ -29,6 +30,8 @@ struct GroceriesView: View {
             }
         }
         .listStyle(.plain)
+        .themedCanvas()
+        .animation(.snappy, value: toBuy.map(\.id) + completed.map(\.id))
         .overlay {
             if layout == .completed, completed.isEmpty {
                 ContentUnavailableView("Nothing completed", systemImage: "checkmark.circle")
@@ -80,6 +83,7 @@ struct GroceriesView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .themedRow()
         .contextMenu {
             Button("Delete", role: .destructive) { Task { await library.remove(item) } }
         }

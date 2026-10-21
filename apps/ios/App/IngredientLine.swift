@@ -1,5 +1,10 @@
 import RecipeKit
 import SwiftUI
+#if os(iOS)
+import UIKit
+#else
+import AppKit
+#endif
 
 /// An ingredient with its amount in bold, the item in the surrounding style, and its preparation in grey italics.
 struct IngredientLine: View {
@@ -31,5 +36,41 @@ struct IngredientLine: View {
             result += note
         }
         return result
+    }
+}
+
+extension View {
+    /// Press and hold an ingredient to see its amount in other units; choosing one copies it.
+    func conversionMenu(for text: String) -> some View {
+        modifier(ConversionMenu(text: text))
+    }
+}
+
+private struct ConversionMenu: ViewModifier {
+    let text: String
+
+    func body(content: Content) -> some View {
+        let ingredient = Ingredient(parsing: text)
+        let options = ingredient.conversions
+        if options.isEmpty {
+            content
+        } else {
+            content.contextMenu {
+                Section("\(ingredient.amount) is") {
+                    ForEach(options, id: \.self) { option in
+                        Button(option, systemImage: "doc.on.doc") { Self.copy(option) }
+                    }
+                }
+            }
+        }
+    }
+
+    private static func copy(_ text: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
     }
 }

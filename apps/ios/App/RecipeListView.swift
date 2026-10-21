@@ -92,6 +92,7 @@ struct RecipeListView: View {
                         }
                     }
                     .tag(recipe.id)
+                    .themedRow()
                     .listRowSeparator(style == .cards ? .hidden : .automatic)
                     .listRowSeparator(recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
@@ -113,6 +114,8 @@ struct RecipeListView: View {
             .listSectionSeparator(.hidden, edges: .top)
         }
         .listStyle(.plain)
+        .themedCanvas()
+        .animation(.snappy, value: items.map(\.id))
         .overlay {
             if library.recipes.isEmpty {
                 ContentUnavailableView("No recipes yet", systemImage: "fork.knife",
@@ -327,6 +330,7 @@ struct CategoryRow: View {
                 Label(node.name, systemImage: node.children.isEmpty ? "tag" : "folder")
             }
         }
+        .themedRow(raised: true)
         .dropDestination(for: RecipeDragItem.self) { items, _ in
             Task { for item in items { await library.addTag(item.id, to: node.path) } }
             return !items.isEmpty
@@ -356,6 +360,7 @@ struct RecipesHomeView: View {
                             Label(collection.title, systemImage: collection.symbol)
                         }
                     }
+                    .themedRow(raised: true)
                 }
             }
             if !library.categoryTree.isEmpty {
@@ -370,6 +375,7 @@ struct RecipesHomeView: View {
                                        description: Text("Tap + to add one, or use the recipes command-line tool."))
             }
         }
+        .themedCanvas()
         .navigationTitle("Recipes")
         .recipeActions(selection: $selection, listStyle: nil, showsSettings: true)
     }
@@ -396,14 +402,12 @@ extension View {
 }
 
 struct RecipeBadges: View {
-    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     let recipe: Recipe
 
     var body: some View {
         HStack(spacing: 6) {
-            if (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites {
-                if recipe.isFavorite { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Theme.accent) }
-            } else if let rating = recipe.rating {
+            if recipe.isFavorite { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Theme.accent) }
+            if let rating = recipe.rating {
                 HStack(spacing: 2) {
                     Image(systemName: "star.fill")
                     Text("\(rating)").monospacedDigit()
@@ -433,7 +437,6 @@ struct RecipeMeta: View {
 
 struct RecipeCard: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.ratingStyle) private var styleRaw = RatingStyle.favorites.rawValue
     let recipe: Recipe
 
     private var hasPhoto: Bool { library.hasImage(recipe.id) }
@@ -446,7 +449,7 @@ struct RecipeCard: View {
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(recipe.title)
-                        .font(.system(.title2, design: .serif, weight: .semibold))
+                        .font(.system(.title2, weight: .semibold))
                         .lineLimit(2)
                         .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
                     details
@@ -486,11 +489,10 @@ struct RecipeCard: View {
 
     @ViewBuilder
     private var badges: some View {
-        let showsFavorite = (RatingStyle(rawValue: styleRaw) ?? .favorites) == .favorites && recipe.isFavorite
-        if showsFavorite || recipe.wantToCook || (recipe.rating != nil && (RatingStyle(rawValue: styleRaw) ?? .favorites) == .stars) {
+        if recipe.isFavorite || recipe.wantToCook || recipe.rating != nil {
             HStack(spacing: 8) {
-                if showsFavorite { Image(systemName: "heart.fill").foregroundStyle(Theme.accent) }
-                if let rating = recipe.rating, (RatingStyle(rawValue: styleRaw) ?? .favorites) == .stars {
+                if recipe.isFavorite { Image(systemName: "heart.fill").foregroundStyle(Theme.accent) }
+                if let rating = recipe.rating {
                     Label("\(rating)", systemImage: "star.fill").foregroundStyle(Theme.accent).monospacedDigit()
                 }
                 if recipe.wantToCook { Image(systemName: "text.line.first.and.arrowtriangle.forward").foregroundStyle(.primary) }
@@ -512,7 +514,7 @@ struct RecipeRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(recipe.title).font(.system(.headline, design: .serif)).lineLimit(2)
+                    Text(recipe.title).font(.system(.headline)).lineLimit(2)
                     RecipeBadges(recipe: recipe)
                 }
                 if !recipe.summary.isEmpty {
