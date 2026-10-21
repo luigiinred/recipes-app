@@ -8,6 +8,20 @@ final class FeaturesTests: XCTestCase {
         XCTAssertFalse(Recipe(title: "Spaghetti", steps: ["Boil the pasta."]).isIdea)
     }
 
+    func testRecipesFittingACategory() {
+        let chili = Recipe(title: "Black Bean Chili", ingredients: ["1 can beans", "2 tbsp chili powder"], tags: ["Dinner/Mains"])
+        let minestrone = Recipe(title: "Minestrone Soup", ingredients: ["1 onion", "2 cups broth"])
+        let cake = Recipe(title: "Lemon Cake", ingredients: ["2 cups flour", "1 lemon"])
+        let lemonade = Recipe(title: "Pink Lemonade", ingredients: ["4 lemons", "1 cup sugar"], tags: ["Drink"])
+        let library = [chili, minestrone, cake, lemonade]
+
+        XCTAssertEqual(RecipeTags.recipes(fitting: "Soup", among: library).map(\.title), ["Black Bean Chili", "Minestrone Soup"])
+        XCTAssertEqual(RecipeTags.recipes(fitting: "Dessert", among: library).map(\.title), ["Lemon Cake"])
+        XCTAssertEqual(RecipeTags.recipes(fitting: "Lemons", among: library).map(\.title), ["Lemon Cake", "Pink Lemonade"])
+        XCTAssertEqual(RecipeTags.recipes(fitting: "Dinner/Mains", among: library).map(\.title), [])
+        XCTAssertEqual(RecipeTags.recipes(fitting: "Dinner", among: [chili]).map(\.title), [])
+    }
+
     func testDurationDetector() {
         func seconds(_ text: String) -> [Int] { DurationDetector.find(in: text).map(\.seconds) }
         XCTAssertEqual(seconds("Simmer for 10 minutes."), [600])

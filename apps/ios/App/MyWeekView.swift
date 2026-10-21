@@ -224,7 +224,7 @@ struct AddMealSheet: View {
                 .listStyle(.plain)
                 .overlay {
                     if library.recipes.isEmpty {
-                        ContentUnavailableView("No recipes yet", systemImage: "fork.knife")
+                        EmptyLibraryView()
                     } else if recipes.isEmpty {
                         ContentUnavailableView.search(text: search)
                     }

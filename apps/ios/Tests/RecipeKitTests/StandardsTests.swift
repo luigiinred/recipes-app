@@ -134,6 +134,20 @@ final class StepImageTests: XCTestCase {
         XCTAssertNil(library.stepImages.data(for: first))
     }
 
+    func testDeletingARecipeClearsItFromTheCalendar() throws {
+        let library = Library(root: root)
+        let saved = try library.recipes.save(Recipe(title: "Chili", wantToCook: true))
+        let other = try library.recipes.save(Recipe(title: "Soup"))
+        try library.mealPlan.save(MealPlanEntry(recipeID: saved.id, title: "Chili", day: "2026-10-21", meal: .dinner))
+        try library.mealPlan.save(MealPlanEntry(recipeID: other.id, title: "Soup", day: "2026-10-22", meal: .dinner))
+        try library.mealPlan.save(MealPlanEntry(title: "Takeout", day: "2026-10-23", meal: .dinner))
+
+        try library.deleteRecipe(saved)
+
+        XCTAssertEqual(try library.mealPlan.list().map(\.title).sorted(), ["Soup", "Takeout"])
+        XCTAssertEqual(try library.recipes.list().map(\.title), ["Soup"])
+    }
+
     func testDroppingAnEmptyStepKeepsImagesAligned() {
         let a = UUID(), c = UUID()
         let recipe = Recipe(title: "R", steps: ["One", " ", "Three"], stepImages: [a, UUID(), c]).standardized()

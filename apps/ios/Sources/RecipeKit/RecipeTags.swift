@@ -165,4 +165,20 @@ public enum RecipeTags {
             index + parts.count <= words.count && Array(words[index..<(index + parts.count)]) == parts
         }
     }
+
+    /// Recipes outside `category` that look like they belong in it: its name says what the dish is (soup, chicken,
+    /// dessert), or turns up in the recipe's title, summary, tags or ingredients.
+    public static func recipes(fitting category: String, among recipes: [Recipe]) -> [Recipe] {
+        let name = CategoryTree.components(category).last ?? category
+        let singular = name.lowercased().hasSuffix("s") ? String(name.dropLast()) : name
+        let generic = canonical(name) ?? canonical(singular)
+        let needles = words(in: name).map { $0.hasSuffix("s") ? String($0.dropLast()) : $0 }
+        return recipes.filter { recipe in
+            guard !recipe.tags.contains(where: { CategoryTree.tag($0, isIn: category) }) else { return false }
+            if let generic, suggest(for: recipe).contains(generic) || recipe.tags.contains(where: { canonical($0) == generic }) { return true }
+            let text = words(in: ([recipe.title, recipe.summary] + recipe.tags + recipe.ingredients).joined(separator: " "))
+            return !needles.isEmpty && needles.allSatisfy { needle in text.contains { $0 == needle || $0 == needle + "s" } }
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
 }

@@ -23,6 +23,8 @@ public struct ImportResult: Sendable {
 }
 
 public enum RecipeImporter {
+    public static let noRecipeMessage = "No recipe found on that page."
+
     public static func importResult(from url: URL, progress: ImportProgress? = nil) async throws -> ImportResult {
         if YouTubeImporter.videoID(from: url) != nil { return try await YouTubeImporter.importResult(from: url, progress: progress) }
         progress?(.plan(["Fetching the page", "Reading the recipe", "Downloading photos"]))
@@ -52,7 +54,7 @@ public enum RecipeImporter {
         try recipe(fromHTML: try await fetchHTML(from: url), sourceURL: url)
     }
 
-    private static func fetchHTML(from url: URL) async throws -> String {
+    static func fetchHTML(from url: URL) async throws -> String {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -100,7 +102,7 @@ public enum RecipeImporter {
                 return recipe
             }
         }
-        throw RecipeError.invalid("No recipe found on that page.")
+        throw RecipeError.invalid(noRecipeMessage)
     }
 
     static func openGraphImage(in html: String, base: URL?) -> String? {

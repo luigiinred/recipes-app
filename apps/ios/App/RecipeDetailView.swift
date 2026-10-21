@@ -16,10 +16,11 @@ struct RecipeDetailView: View {
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
     @State private var generatingImage = false
-    @State private var scrollRequest = 0
+    @State private var viewportHeight: CGFloat = 0
     @State private var scrolled: CGFloat = 0
     @State private var topInset: CGFloat = 0
     @State private var sidePaneScrolled = false
+    @State private var titleScrolledAway = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
@@ -36,12 +37,13 @@ struct RecipeDetailView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
         .background(.background)
         .themedCanvas()
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }
         }
-        .navigationTitle("")
+        .navigationTitle(titleScrolledAway ? recipe.title : "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -94,38 +96,39 @@ struct RecipeDetailView: View {
     }
 
     private var oneColumn: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if recipe.youTubeVideoID != nil {
-                        video.padding([.horizontal, .top], 24)
-                    } else if hasArtwork {
-                        titleBanner
-                    }
-                    VStack(alignment: .leading, spacing: 24) {
-                        header(showsTitle: !hasArtwork)
-                        if recipe.isIdea {
-                            ideaNote
-                        } else {
-                            TwoPaneLayout {
-                                ingredients
-                                steps
-                            }
-                        }
-                        footer
-                    }
-                    .padding(24)
-                    .frame(maxWidth: 900, alignment: .leading)
-                    .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if recipe.youTubeVideoID != nil {
+                    video.padding([.horizontal, .top], 24)
+                } else if hasArtwork {
+                    titleBanner
                 }
-                .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 24) {
+                    header(showsTitle: !hasArtwork)
+                    if recipe.isIdea {
+                        ideaNote
+                    } else {
+                        TwoPaneLayout {
+                            ingredients
+                            steps
+                        }
+                    }
+                    footer
+                }
+                .padding(24)
+                .frame(maxWidth: 900, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-            .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
+            .textSelection(.enabled)
+        }
+        .ignoresSafeArea(edges: hasArtwork ? .top : [])
+        .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 60 } action: { _, scrolledAway in
+            titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
         }
     }
 
-    /// The title at the top of the page over the photo, which reaches up under the status bar.
+    /// The title at the top of the page over the photo, which runs up behind the navigation bar.
     private var titleBanner: some View {
         Text(recipe.title)
             .font(.system(.largeTitle, weight: .bold))
@@ -133,7 +136,8 @@ struct RecipeDetailView: View {
             .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
             .lineLimit(4)
             .padding(24)
-            .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+            .padding(.top, topInset)
+            .frame(maxWidth: .infinity, minHeight: 200 + topInset, alignment: .topLeading)
             .background {
                 ZStack {
                     Color.clear.overlay { artwork }.clipped()
@@ -147,21 +151,18 @@ struct RecipeDetailView: View {
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
     private func twoColumns(width: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        if recipe.youTubeVideoID != nil { video }
-                        header(showsTitle: true)
-                        steps
-                        footer
-                    }
-                    .padding(24)
-                    .frame(maxWidth: 720, alignment: .leading)
-                    .frame(maxWidth: .infinity)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    if recipe.youTubeVideoID != nil { video }
+                    header(showsTitle: true)
+                    steps
+                    footer
                 }
-                .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-                .onChange(of: scrollRequest) { _, _ in withAnimation { proxy.scrollTo("video", anchor: .top) } }
+                .padding(24)
+                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
+            .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -199,9 +200,8 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var video: some View {
         if let videoID = recipe.youTubeVideoID {
-            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled)
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled, viewportHeight: viewportHeight)
                 .zIndex(1)
-                .id("video")
         }
     }
 
@@ -361,7 +361,6 @@ struct RecipeDetailView: View {
                             if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
                                 Button {
                                     player.play(from: seconds)
-                                    scrollRequest += 1
                                 } label: {
                                     Label(Recipe.clock(seconds), systemImage: "play.fill")
                                         .font(.caption.weight(.semibold).monospacedDigit())

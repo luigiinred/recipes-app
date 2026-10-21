@@ -56,4 +56,18 @@ final class RecipeImporterTests: XCTestCase {
         XCTAssertEqual(recipe.ingredients, ["1 cup flour", "2 eggs"])
         XCTAssertEqual(recipe.steps, ["Whisk.", "Cook."])
     }
+
+    func testPageTextKeepsTheWordsAndDropsMarkup() {
+        let html = """
+        <html><head><title>Best Soup &amp; Stew | Kitchen</title><style>p { color: red }</style></head>
+        <body><nav>Home Menu</nav><script>var x = "ignore";</script>
+        <h1>Best Soup</h1><ul><li>2 cups stock</li><li>1 onion</li></ul>
+        <p>Simmer   for 20 minutes.</p><!-- comment --></body></html>
+        """
+        XCTAssertEqual(RecipeImporter.pageTitle(fromHTML: html), "Best Soup & Stew | Kitchen")
+        XCTAssertEqual(
+            RecipeImporter.visibleText(fromHTML: html),
+            "Best Soup\n2 cups stock\n1 onion\nSimmer for 20 minutes."
+        )
+    }
 }

@@ -32,5 +32,6 @@ public struct Library: Sendable {
         try recipes.delete(recipe)
         try images.delete(for: recipe.id)
         for id in recipe.stepImages.compactMap({ $0 }) { try stepImages.delete(for: id) }
+        for entry in try mealPlan.list() where entry.recipeID == recipe.id { try mealPlan.delete(entry) }
     }
 }

@@ -13,6 +13,21 @@ struct OrganizingSnapshotTests {
         ))
     }
 
+    @Test("syncing: the library hasn't loaded yet")
+    func syncing() {
+        assertPageSnapshots(of: RecipeListView(
+            collection: .constant(.all), selection: .constant(nil)
+        ).environmentObject(RecipeLibrary()))
+    }
+
+    @Test("find recipes that fit a category")
+    func categoryScan() {
+        assertPageSnapshots(
+            of: CategoryScanSheet(category: "Soup", candidates: RecipeTags.recipes(fitting: "Soup", among: SampleData.recipes)),
+            inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet
+        )
+    }
+
     @Test("photo cards")
     func photoCards() {
         assertPageSnapshots(of: RecipeListView(
