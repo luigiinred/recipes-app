@@ -20,6 +20,7 @@ final class RecipeLibrary: ObservableObject {
     @Published private(set) var mealPlan: [MealPlanEntry] = []
     @Published private(set) var groceries: [GroceryItem] = []
     @Published private(set) var feeds: [Feed] = []
+    @Published private(set) var categoryOrder: [String] = []
     @Published private(set) var imageStamps: [UUID: Date] = [:]
     @Published private(set) var stepImageStamps: [UUID: Date] = [:]
     @Published private(set) var isICloud = false
@@ -37,7 +38,7 @@ final class RecipeLibrary: ObservableObject {
     init() {}
 
     init(
-        recipes: [Recipe], mealPlan: [MealPlanEntry] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [],
+        recipes: [Recipe], mealPlan: [MealPlanEntry] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [], categoryOrder: [String] = [],
         images: [UUID: Data] = [:], stepImages: [UUID: Data] = [:], isICloud: Bool = true, remindersStatus: RemindersStatus = .unavailable
     ) {
         self.remindersStatus = remindersStatus
@@ -45,6 +46,7 @@ final class RecipeLibrary: ObservableObject {
         self.mealPlan = mealPlan
         self.groceries = groceries
         self.feeds = feeds
+        self.categoryOrder = categoryOrder
         self.isICloud = isICloud
         isLoaded = true
         for (id, data) in images {
@@ -61,7 +63,7 @@ final class RecipeLibrary: ObservableObject {
 
     static let thumbnailSize = 1200
 
-    var categoryTree: [CategoryNode] { CategoryTree.build(from: recipes.flatMap(\.tags)) }
+    var categoryTree: [CategoryNode] { CategoryTree.build(from: recipes.flatMap(\.tags), order: categoryOrder) }
 
     var tags: [String] {
         Array(Set(recipes.flatMap(\.tags))).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
@@ -162,10 +164,10 @@ final class RecipeLibrary: ObservableObject {
     func reload() async {
         guard let library else { return }
         let result = await Task.detached {
-            Result { try (library.recipes.list(), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps()) }
+            Result { try (library.recipes.list(), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
         }.value
         switch result {
-        case .success(let (recipes, plan, groceries, feeds, stamps, stepStamps)):
+        case .success(let (recipes, plan, groceries, feeds, stamps, stepStamps, order)):
             if recipes != self.recipes {
                 self.recipes = recipes
                 if reminders != nil { Self.index(recipes) }
@@ -174,6 +176,7 @@ final class RecipeLibrary: ObservableObject {
             if groceries != self.groceries { self.groceries = groceries }
             let sortedFeeds = feeds.sorted { $0.createdAt < $1.createdAt }
             if sortedFeeds != self.feeds { self.feeds = sortedFeeds }
+            if order != categoryOrder { categoryOrder = order }
             if stamps != imageStamps { imageStamps = stamps }
             if stepStamps != stepImageStamps { stepImageStamps = stepStamps }
             if !isLoaded { isLoaded = true }
@@ -243,6 +246,25 @@ final class RecipeLibrary: ObservableObject {
         guard !tag.isEmpty, !changed.tags.contains(where: { CategoryTree.tag($0, isIn: tag) }) else { return }
         changed.tags.append(tag)
         await save(changed)
+    }
+
+    /// Moves a category, with everything beneath it, under `parent` (or to the top level) ahead of its sibling `before`.
+    func moveCategory(_ path: String, toParent parent: String?, before sibling: String?) async {
+        guard CategoryTree.canMove(path, toParent: parent) else { return }
+        let destination = CategoryTree.destination(moving: path, toParent: parent)
+        let order = CategoryTree.moved(path, toParent: parent, before: sibling, tags: recipes.flatMap(\.tags), order: categoryOrder).order
+        let changed = recipes.compactMap { recipe -> Recipe? in
+            var seen = Set<String>()
+            let tags = recipe.tags.map { CategoryTree.rename($0, from: path, to: destination) }.filter { seen.insert($0.lowercased()).inserted }
+            guard tags != recipe.tags else { return nil }
+            var moved = recipe
+            moved.tags = tags
+            return moved
+        }
+        await perform { library in
+            for recipe in changed { try library.recipes.save(recipe) }
+            try library.categoryOrder.save(order)
+        }
     }
 
     /// Takes a recipe out of a category by dropping its tags in that category and beneath it.

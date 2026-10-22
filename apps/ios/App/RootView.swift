@@ -300,6 +300,7 @@ struct SidebarView: View {
                         .padding(.bottom, 6)
                         .contentShape(Rectangle())
                         .onTapGesture { recipesExpanded.toggle() }
+                        .categoryRootDrop()
                 }
                 Label("Plan", systemImage: "calendar").tag(AppSection.plan)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
@@ -355,13 +356,9 @@ struct SidebarView: View {
         )
     }
 
-    /// Dropping a recipe on a category files it there.
+    /// Drop a recipe on a category to file it there; drag a category to reorder or nest it.
     private func categoryRow(_ path: String) -> some View {
-        row(.category(path))
-            .dropDestination(for: RecipeDragItem.self) { items, _ in
-                Task { for item in items { await library.addTag(item.id, to: path) } }
-                return !items.isEmpty
-            }
+        row(.category(path)).categoryDragAndDrop(path)
     }
 
     private func row(_ collection: RecipeCollection) -> some View {
