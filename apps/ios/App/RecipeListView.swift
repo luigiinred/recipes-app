@@ -275,11 +275,15 @@ struct GridSection<Content: View>: View {
     let title: String?
     let minimum: CGFloat
     let spacing: CGFloat
+    var takesCategories = false
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let title { Text(title).font(.title3.weight(.semibold)) }
+            if let title {
+                if takesCategories { Text(title).font(.title3.weight(.semibold)).categoryRootDrop() }
+                else { Text(title).font(.title3.weight(.semibold)) }
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: spacing)], spacing: spacing) { content }
         }
     }
@@ -471,10 +475,7 @@ struct CategoryRow: View {
             }
         }
         .themedRow(raised: true)
-        .dropDestination(for: RecipeDragItem.self) { items, _ in
-            Task { for item in items { await library.addTag(item.id, to: node.path) } }
-            return !items.isEmpty
-        }
+        .categoryDragAndDrop(node.path)
     }
 }
 
@@ -508,11 +509,11 @@ private struct FolderTile: View {
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .dropDestination(for: RecipeDragItem.self) { items, _ in
-            guard case .category(let path) = collection else { return false }
-            Task { for item in items { await library.addTag(item.id, to: path) } }
-            return !items.isEmpty
-        }
+        .categoryDragAndDrop(categoryPath, axis: .horizontal)
+    }
+
+    private var categoryPath: String? {
+        if case .category(let path) = collection { path } else { nil }
     }
 }
 
@@ -558,8 +559,10 @@ struct RecipesHomeView: View {
                 }
             }
             if !library.categoryTree.isEmpty {
-                Section("Categories") {
+                Section {
                     ForEach(library.categoryTree) { CategoryRow(node: $0) }
+                } header: {
+                    Text("Categories").categoryRootDrop()
                 }
             }
         }
@@ -573,7 +576,7 @@ struct RecipesHomeView: View {
                     ForEach(collections, id: \.self) { FolderTile(collection: $0) }
                 }
                 if !library.categoryTree.isEmpty {
-                    GridSection(title: "Categories", minimum: 240, spacing: 16) {
+                    GridSection(title: "Categories", minimum: 240, spacing: 16, takesCategories: true) {
                         ForEach(library.categoryTree) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
                     }
                 }
