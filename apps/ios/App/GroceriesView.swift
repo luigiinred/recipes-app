@@ -5,10 +5,12 @@ struct GroceriesView: View {
     enum Layout { case combined, toBuy, completed }
 
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
     let layout: Layout
     var embedded = false
 
     @State private var newItem = ""
+    @FocusState private var addingItem: Bool
 
     private var toBuy: [GroceryItem] { sorted(library.groceries.filter { !$0.isChecked }) }
     private var completed: [GroceryItem] { sorted(library.groceries.filter(\.isChecked)) }
@@ -18,6 +20,7 @@ struct GroceriesView: View {
             if layout != .completed {
                 section(embedded ? "To Buy" : nil) {
                     TextField("Add item", text: $newItem)
+                        .focused($addingItem)
                         .onSubmit(addItem)
                         .themedRow()
                     ForEach(toBuy) { row($0) }
@@ -32,6 +35,11 @@ struct GroceriesView: View {
         .listStyle(.plain)
         .themedCanvas()
         .animation(.snappy, value: toBuy.map(\.id) + completed.map(\.id))
+        .onChange(of: router.add) { _, target in
+            guard target == .groceries, layout != .completed else { return }
+            router.add = nil
+            addingItem = true
+        }
         .overlay {
             if layout == .completed, completed.isEmpty {
                 MascotEmptyState(scene: .idle, title: "Nothing completed", message: "Things you check off end up here.")
