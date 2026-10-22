@@ -57,6 +57,13 @@ struct RootView: View {
         .onChange(of: router.recipeID, initial: true) { _, id in
             if id != nil { tab = .recipes }
         }
+        .onChange(of: router.reminder, initial: true) { _, kind in
+            switch kind {
+            case .logDinner, .planWeek: tab = .plan
+            case .addRecipe: tab = .recipes
+            case nil: break
+            }
+        }
     }
 }
 
@@ -134,6 +141,9 @@ struct RecipesTab: View {
             path = [.recipe(id)]
             router.recipeID = nil
         }
+        .onChange(of: router.reminder, initial: true) { _, kind in
+            if kind == .addRecipe { path = [] }
+        }
     }
 
     @ViewBuilder
@@ -149,6 +159,7 @@ struct RecipesTab: View {
 
 struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
     @State private var path: [UUID] = []
     @State private var mode: PlanMode
     private let showsSmartPlan: Bool
@@ -166,6 +177,11 @@ struct PlanTab: View {
                         RecipeDetailView(recipe: recipe)
                     }
                 }
+        }
+        .onChange(of: router.reminder, initial: true) { _, kind in
+            guard kind == .logDinner || kind == .planWeek else { return }
+            mode = .week
+            router.reminder = nil
         }
     }
 }
@@ -253,6 +269,17 @@ struct RootView: View {
             section = .recipes(.all)
             path = [id]
             router.recipeID = nil
+        }
+        .onChange(of: router.reminder, initial: true) { _, kind in
+            switch kind {
+            case .logDinner, .planWeek:
+                section = .plan
+                planMode = .week
+                router.reminder = nil
+            case .addRecipe:
+                section = .recipes(.all)
+            case nil: break
+            }
         }
     }
 

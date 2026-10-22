@@ -45,6 +45,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        NSAlarmKitUsageDescription: Recipes rings your cooking timers like an alarm, so you hear them even when your phone is silenced.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Recipes connects to your Mealie server on your home network to sync recipes.
@@ -119,7 +120,8 @@ targets:
     supportedDestinations: [iOS]
     sources:
       - TimerWidget
-      - App/LiveActivity/TimerActivityAttributes.swift
+      - App/LiveActivity/TimerAlarmMetadata.swift
+      - App/RecipeLink.swift
     info:
       path: TimerWidget/Info.plist
       properties:

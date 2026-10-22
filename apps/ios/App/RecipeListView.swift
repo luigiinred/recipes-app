@@ -297,6 +297,7 @@ struct GridSection<Content: View>: View {
 /// Everything for adding recipes: the toolbar, the new/import/scan flows, and their sheets.
 private struct RecipeActionsModifier: ViewModifier {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
     @Binding var selection: Recipe.ID?
     var listStyle: Binding<RecipeListStyle>?
     var showsSettings = false
@@ -354,6 +355,11 @@ private struct RecipeActionsModifier: ViewModifier {
                     Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
                 } label: { Label("Add Recipe", systemImage: "plus") }
             }
+        }
+        .onChange(of: router.reminder, initial: true) { _, kind in
+            guard kind == .addRecipe else { return }
+            showingImport = true
+            router.reminder = nil
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingNew) {

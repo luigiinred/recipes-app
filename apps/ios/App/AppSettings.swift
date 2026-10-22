@@ -23,6 +23,23 @@ enum AppSettings {
         static let appearance = "appearance"
         static let fontStyle = "fontStyle"
         static let accentColor = "accentColorHex"
+
+        static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
+        static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }
+        static func reminderWeekday(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).weekday" }
+    }
+
+    static func reminderPreferences(_ defaults: UserDefaults = .standard) -> ReminderPreferences {
+        var preferences = ReminderPreferences()
+        for kind in ReminderKind.allCases {
+            let fallback = ReminderPreferences.defaultSetting(for: kind)
+            preferences[kind] = ReminderSetting(
+                isOn: defaults.bool(forKey: Key.reminderOn(kind)),
+                minutes: defaults.object(forKey: Key.reminderMinutes(kind)) as? Int ?? fallback.minutes,
+                weekday: defaults.object(forKey: Key.reminderWeekday(kind)) as? Int ?? fallback.weekday
+            )
+        }
+        return preferences
     }
 
     enum WeekStart: String, CaseIterable {
