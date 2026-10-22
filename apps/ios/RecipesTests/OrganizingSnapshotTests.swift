@@ -20,6 +20,18 @@ struct OrganizingSnapshotTests {
         ).environmentObject(RecipeLibrary()))
     }
 
+    @Test("empty library")
+    func emptyLibrary() {
+        assertPageSnapshots(of: RecipeListView(
+            collection: .constant(.all), selection: .constant(nil)
+        ).environmentObject(RecipeLibrary(recipes: [])))
+    }
+
+    @Test("empty collection")
+    func emptyCollection() {
+        assertPageSnapshots(of: Self.list(.category("Nothing Here")))
+    }
+
     @Test("find recipes that fit a category")
     func categoryScan() {
         assertPageSnapshots(
