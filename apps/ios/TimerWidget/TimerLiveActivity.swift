@@ -7,6 +7,10 @@ import WidgetKit
 struct TimerWidgetBundle: WidgetBundle {
     var body: some Widget {
         TimerLiveActivity()
+        MealPlanWidget()
+        UpNextWidget()
+        GroceriesWidget()
+        RandomRecipeWidget()
     }
 }
 

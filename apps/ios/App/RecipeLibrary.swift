@@ -31,6 +31,9 @@ final class RecipeLibrary: ObservableObject {
     private var library: Library?
     private var reminders: RemindersSync?
     private var remindersChanged = false
+    #if os(iOS) && !SHARE_EXTENSION
+    private let widgets = WidgetSync()
+    #endif
     private static let remindersKey = "syncGroceriesWithReminders"
     private var thumbnails: [UUID: (stamp: Date, image: CGImage)] = [:]
     private var stepThumbnails: [UUID: (stamp: Date, image: CGImage)] = [:]
@@ -118,8 +121,16 @@ final class RecipeLibrary: ObservableObject {
         while !Task.isCancelled {
             await reload()
             await syncReminders()
+            await publishWidgets()
             try? await Task.sleep(for: .seconds(2))
         }
+    }
+
+    private func publishWidgets() async {
+        #if os(iOS) && !SHARE_EXTENSION
+        guard let library, isLoaded else { return }
+        await widgets.publish(recipes: recipes, mealPlan: mealPlan, groceries: groceries, imageIDs: Set(imageStamps.keys), library: library)
+        #endif
     }
 
     var remindersEnabled: Bool {

@@ -13,6 +13,7 @@ settings:
   base:
     DEVELOPMENT_TEAM: ${RECIPES_TEAM_ID}
     RECIPES_ICLOUD_CONTAINER: ${RECIPES_ICLOUD_CONTAINER}
+    RECIPES_APP_GROUP: group.${RECIPES_BUNDLE_ID}
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.2"
     CURRENT_PROJECT_VERSION: "15"
@@ -38,6 +39,7 @@ targets:
         NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts.
         CFBundleIconName: AppIcon
         RecipesICloudContainer: "$(RECIPES_ICLOUD_CONTAINER)"
+        RecipesAppGroup: "$(RECIPES_APP_GROUP)"
         CFBundleURLTypes:
           - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
             CFBundleURLSchemes: [recipes]
@@ -122,10 +124,14 @@ targets:
       - TimerWidget
       - App/LiveActivity/TimerAlarmMetadata.swift
       - App/RecipeLink.swift
+    dependencies:
+      - package: RecipeKit
+        product: RecipeKit
     info:
       path: TimerWidget/Info.plist
       properties:
-        CFBundleDisplayName: Recipe Timers
+        CFBundleDisplayName: Recipes
+        RecipesAppGroup: "$(RECIPES_APP_GROUP)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
@@ -133,6 +139,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ${RECIPES_BUNDLE_ID}.timers
+        CODE_SIGN_ENTITLEMENTS: TimerWidget/TimerWidget.entitlements
         CODE_SIGN_STYLE: Automatic
         SKIP_INSTALL: YES
   RecipesTests:

@@ -35,6 +35,7 @@ struct RecipesApp: App {
                 .onOpenURL { url in
                     if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
                     else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
+                    else if let destination = RecipeLink.destination(from: url) { router.destination = destination }
                 }
         }
         #if os(macOS)

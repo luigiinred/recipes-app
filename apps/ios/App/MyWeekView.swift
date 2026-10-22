@@ -4,6 +4,7 @@ import SwiftUI
 /// One week at a glance: each day's meals, with a quick way to add more or let Apple Intelligence fill the gaps.
 struct MyWeekView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.referenceDate) private var referenceDate
     let open: (UUID) -> Void
 
@@ -47,6 +48,11 @@ struct MyWeekView: View {
             .animation(.snappy, value: library.mealPlan.map(\.id))
         }
         .onAppear { jumpToToday() }
+        .onChange(of: router.add) { _, target in
+            guard target == .plan else { return }
+            router.add = nil
+            addingOn = today
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { smartPlanning = true } label: { Label("Smart Plan", systemImage: "sparkles") }

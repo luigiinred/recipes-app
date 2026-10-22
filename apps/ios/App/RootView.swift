@@ -21,6 +21,7 @@ struct RootView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var tab: AppTab
+    @State private var previousTab: AppTab
     @State private var query: String
     private let planMode: PlanMode
     private let showsSmartPlan: Bool
@@ -36,10 +37,14 @@ struct RootView: View {
         self.recipesPath = recipesPath
         self.recipeSelection = recipeSelection
         _tab = State(initialValue: tab)
+        _previousTab = State(initialValue: tab)
         _query = State(initialValue: searchQuery)
         self.planMode = planMode
         self.showsSmartPlan = showsSmartPlan
     }
+
+    /// On the Plan and Groceries tabs the tab bar's search button becomes an add button for that tab.
+    private func searchBecomesAdd(on tab: AppTab) -> Bool { sizeClass == .compact && (tab == .plan || tab == .groceries) }
 
     private var sidebarCollections: [RecipeCollection] {
         RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
@@ -69,13 +74,27 @@ struct RootView: View {
             if sizeClass == .regular {
                 Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: true) }
             }
-            Tab(value: AppTab.search, role: .search) { SearchTab(query: $query) }
+            Tab(value: AppTab.search, role: .search) {
+                SearchTab(query: $query)
+            } label: {
+                if searchBecomesAdd(on: tab) { Label("Add", systemImage: "plus") } else { Label("Search", systemImage: "magnifyingglass") }
+            }
         }
         .tabViewStyle(.sidebarAdaptable)
         .sidebarFirst()
         .reviewPrompt()
         .tabViewSearchActivation(.searchTabSelection)
         .cookModeCover(cook)
+        .onChange(of: tab) { _, new in
+            guard new == .search, searchBecomesAdd(on: previousTab) else { previousTab = new; return }
+            tab = previousTab
+            router.add = previousTab == .plan ? .plan : .groceries
+        }
+        .onChange(of: router.destination, initial: true) { _, destination in
+            guard let destination else { return }
+            tab = destination == .plan ? .plan : .groceries
+            router.destination = nil
+        }
         .onChange(of: router.recipeID, initial: true) { _, id in
             if id != nil { tab = .recipes }
         }
@@ -296,6 +315,11 @@ struct RootView: View {
         }
         .sheet(isPresented: $addingFeed) { AddFeedSheet() }
         .cookModeCover(cook)
+        .onChange(of: router.destination, initial: true) { _, destination in
+            guard let destination else { return }
+            section = destination == .plan ? .plan : .groceries
+            router.destination = nil
+        }
         .onChange(of: router.recipeID, initial: true) { _, id in
             guard let id else { return }
             section = .recipes(.all)

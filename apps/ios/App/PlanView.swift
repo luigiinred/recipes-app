@@ -37,10 +37,14 @@ struct QueueView: View {
     @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
+    @EnvironmentObject private var router: AppRouter
     let open: (UUID) -> Void
 
     @State private var planning: Recipe?
     @State private var adding = false
+    #if os(iOS)
+    @State private var editMode = EditMode.inactive
+    #endif
 
     private var queue: [Recipe] { RecipeCollection.wantToCook.filter(library.recipes) }
 
@@ -84,9 +88,25 @@ struct QueueView: View {
                 }
             }
         }
+        #if os(iOS)
+        .environment(\.editMode, $editMode)
+        .onChange(of: queue.count) { _, count in if count < 2 { editMode = .inactive } }
+        #endif
+        .onChange(of: router.add) { _, target in
+            guard target == .plan else { return }
+            router.add = nil
+            adding = true
+        }
         .toolbar {
             #if os(iOS)
-            if queue.count > 1 { ToolbarItem(placement: .navigation) { EditButton() } }
+            if queue.count > 1 {
+                ToolbarItem(placement: .navigation) {
+                    Button { withAnimation { editMode = editMode.isEditing ? .inactive : .active } } label: {
+                        Label(editMode.isEditing ? "Done" : "Reorder", systemImage: editMode.isEditing ? "checkmark" : "arrow.up.arrow.down")
+                    }
+                    .labelStyle(.iconOnly)
+                }
+            }
             #endif
             ToolbarItem(placement: .primaryAction) {
                 Button { adding = true } label: { Label("Add to Up Next", systemImage: "plus") }
