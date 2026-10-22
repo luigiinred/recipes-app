@@ -12,8 +12,11 @@ enum AppSection: Hashable {
 struct RootView: View {
     enum AppTab: Hashable {
         case recipes, feeds, plan, groceries, settings, search
+        case collection(RecipeCollection)
     }
 
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -38,10 +41,29 @@ struct RootView: View {
         self.showsSmartPlan = showsSmartPlan
     }
 
+    private var sidebarCollections: [RecipeCollection] {
+        RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
+            .filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
+    }
+
     /// The tab bar and the sidebar are one component on iPad. Collections and categories filter the Recipes tab.
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+            if sizeClass == .regular {
+                TabSection("Recipes") {
+                    Tab("All Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+                    ForEach(sidebarCollections, id: \.self) { collection in
+                        Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
+                            .defaultVisibility(.hidden, for: .tabBar)
+                    }
+                    ForEach(library.categoryTree) { node in
+                        Tab(node.name, systemImage: node.children.isEmpty ? "tag" : "folder", value: AppTab.collection(.category(node.path))) { RecipesTab(root: .category(node.path)) }
+                            .defaultVisibility(.hidden, for: .tabBar)
+                    }
+                }
+            } else {
+                Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+            }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             if sizeClass == .regular {
@@ -115,8 +137,15 @@ struct RecipesTab: View {
     @EnvironmentObject private var router: AppRouter
     @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
+    private let rootCollection: RecipeCollection?
+
+    init(root: RecipeCollection) {
+        rootCollection = root
+        _path = State(initialValue: [])
+    }
 
     init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
+        rootCollection = nil
         var path = path
         if path.isEmpty {
             if collection != .all { path.append(.collection(collection)) }
@@ -128,8 +157,11 @@ struct RecipesTab: View {
     /// Home, then a collection or category, then a recipe, each pushed onto one stack. On iPad the first two are grids and a recipe fills the screen.
     var body: some View {
         NavigationStack(path: $path) {
-            RecipesHomeView(selection: $selection)
-                .navigationDestination(for: RecipesRoute.self) { destination($0) }
+            Group {
+                if let rootCollection { RecipeListView(collection: .constant(rootCollection), selection: $selection) }
+                else { RecipesHomeView(selection: $selection) }
+            }
+            .navigationDestination(for: RecipesRoute.self) { destination($0) }
         }
         .onChange(of: selection) { _, id in
             guard let id else { return }
