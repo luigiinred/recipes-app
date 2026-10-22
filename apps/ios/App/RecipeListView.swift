@@ -56,7 +56,8 @@ struct RecipeListView: View {
             .recipeActions(
                 selection: $selection,
                 listStyle: usesGrid ? nil : Binding(get: { style }, set: { storedStyle = $0 }),
-                showsSettings: showsSettings
+                showsSettings: showsSettings,
+                findRecipes: browsedCategory != nil && !library.recipes.isEmpty ? FindRecipesAction(title: collection.title) { scanning = true } : nil
             )
             .sheet(item: $editing) { recipe in
                 RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
@@ -133,20 +134,11 @@ struct RecipeListView: View {
                 #endif
             }
             .listSectionSeparator(.hidden, edges: .top)
-            if browsedCategory != nil, !library.recipes.isEmpty {
-                Section { scanButton }.themedRow()
-            }
         }
         .listStyle(.plain)
         .themedCanvas()
         .animation(.snappy, value: items.map(\.id))
         .overlay { emptyState }
-    }
-
-    private var scanButton: some View {
-        Button { scanning = true } label: {
-            Label("Find Recipes for \(collection.title)", systemImage: "sparkle.magnifyingglass")
-        }
     }
 
     @ViewBuilder
@@ -195,7 +187,6 @@ struct RecipeListView: View {
                         }
                     }
                 }
-                if browsedCategory != nil, !library.recipes.isEmpty { scanButton.buttonStyle(.bordered) }
             }
             .padding(24)
         }
@@ -294,6 +285,11 @@ struct GridSection<Content: View>: View {
     }
 }
 
+struct FindRecipesAction {
+    let title: String
+    let perform: () -> Void
+}
+
 /// Everything for adding recipes: the toolbar, the new/import/scan flows, and their sheets.
 private struct RecipeActionsModifier: ViewModifier {
     @EnvironmentObject private var library: RecipeLibrary
@@ -301,6 +297,7 @@ private struct RecipeActionsModifier: ViewModifier {
     @Binding var selection: Recipe.ID?
     var listStyle: Binding<RecipeListStyle>?
     var showsSettings = false
+    var findRecipes: FindRecipesAction?
 
     @State private var showingNew = false
     @State private var showingIdea = false
@@ -332,28 +329,21 @@ private struct RecipeActionsModifier: ViewModifier {
                 }
             }
             #endif
-            if let listStyle {
+            if let findRecipes {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        listStyle.wrappedValue = listStyle.wrappedValue == .cards ? .list : .cards
-                    } label: {
-                        Label(listStyle.wrappedValue == .cards ? "Show as List" : "Show as Cards", systemImage: listStyle.wrappedValue == .cards ? "list.bullet" : "square.grid.2x2")
-                    }
-                    .help(listStyle.wrappedValue == .cards ? "Show as a compact list" : "Show as photo cards")
+                    Menu {
+                        if let listStyle { listStyleButton(listStyle) }
+                        Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
+                        Button("Find Recipes for \(findRecipes.title)", systemImage: "sparkle.magnifyingglass", action: findRecipes.perform)
+                    } label: { Label("More", systemImage: "ellipsis.circle") }
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
-                    Button("New Idea…", systemImage: "lightbulb") { showingIdea = true }
-                    Button("Import from Web or YouTube…", systemImage: "globe") { showingImport = true }
-                    #if os(iOS)
-                    Button("Scan Recipe…", systemImage: "doc.viewfinder") {
-                        if DocumentScanner.isAvailable { showingScanner = true } else { scanError = "Scanning needs a device with a camera." }
-                    }
-                    #endif
-                    Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
-                } label: { Label("Add Recipe", systemImage: "plus") }
+            } else {
+                if let listStyle {
+                    ToolbarItem(placement: .primaryAction) { listStyleButton(listStyle) }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
+                }
             }
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
@@ -415,6 +405,28 @@ private struct RecipeActionsModifier: ViewModifier {
         }
     }
 
+    private func listStyleButton(_ listStyle: Binding<RecipeListStyle>) -> some View {
+        Button {
+            listStyle.wrappedValue = listStyle.wrappedValue == .cards ? .list : .cards
+        } label: {
+            Label(listStyle.wrappedValue == .cards ? "Show as List" : "Show as Cards", systemImage: listStyle.wrappedValue == .cards ? "list.bullet" : "square.grid.2x2")
+        }
+        .help(listStyle.wrappedValue == .cards ? "Show as a compact list" : "Show as photo cards")
+    }
+
+    @ViewBuilder
+    private var addItems: some View {
+        Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
+        Button("New Idea…", systemImage: "lightbulb") { showingIdea = true }
+        Button("Import from Web or YouTube…", systemImage: "globe") { showingImport = true }
+        #if os(iOS)
+        Button("Scan Recipe…", systemImage: "doc.viewfinder") {
+            if DocumentScanner.isAvailable { showingScanner = true } else { scanError = "Scanning needs a device with a camera." }
+        }
+        #endif
+        Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
+    }
+
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
         isScanning = true
         Task {
@@ -435,8 +447,8 @@ private struct RecipeActionsModifier: ViewModifier {
 }
 
 extension View {
-    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, showsSettings: Bool = false) -> some View {
-        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, showsSettings: showsSettings))
+    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, showsSettings: Bool = false, findRecipes: FindRecipesAction? = nil) -> some View {
+        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, showsSettings: showsSettings, findRecipes: findRecipes))
     }
 }
 
