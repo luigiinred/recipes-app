@@ -13,7 +13,7 @@ struct CookModeView: View {
 
     @State private var showingIngredients = false
 
-    private var recipe: Recipe? { library.recipe(id: session.current) }
+    private var recipe: Recipe? { library.recipe(id: session.current)?.scaled(by: session.scale) }
 
     private static let margin: CGFloat = 20
     /// Room at the bottom of a step so its last line can scroll clear of the floating buttons.

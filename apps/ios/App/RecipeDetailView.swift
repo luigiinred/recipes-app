@@ -25,8 +25,10 @@ struct RecipeDetailView: View {
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
     @State private var showingTimeline = false
+    @State private var scale = 1.0
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
+    private var scaled: Recipe { recipe.scaled(by: scale) }
 
     var body: some View {
         GeometryReader { geometry in
@@ -91,7 +93,7 @@ struct RecipeDetailView: View {
         .recipeImageGenerator(isPresented: $generatingImage, recipe: recipe) { data in
             Task { await library.save(recipe, image: .set(data)) }
         }
-        .sheet(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: recipe) }
+        .sheet(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: scaled) }
         .sheet(isPresented: $addingToCalendar) { AddToCalendarSheet(recipe: recipe) }
     }
 
@@ -252,7 +254,7 @@ struct RecipeDetailView: View {
         let stats: [(String, String)] = [
             recipe.totalMinutes.map { ("Total Time", Self.duration($0)) },
             recipe.cookMinutes.map { ("Cook Time", Self.duration($0)) },
-            recipe.servings.map { ("Servings", "\($0)") },
+            scaled.servings.map { ("Servings", "\($0)") },
         ].compactMap { $0 }
         if !stats.isEmpty {
             HStack(spacing: 0) {
@@ -278,7 +280,7 @@ struct RecipeDetailView: View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 if !recipe.isIdea {
-                    tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe) }
+                    tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe, scale: scale) }
                         .disabled(recipe.steps.isEmpty)
                     tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
                         .disabled(recipe.ingredients.isEmpty)
@@ -323,9 +325,9 @@ struct RecipeDetailView: View {
     }
 
     private var ingredients: some View {
-        section("Ingredients") {
+        section("Ingredients", trailing: { if previewSave == nil, !recipe.ingredients.isEmpty { ScaleMenu(scale: $scale) } }) {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(recipe.ingredientGroups.enumerated()), id: \.offset) { _, group in
+                ForEach(Array(scaled.ingredientGroups.enumerated()), id: \.offset) { _, group in
                     if let title = group.title {
                         Text(title)
                             .font(.subheadline.weight(.semibold))
@@ -395,8 +397,18 @@ struct RecipeDetailView: View {
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        section(title, trailing: { EmptyView() }, content: content)
+    }
+
+    private func section<Trailing: View, Content: View>(
+        _ title: String, @ViewBuilder trailing: () -> Trailing, @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1)
+            HStack {
+                Text(title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1)
+                Spacer()
+                trailing()
+            }
             content()
         }
     }
