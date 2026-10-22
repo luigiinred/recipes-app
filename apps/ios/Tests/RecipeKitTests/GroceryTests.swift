@@ -12,6 +12,9 @@ final class GroceryTests: XCTestCase {
             ("½ cup milk", "½ cup", "milk"),
             ("salt", "", "salt"),
             ("2 cups", "", "2 cups"),
+            ("1 to 2 cups flour", "1 to 2 cups", "flour"),
+            ("1-2 oz cheese", "1-2 oz", "cheese"),
+            ("1 (18.25 ounce) package cake mix", "1 package", "(18.25 ounce) cake mix"),
         ]
         for (input, quantity, name) in cases {
             let parts = IngredientParser.split(input)

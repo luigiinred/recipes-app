@@ -3,6 +3,7 @@ import SwiftUI
 import UIKit
 
 /// `Color.accentColor` follows UIKit's tint, which SwiftUI's `.tint` reaches inside a navigation stack but not in a full-screen cover or a sheet.
+/// The proxy gives each new view its own tint, so views already on screen are updated by hand when the accent changes.
 @MainActor
 enum ThemeTint {
     static func apply(_ color: Color) {
@@ -10,6 +11,14 @@ enum ThemeTint {
         UIView.appearance().tintColor = tint
         for window in UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.windows }).flatMap({ $0 }) {
             window.tintColor = tint
+            retint(window, to: tint)
+        }
+    }
+
+    private static func retint(_ view: UIView, to tint: UIColor) {
+        for subview in view.subviews {
+            subview.tintColor = tint
+            retint(subview, to: tint)
         }
     }
 }

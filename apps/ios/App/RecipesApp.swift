@@ -10,6 +10,8 @@ struct RecipesApp: App {
     @StateObject private var mealie = MealieSyncController()
     @Environment(\.scenePhase) private var scenePhase
 
+    init() { ReminderCenter.shared.install() }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -26,15 +28,13 @@ struct RecipesApp: App {
                 #endif
                 .task { await library.run() }
                 .task { await mealie.run() }
-                .onChange(of: library.recipes) { mealie.request() }
-                .onChange(of: library.mealPlan) { mealie.request() }
+                .onChange(of: library.recipes) { mealie.request(); rescheduleReminders() }
+                .onChange(of: library.mealPlan) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.groceries) { mealie.request() }
-                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request() } }
-                #if os(iOS)
-                .task { await TimerLiveActivities.endAll() }
-                #endif
+                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); rescheduleReminders() } }
                 .onOpenURL { url in
-                    if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
+                    if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
+                    else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
                 }
         }
         #if os(macOS)
@@ -45,5 +45,9 @@ struct RecipesApp: App {
                 .appTheme()
         }
         #endif
+    }
+
+    private func rescheduleReminders() {
+        Task { await ReminderCenter.shared.reschedule(plan: library.mealPlan, recipes: library.recipes) }
     }
 }

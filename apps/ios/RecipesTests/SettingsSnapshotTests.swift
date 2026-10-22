@@ -14,6 +14,11 @@ struct SettingsSnapshotTests {
         ), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
+    @Test("reminders")
+    func reminders() {
+        assertPageSnapshots(of: RemindersSettingsPage(), macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+    }
+
     @Test("add a meal: Up Next and search")
     func addMealSheet() {
         assertPageSnapshots(of: AddMealSheet(day: SampleData.now, initialMeal: .lunch, source: .all), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)

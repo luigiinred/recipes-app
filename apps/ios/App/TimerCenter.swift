@@ -1,15 +1,17 @@
 import Foundation
 import UserNotifications
 
-struct CookTimer: Identifiable, Hashable {
+struct CookTimer: Identifiable, Hashable, Codable {
     let id: UUID
     var label: String
+    var recipeID: UUID?
     let duration: Int
     let endsAt: Date
 
-    init(id: UUID = UUID(), label: String, duration: Int, endsAt: Date) {
+    init(id: UUID = UUID(), label: String, recipeID: UUID? = nil, duration: Int, endsAt: Date) {
         self.id = id
         self.label = label
+        self.recipeID = recipeID
         self.duration = duration
         self.endsAt = endsAt
     }
@@ -22,52 +24,78 @@ struct CookTimer: Identifiable, Hashable {
 @MainActor
 final class TimerCenter: ObservableObject {
     @Published private(set) var timers: [CookTimer] = []
+    private var alarmBacked: Set<UUID> = []
+    private let defaults: UserDefaults?
+    private static let storeKey = "cookTimers"
 
-    init(seed: [CookTimer] = []) {
-        timers = seed
+    /// A seeded center is for previews and tests, so it neither restores nor saves.
+    init(seed: [CookTimer]? = nil, defaults: UserDefaults = .standard) {
+        self.defaults = seed == nil ? defaults : nil
+        timers = seed ?? []
+        #if os(iOS)
+        if seed == nil { Task { await restoreAndFollowAlarms() } }
+        #endif
     }
 
-    func start(label: String, seconds: Int) {
-        let timer = CookTimer(label: label, duration: seconds, endsAt: Date().addingTimeInterval(Double(seconds)))
+    func start(label: String, recipeID: UUID? = nil, seconds: Int) {
+        let timer = CookTimer(label: label, recipeID: recipeID, duration: seconds, endsAt: Date().addingTimeInterval(Double(seconds)))
         timers.append(timer)
-        scheduleNotification(for: timer)
+        save()
         #if os(iOS)
-        TimerLiveActivities.start(timer)
+        Task {
+            if await TimerAlarms.schedule(timer) { alarmBacked.insert(timer.id) } else { scheduleNotification(for: timer) }
+        }
+        #else
+        scheduleNotification(for: timer)
         #endif
     }
 
     func cancel(_ timer: CookTimer) {
         timers.removeAll { $0.id == timer.id }
+        alarmBacked.remove(timer.id)
+        save()
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [timer.id.uuidString])
         #if os(iOS)
-        Task { await TimerLiveActivities.end(timer.id) }
+        TimerAlarms.cancel(timer.id)
         #endif
     }
 
+    private func save() {
+        guard let defaults else { return }
+        defaults.set(try? JSONEncoder().encode(timers), forKey: Self.storeKey)
+    }
+
+    #if os(iOS)
+    /// Alarms outlive the app, so timers do too; one stopped from the Lock Screen is dropped here.
+    private func restoreAndFollowAlarms() async {
+        let live = TimerAlarms.current
+        let saved = defaults?.data(forKey: Self.storeKey).flatMap { try? JSONDecoder().decode([CookTimer].self, from: $0) } ?? []
+        let restored = saved.filter { live.contains($0.id) }
+        alarmBacked.formUnion(restored.map(\.id))
+        timers = restored + timers
+        save()
+        for await ids in TimerAlarms.ids {
+            let gone = alarmBacked.subtracting(ids)
+            guard !gone.isEmpty else { continue }
+            alarmBacked.subtract(gone)
+            timers.removeAll { gone.contains($0.id) }
+            save()
+        }
+    }
+    #endif
+
     private func scheduleNotification(for timer: CookTimer) {
         let center = UNUserNotificationCenter.current()
-        center.delegate = ForegroundPresenter.shared
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
             content.title = "Timer done"
             content.body = timer.label
             content.sound = .default
+            if let recipeID = timer.recipeID { content.userInfo = [NotificationDelegate.recipeKey: recipeID.uuidString] }
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, Double(timer.duration)), repeats: false)
             center.add(UNNotificationRequest(identifier: timer.id.uuidString, content: content, trigger: trigger))
         }
-    }
-}
-
-private final class ForegroundPresenter: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = ForegroundPresenter()
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .sound])
     }
 }
 

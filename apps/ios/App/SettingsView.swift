@@ -1,9 +1,10 @@
 import ImagePlayground
 import RecipeKit
 import SwiftUI
+import UserNotifications
 
 enum SettingsPage: Hashable {
-    case recipes, planner, cooking, groceries, theme, mealie, intelligence, data
+    case recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -73,6 +74,7 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
             NavigationLink(value: SettingsPage.groceries) { Label("Groceries", systemImage: "checklist") }
+            NavigationLink(value: SettingsPage.reminders) { Label("Reminders", systemImage: "bell") }
         }
         Section {
             NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
@@ -124,6 +126,7 @@ struct SettingsView: View {
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
+        case .reminders: RemindersSettingsPage()
         case .theme: ThemeSettingsPage()
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
@@ -247,6 +250,108 @@ private struct GroceriesSettingsPage: View {
         }
         .formStyle(.grouped)
         .settingsPage("Groceries")
+    }
+}
+
+struct RemindersSettingsPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.openURL) private var openURL
+    @AppStorage(AppSettings.Key.reminderOn(.logDinner)) private var logOn = false
+    @AppStorage(AppSettings.Key.reminderMinutes(.logDinner)) private var logMinutes = ReminderPreferences.defaultSetting(for: .logDinner).minutes
+    @AppStorage(AppSettings.Key.reminderOn(.planWeek)) private var planOn = false
+    @AppStorage(AppSettings.Key.reminderMinutes(.planWeek)) private var planMinutes = ReminderPreferences.defaultSetting(for: .planWeek).minutes
+    @AppStorage(AppSettings.Key.reminderWeekday(.planWeek)) private var planWeekday = ReminderPreferences.defaultSetting(for: .planWeek).weekday
+    @AppStorage(AppSettings.Key.reminderOn(.addRecipe)) private var addOn = false
+    @AppStorage(AppSettings.Key.reminderMinutes(.addRecipe)) private var addMinutes = ReminderPreferences.defaultSetting(for: .addRecipe).minutes
+    @AppStorage(AppSettings.Key.reminderWeekday(.addRecipe)) private var addWeekday = ReminderPreferences.defaultSetting(for: .addRecipe).weekday
+    @State private var authorization: UNAuthorizationStatus = .notDetermined
+
+    private var blocked: Bool { authorization == .denied }
+
+    var body: some View {
+        Form {
+            Section {
+                reminder("Log dinner", isOn: $logOn, minutes: $logMinutes, weekday: nil)
+            } header: {
+                Text("Every day")
+            } footer: {
+                Text("A nudge to log what you cooked. It names the dinner you planned, and stays quiet on days you've already logged something.")
+            }
+            Section {
+                reminder("Plan next week", isOn: $planOn, minutes: $planMinutes, weekday: $planWeekday)
+            } header: {
+                Text("Planning")
+            } footer: {
+                Text("Skipped for any week that already has a few meals planned.")
+            }
+            Section {
+                reminder("Add a recipe", isOn: $addOn, minutes: $addMinutes, weekday: $addWeekday)
+            } header: {
+                Text("Saving")
+            } footer: {
+                Text("A weekly reminder to save a recipe from a link, a photo, or a video.")
+            }
+            Section {
+                Button("Turn All Off", role: .destructive) { logOn = false; planOn = false; addOn = false }
+                    .disabled(!(logOn || planOn || addOn))
+            } footer: {
+                if blocked {
+                    Text("Notifications are off for Recipes in system settings, so none of these will appear.")
+                } else {
+                    Text("Reminders are off until you turn one on. They stay on this device, and fade out on their own if you stop opening Recipes.")
+                }
+            }
+            if blocked, let url = Self.systemSettingsURL {
+                Section { Button("Open System Settings") { openURL(url) } }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Reminders")
+        .task { authorization = await ReminderCenter.shared.authorization }
+        .onChange(of: [logOn, planOn, addOn]) { _, new in
+            guard new.contains(true) else { return reschedule() }
+            Task {
+                if await ReminderCenter.shared.authorization == .notDetermined { _ = await ReminderCenter.shared.requestAuthorization() }
+                authorization = await ReminderCenter.shared.authorization
+                reschedule()
+            }
+        }
+        .onChange(of: [logMinutes, planMinutes, planWeekday, addMinutes, addWeekday]) { reschedule() }
+    }
+
+    private func reschedule() {
+        Task { await ReminderCenter.shared.reschedule(plan: library.mealPlan, recipes: library.recipes) }
+    }
+
+    @ViewBuilder
+    private func reminder(_ title: String, isOn: Binding<Bool>, minutes: Binding<Int>, weekday: Binding<Int>?) -> some View {
+        Toggle(title, isOn: isOn)
+        if isOn.wrappedValue {
+            if let weekday {
+                Picker("Day", selection: weekday) {
+                    ForEach(Array(Calendar.current.weekdaySymbols.enumerated()), id: \.offset) { Text($0.element).tag($0.offset + 1) }
+                }
+            }
+            DatePicker("Time", selection: time(minutes), displayedComponents: .hourAndMinute)
+        }
+    }
+
+    private func time(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding(
+            get: { Calendar.current.date(byAdding: .minute, value: minutes.wrappedValue, to: Calendar.current.startOfDay(for: Date())) ?? Date() },
+            set: {
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                minutes.wrappedValue = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            }
+        )
+    }
+
+    private static var systemSettingsURL: URL? {
+        #if os(iOS)
+        URL(string: UIApplication.openNotificationSettingsURLString)
+        #else
+        URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+        #endif
     }
 }
 
