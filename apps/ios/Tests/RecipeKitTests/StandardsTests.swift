@@ -15,6 +15,16 @@ final class StandardsTests: XCTestCase {
             ("8 fl oz water", "8", .fluidOunce, "water", "8 fl oz water"),
             ("Salt to taste", "", nil, "Salt to taste", "Salt to taste"),
             ("2 cups", "", nil, "2 cups", "2 cups"),
+            ("1 to 2 oz cheese", "1-2", .ounce, "cheese", "1-2 oz cheese"),
+            ("1 - 2 oz cheese", "1-2", .ounce, "cheese", "1-2 oz cheese"),
+            ("1–2 tablespoons honey", "1-2", .tablespoon, "honey", "1-2 tbsp honey"),
+            ("1 1/2 to 2 cups stock", "1 1/2-2", .cup, "stock", "1 1/2-2 cups stock"),
+            ("½-1 tsp salt", "1/2-1", .teaspoon, "salt", "1/2-1 tsp salt"),
+            ("2 or 3 eggs", "2-3", nil, "eggs", "2-3 eggs"),
+            ("1 (18.25 ounce) package devil's food cake mix", "1", .package, "(18.25 ounce) devil's food cake mix", "1 package (18.25 ounce) devil's food cake mix"),
+            ("2 (14 oz) cans diced tomatoes", "2", .can, "(14 oz) diced tomatoes", "2 cans (14 oz) diced tomatoes"),
+            ("1 (8-ounce) can tomato sauce", "1", .can, "(8-ounce) tomato sauce", "1 can (8-ounce) tomato sauce"),
+            ("1 (28 ounce) tomatoes", "1", nil, "(28 ounce) tomatoes", "1 (28 ounce) tomatoes"),
         ]
         for (input, quantity, unit, item, text) in cases {
             let ingredient = Ingredient(parsing: input)
@@ -24,6 +34,35 @@ final class StandardsTests: XCTestCase {
             XCTAssertEqual(ingredient.text, text, input)
             XCTAssertEqual(Ingredient(parsing: ingredient.text).text, text, "idempotent: \(input)")
         }
+    }
+
+    func testScalingIngredients() {
+        let cases: [(String, Double, String)] = [
+            ("1 1/2 cups flour", 2, "3 cups flour"),
+            ("1 cup sugar", 0.5, "1/2 cup sugar"),
+            ("1/3 cup oil", 3, "1 cup oil"),
+            ("1-2 oz cheese", 2, "2-4 oz cheese"),
+            ("1 to 1 1/2 cups milk", 2, "2-3 cups milk"),
+            ("4 eggs", 1.5, "6 eggs"),
+            ("1 (18.25 ounce) package cake mix", 2, "2 packages (18.25 ounce) cake mix"),
+            ("2 cloves garlic, minced", 2, "4 cloves garlic, minced"),
+            ("Salt to taste", 3, "Salt to taste"),
+            ("1 cup flour", 1, "1 cup flour"),
+            ("1 tsp salt", 0.25, "1/4 tsp salt"),
+            ("1 egg", 1.0 / 3, "1/3 egg"),
+            ("1/8 tsp salt", 1.5, "0.2 tsp salt"),
+        ]
+        for (input, factor, expected) in cases {
+            XCTAssertEqual(Ingredient(parsing: input).scaled(by: factor).text, expected, "\(input) x \(factor)")
+        }
+    }
+
+    func testScalingARecipeScalesServings() {
+        let recipe = Recipe(title: "Soup", servings: 4, ingredients: ["2 cups broth", "salt"], steps: ["Simmer."])
+        let doubled = recipe.scaled(by: 2)
+        XCTAssertEqual(doubled.ingredients, ["4 cups broth", "salt"])
+        XCTAssertEqual(doubled.servings, 8)
+        XCTAssertEqual(recipe.scaled(by: 1), recipe)
     }
 
     func testIngredientPartsForDisplay() {

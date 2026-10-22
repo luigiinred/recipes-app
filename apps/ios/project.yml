@@ -14,8 +14,8 @@ settings:
     DEVELOPMENT_TEAM: ${RECIPES_TEAM_ID}
     RECIPES_ICLOUD_CONTAINER: ${RECIPES_ICLOUD_CONTAINER}
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.1"
-    CURRENT_PROJECT_VERSION: "14"
+    MARKETING_VERSION: "1.2"
+    CURRENT_PROJECT_VERSION: "15"
 targets:
   Recipes:
     type: application
@@ -45,6 +45,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        NSAlarmKitUsageDescription: Recipes rings your cooking timers like an alarm, so you hear them even when your phone is silenced.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Recipes connects to your Mealie server on your home network to sync recipes.
@@ -119,7 +120,8 @@ targets:
     supportedDestinations: [iOS]
     sources:
       - TimerWidget
-      - App/LiveActivity/TimerActivityAttributes.swift
+      - App/LiveActivity/TimerAlarmMetadata.swift
+      - App/RecipeLink.swift
     info:
       path: TimerWidget/Info.plist
       properties:

@@ -13,7 +13,7 @@ struct CookModeView: View {
 
     @State private var showingIngredients = false
 
-    private var recipe: Recipe? { library.recipe(id: session.current) }
+    private var recipe: Recipe? { library.recipe(id: session.current)?.scaled(by: session.scale) }
 
     private static let margin: CGFloat = 20
     /// Room at the bottom of a step so its last line can scroll clear of the floating buttons.
@@ -131,7 +131,7 @@ struct CookModeView: View {
                               let seconds = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                                 .queryItems?.first(where: { $0.name == "seconds" })?.value.flatMap(Int.init)
                         else { return .systemAction }
-                        timers.start(label: "\(recipe.title) · step \(index + 1)", seconds: seconds)
+                        timers.start(label: "\(recipe.title) · step \(index + 1)", recipeID: recipe.id, seconds: seconds)
                         return .handled
                     })
                 CookStepIngredients(recipe: recipe, step: index)

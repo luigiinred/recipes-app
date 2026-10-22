@@ -151,17 +151,32 @@ public struct Ingredient: Hashable, Sendable {
         var quantityTokens: [String] = []
         var unit: IngredientUnit?
 
-        while unit == nil, let token = tokens.first, Self.isNumeric(token) {
+        var joinsRange = false
+        while unit == nil, let token = tokens.first {
+            if !quantityTokens.isEmpty, !joinsRange, Self.rangeWords.contains(token.lowercased()), tokens.count > 1, Self.isNumeric(tokens[1]) {
+                tokens.removeFirst()
+                joinsRange = true
+                continue
+            }
+            guard Self.isNumeric(token) else { break }
             tokens.removeFirst()
             let (number, suffix) = Self.splitNumber(token)
-            if suffix.isEmpty {
-                quantityTokens.append(number)
-            } else if let attached = IngredientUnit(alias: suffix) {
-                quantityTokens.append(number)
-                unit = attached
+            let written = suffix.isEmpty || IngredientUnit(alias: suffix) != nil ? number : token
+            if joinsRange, !quantityTokens.isEmpty {
+                quantityTokens[quantityTokens.count - 1] += "-" + written
             } else {
-                quantityTokens.append(token)
+                quantityTokens.append(written)
             }
+            joinsRange = false
+            if !suffix.isEmpty { unit = IngredientUnit(alias: suffix) }
+        }
+        var size = ""
+        if !quantityTokens.isEmpty, unit == nil, tokens.first?.hasPrefix("(") == true,
+           let close = tokens.prefix(6).firstIndex(where: { $0.hasSuffix(")") }), close + 1 < tokens.count,
+           let packaged = IngredientUnit(alias: tokens[close + 1]) {
+            size = tokens[...close].joined(separator: " ")
+            unit = packaged
+            tokens.removeSubrange(...(close + 1))
         }
         if !quantityTokens.isEmpty, unit == nil, let token = tokens.first {
             if ["fl", "fl."].contains(token.lowercased()), tokens.count > 1, ["oz", "oz."].contains(tokens[1].lowercased()) {
@@ -174,7 +189,7 @@ public struct Ingredient: Hashable, Sendable {
         }
         if unit != nil, tokens.first?.lowercased() == "of" { tokens.removeFirst() }
 
-        let item = tokens.joined(separator: " ")
+        let item = ([size] + tokens).filter { !$0.isEmpty }.joined(separator: " ")
         if quantityTokens.isEmpty || item.isEmpty {
             self.init(item: original)
         } else {
@@ -226,10 +241,19 @@ public struct Ingredient: Hashable, Sendable {
 
     /// Numeric value of a quantity such as "1 1/2", "0.5" or "2-3" (a range reads as its upper end).
     static func value(of quantity: String) -> Double? {
-        let range = quantity.split(whereSeparator: { $0 == "-" || $0 == "–" }).map(String.init)
-        guard let upper = range.last else { return nil }
+        rangeEnds(of: quantity)?.upper
+    }
+
+    /// The lower and upper ends of a quantity; both are the same number when it isn't a range.
+    static func rangeEnds(of quantity: String) -> (lower: Double, upper: Double)? {
+        let ends = quantity.split(whereSeparator: { $0 == "-" || $0 == "–" }).map { number(of: String($0)) }
+        guard let first = ends.first, let last = ends.last, let lower = first, let upper = last else { return nil }
+        return (lower, upper)
+    }
+
+    private static func number(of text: String) -> Double? {
         var total = 0.0
-        let parts = upper.split(whereSeparator: \.isWhitespace)
+        let parts = text.split(whereSeparator: \.isWhitespace)
         guard !parts.isEmpty else { return nil }
         for part in parts {
             let pieces = part.split(separator: "/").map { Double($0) }
@@ -247,6 +271,8 @@ public struct Ingredient: Hashable, Sendable {
     private static let vulgarFractions: [Character: String] = [
         "¼": "1/4", "½": "1/2", "¾": "3/4", "⅓": "1/3", "⅔": "2/3", "⅛": "1/8", "⅜": "3/8", "⅝": "5/8", "⅞": "7/8",
     ]
+    /// What can sit between the two ends of a range: "1 to 2", "1 - 2", "1 or 2".
+    static let rangeWords: Set<String> = ["to", "or", "-", "–", "—"]
     private static let numberCharacters = CharacterSet(charactersIn: "0123456789./-–,")
 
     private static func isNumeric(_ token: String) -> Bool {
@@ -266,7 +292,7 @@ public struct Ingredient: Hashable, Sendable {
         return (number, String(rest))
     }
 
-    /// "½" and "1½" become "1/2" and "1 1/2"; surrounding spaces collapse.
+    /// "½" and "1½" become "1/2" and "1 1/2", an en dash in a range becomes a hyphen, and surrounding spaces collapse.
     static func normalizedQuantity(_ quantity: String) -> String {
         var result = ""
         for character in quantity {
@@ -274,7 +300,7 @@ public struct Ingredient: Hashable, Sendable {
                 if let last = result.last, last.isNumber { result.append(" ") }
                 result += fraction
             } else {
-                result.append(character)
+                result.append(character == "–" ? "-" : character)
             }
         }
         return result.split(whereSeparator: \.isWhitespace).joined(separator: " ")
