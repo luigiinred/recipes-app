@@ -115,6 +115,68 @@ final class CategoryTreeTests: XCTestCase {
         XCTAssertEqual(CategoryTree.tags(from: " Dinner / Pasta, ,Soup,"), ["Dinner/Pasta", "Soup"])
     }
 
+    func testBuildFollowsTheChosenOrderThenAlphabetical() {
+        let tags = ["Dinner/Pasta", "Dinner/Soup", "Breakfast", "Dessert"]
+        let tree = CategoryTree.build(from: tags, order: ["Dessert", "Dinner", "Dinner/Soup", "Dinner/Pasta"])
+        XCTAssertEqual(tree.map(\.name), ["Dessert", "Dinner", "Breakfast"])
+        XCTAssertEqual(tree[1].children.map(\.name), ["Soup", "Pasta"])
+    }
+
+    func testNestingACategoryRewritesItsSubtreeAndOrder() {
+        let result = CategoryTree.moved(
+            "Pasta", toParent: "Dinner", before: nil,
+            tags: ["Pasta", "Pasta/Fresh", "Dinner/Soup", "Dessert"], order: []
+        )
+        XCTAssertEqual(result.tags, ["Dinner/Pasta", "Dinner/Pasta/Fresh", "Dinner/Soup", "Dessert"])
+        let tree = CategoryTree.build(from: result.tags, order: result.order)
+        XCTAssertEqual(tree.map(\.name), ["Dessert", "Dinner"])
+        XCTAssertEqual(tree[1].children.map(\.name), ["Soup", "Pasta"])
+        XCTAssertEqual(tree[1].children[1].children.map(\.path), ["Dinner/Pasta/Fresh"])
+    }
+
+    func testReorderingWithinALevelPlacesItBeforeTheSibling() {
+        let result = CategoryTree.moved(
+            "Sweets", toParent: nil, before: "Breakfast",
+            tags: ["Breakfast", "Dinner", "Sweets"], order: []
+        )
+        XCTAssertEqual(result.tags, ["Breakfast", "Dinner", "Sweets"])
+        XCTAssertEqual(CategoryTree.build(from: result.tags, order: result.order).map(\.name), ["Sweets", "Breakfast", "Dinner"])
+    }
+
+    func testMovingToTheTopLevelUnnestsAndMergesDuplicates() {
+        let result = CategoryTree.moved(
+            "Dinner/Soup", toParent: nil, before: nil,
+            tags: ["Dinner/Soup", "Soup", "Dinner/Pasta"], order: []
+        )
+        XCTAssertEqual(result.tags, ["Soup", "Soup", "Dinner/Pasta"])
+        XCTAssertEqual(CategoryTree.build(from: result.tags, order: result.order).map(\.name), ["Dinner", "Soup"])
+    }
+
+    func testACategoryCannotMoveIntoItself() {
+        XCTAssertFalse(CategoryTree.canMove("Dinner", toParent: "Dinner/Pasta"))
+        XCTAssertFalse(CategoryTree.canMove("Dinner", toParent: "dinner"))
+        XCTAssertTrue(CategoryTree.canMove("Dinner/Pasta", toParent: nil))
+        XCTAssertTrue(CategoryTree.canMove("Pasta", toParent: "Dinner"))
+    }
+
+    func testNextSiblingSkipsTheDraggedCategory() {
+        let tree = CategoryTree.build(from: ["Breakfast", "Dinner/Pasta", "Dinner/Soup", "Dinner/Stew", "Sweets"])
+        XCTAssertEqual(CategoryTree.nextSibling(after: "Breakfast", in: tree), "Dinner")
+        XCTAssertEqual(CategoryTree.nextSibling(after: "Dinner/Pasta", in: tree), "Dinner/Soup")
+        XCTAssertEqual(CategoryTree.nextSibling(after: "Dinner/Pasta", excluding: "Dinner/Soup", in: tree), "Dinner/Stew")
+        XCTAssertNil(CategoryTree.nextSibling(after: "Sweets", in: tree))
+    }
+
+    func testOrderPersistsInTheLibraryFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("order-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = Library(root: root).categoryOrder
+        XCTAssertEqual(store.load(), [])
+        try store.save(["Dessert", "Dinner"])
+        XCTAssertEqual(store.load(), ["Dessert", "Dinner"])
+    }
+
     func testCategoryFilterIncludesDescendants() {
         let pasta = Recipe(title: "Pasta", tags: ["Dinner/Pasta"])
         let soup = Recipe(title: "Soup", tags: ["Lunch"])

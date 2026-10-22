@@ -13,6 +13,7 @@ public struct Library: Sendable {
     public var stepImages: RecipeImageStore { RecipeImageStore(directory: root.appendingPathComponent("StepImages")) }
     public var feeds: DocumentStore<Feed> { DocumentStore(directory: root.appendingPathComponent("Feeds")) }
     public var groceries: DocumentStore<GroceryItem> { DocumentStore(directory: root.appendingPathComponent("Groceries")) }
+    public var categoryOrder: CategoryOrderStore { CategoryOrderStore(url: root.appendingPathComponent("CategoryOrder.json")) }
 
     @discardableResult
     public func add(_ result: ImportResult) throws -> Recipe {
