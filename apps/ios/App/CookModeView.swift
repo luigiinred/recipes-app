@@ -131,7 +131,7 @@ struct CookModeView: View {
                               let seconds = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                                 .queryItems?.first(where: { $0.name == "seconds" })?.value.flatMap(Int.init)
                         else { return .systemAction }
-                        timers.start(label: "\(recipe.title) · step \(index + 1)", seconds: seconds)
+                        timers.start(label: "\(recipe.title) · step \(index + 1)", recipeID: recipe.id, seconds: seconds)
                         return .handled
                     })
                 CookStepIngredients(recipe: recipe, step: index)
