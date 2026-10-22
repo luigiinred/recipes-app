@@ -285,16 +285,24 @@ struct SidebarView: View {
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
     @Binding var section: AppSection?
     @Binding var addingFeed: Bool
+    @State private var recipesExpanded = true
     @State private var collapsed: Set<String> = []
 
     var body: some View {
         List(selection: $section) {
             Section {
-                row(.all)
-                ForEach(RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites), id: \.self) { row($0) }
-                ForEach(library.categoryTree) { categoryRows($0) }
-            } header: {
-                Text("Recipes").font(.system(.title2, weight: .bold)).foregroundStyle(.primary)
+                DisclosureGroup(isExpanded: $recipesExpanded) {
+                    row(.all)
+                    ForEach(RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites), id: \.self) { row($0) }
+                    ForEach(library.categoryTree) { categoryRows($0) }
+                } label: {
+                    Label("Recipes", systemImage: "fork.knife")
+                        .padding(.bottom, 6)
+                        .contentShape(Rectangle())
+                        .onTapGesture { recipesExpanded.toggle() }
+                }
+                Label("Plan", systemImage: "calendar").tag(AppSection.plan)
+                Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
             }
             if AppFeatures.feeds {
             Section("Feeds") {
@@ -310,11 +318,8 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
             }
             }
-            Section {
-                Label("Plan", systemImage: "calendar").tag(AppSection.plan)
-                Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
-            }
         }
+        .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 if ReviewPrompt.isDue(recipes: library.recipes, onboarded: onboarded, dismissed: reviewDismissed) {
