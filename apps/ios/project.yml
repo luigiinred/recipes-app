@@ -16,7 +16,7 @@ settings:
     RECIPES_APP_GROUP: group.${RECIPES_BUNDLE_ID}
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.2"
-    CURRENT_PROJECT_VERSION: "15"
+    CURRENT_PROJECT_VERSION: "16"
 targets:
   Recipes:
     type: application
