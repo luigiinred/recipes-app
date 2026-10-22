@@ -60,7 +60,7 @@ extension Ingredient {
     ]
 
     /// "1 1/2" for 1.5, or nil when no common fraction is within 6% of the amount. Past 10 only halves are used.
-    private static func mixedNumber(_ amount: Double) -> String? {
+    static func mixedNumber(_ amount: Double) -> String? {
         var whole = amount.rounded(.down)
         let allowed = amount >= 10 ? fractions.filter { [0, 0.5, 1].contains($0.value) } : fractions
         guard let nearest = allowed.min(by: { abs($0.value - (amount - whole)) < abs($1.value - (amount - whole)) }) else { return nil }

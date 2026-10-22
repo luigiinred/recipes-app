@@ -45,16 +45,31 @@ public enum IngredientParser {
 
     public static func split(_ text: String) -> (quantity: String, name: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let tokens = trimmed.split(whereSeparator: \.isWhitespace).map(String.init)
+        var tokens = trimmed.split(whereSeparator: \.isWhitespace).map(String.init)
         var index = 0
-        while index < tokens.count, isNumeric(tokens[index]) { index += 1 }
+        while index < tokens.count {
+            if isNumeric(tokens[index]) {
+                index += 1
+            } else if index > 0, Ingredient.rangeWords.contains(tokens[index].lowercased()), index + 1 < tokens.count, isNumeric(tokens[index + 1]) {
+                index += 2
+            } else {
+                break
+            }
+        }
         guard index > 0 else { return ("", trimmed) }
+        var size = ""
+        if index < tokens.count, tokens[index].hasPrefix("("),
+           let close = tokens[index...].prefix(6).firstIndex(where: { $0.hasSuffix(")") }), close + 1 < tokens.count,
+           IngredientUnit(alias: tokens[close + 1]) != nil {
+            size = tokens[index...close].joined(separator: " ")
+            tokens.removeSubrange(index...close)
+        }
         if index < tokens.count, IngredientUnit(alias: tokens[index]) != nil {
             index += 1
         }
         let quantity = tokens[..<index].joined(separator: " ")
         if index < tokens.count, tokens[index].lowercased() == "of" { index += 1 }
-        let name = tokens[index...].joined(separator: " ")
+        let name = ([size] + tokens[index...]).filter { !$0.isEmpty }.joined(separator: " ")
         return name.isEmpty ? ("", trimmed) : (quantity, name)
     }
 
