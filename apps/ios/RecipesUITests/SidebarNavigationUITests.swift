@@ -8,7 +8,9 @@ final class SidebarNavigationUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         library = FileManager.default.temporaryDirectory.appendingPathComponent("recipes-ui-\(UUID().uuidString)")
-        _ = try Library(root: library).recipes.save(Recipe(title: "Test Shakshuka", ingredients: ["2 eggs"], steps: ["Cook."], tags: ["Breakfast"]))
+        let recipes = Library(root: library).recipes
+        _ = try recipes.save(Recipe(title: "Test Shakshuka", ingredients: ["2 eggs"], steps: ["Cook."], tags: ["Breakfast"]))
+        _ = try recipes.save(Recipe(title: "Test Carbonara", ingredients: ["1 egg"], steps: ["Cook."], tags: ["Dinner/Pasta"]))
     }
 
     override func tearDown() {
@@ -34,6 +36,26 @@ final class SidebarNavigationUITests: XCTestCase {
 
         app.staticTexts["Favorites"].firstMatch.click()
         XCTAssertFalse(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 2), "Favorites should be empty")
+    }
+
+    func testClickingACategoryShowsItsRecipes() {
+        let app = XCUIApplication()
+        app.launchEnvironment["RECIPES_DIR"] = library.path
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Test Carbonara"].waitForExistence(timeout: 15), "recipe list should show the recipe")
+
+        app.staticTexts["Breakfast"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 10), "Breakfast should list its recipe")
+        XCTAssertFalse(app.staticTexts["Test Carbonara"].waitForExistence(timeout: 2), "Breakfast should hide other recipes")
+
+        app.staticTexts["Dinner"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["Test Carbonara"].waitForExistence(timeout: 10), "a parent category should list its children's recipes")
+        XCTAssertFalse(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 2), "Dinner should hide other recipes")
+
+        app.staticTexts["Pasta"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["Test Carbonara"].waitForExistence(timeout: 10), "a subcategory should list its recipe")
     }
 }
 #endif
