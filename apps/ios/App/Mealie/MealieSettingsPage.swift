@@ -12,6 +12,9 @@ struct MealieSettingsPage: View {
     @State private var isConnecting = false
     @State private var connectError: String?
     @State private var isConfirmingDisconnect = false
+    @State private var isSharing = false
+    @State private var shareError: String?
+    @State private var shareLink: MealieLink?
 
     var body: some View {
         Form {
@@ -25,6 +28,21 @@ struct MealieSettingsPage: View {
         #endif
         .confirmationDialog("Disconnect from Mealie?", isPresented: $isConfirmingDisconnect, titleVisibility: .visible) {
             Button("Disconnect", role: .destructive) { mealie.disconnect() }
+        }
+        .sheet(item: $shareLink) { link in
+            ShareAccessSheet(link: link)
+                .presentationDetents([.medium])
+        }
+    }
+
+    private func share() async {
+        isSharing = true
+        shareError = nil
+        defer { isSharing = false }
+        do {
+            shareLink = try await mealie.makeShareLink()
+        } catch {
+            shareError = error.localizedDescription
         }
     }
 
@@ -115,6 +133,22 @@ struct MealieSettingsPage: View {
         } footer: {
             Text("Groceries go to one Mealie shopping list, made for you if it doesn't exist. Grocery items can also sync with Reminders.")
         }
+        if mealie.canShareAccess {
+            Section {
+                Button {
+                    Task { await share() }
+                } label: {
+                    if isSharing { ProgressView() } else { Label("Share Access", systemImage: "square.and.arrow.up") }
+                }
+                .disabled(isSharing)
+            } footer: {
+                if let shareError {
+                    Text(shareError).foregroundStyle(.red)
+                } else {
+                    Text("Makes a new API token and a link that connects Recipes on another device to this server. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust. Delete the token under API Tokens in Mealie to revoke it.")
+                }
+            }
+        }
         Section {
             Button("Disconnect", role: .destructive) { isConfirmingDisconnect = true }
         } footer: {
@@ -141,4 +175,33 @@ struct MealieSettingsPage: View {
             LabeledContent("Status") { Text(message).foregroundStyle(.red).multilineTextAlignment(.trailing) }
         }
     }
+}
+
+private struct ShareAccessSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let link: MealieLink
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "key.horizontal").font(.largeTitle).foregroundStyle(.tint)
+                Text("A new token was made for this link. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust.")
+                    .multilineTextAlignment(.center)
+                ShareLink(item: link.url, message: Text("Open this on a phone with Recipes to sync with my Mealie server.")) {
+                    Label("Send Link", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            .navigationTitle("Share Access")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
+        }
+    }
+}
+
+extension MealieLink: Identifiable {
+    public var id: String { token }
 }

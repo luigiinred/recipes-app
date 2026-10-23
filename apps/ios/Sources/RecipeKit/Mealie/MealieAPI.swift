@@ -120,6 +120,13 @@ public struct MealieClient: MealieAPI {
         return MealieUser(id: id, username: object["username"] as? String ?? "")
     }
 
+    /// Makes a new API token for the signed-in user and returns its secret, which Mealie shows only once.
+    public func createAPIToken(name: String) async throws -> String {
+        let created = try await object("POST", "users/api-tokens", body: ["name": name])
+        guard let token = created["token"] as? String, !token.isEmpty else { throw MealieError.notMealie }
+        return token
+    }
+
     // MARK: - Recipes
 
     public func recipeList() async throws -> [MealieRecipeSummary] {
