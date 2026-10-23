@@ -3,7 +3,7 @@
   {
    "id": "devices",
    "lineup": true,
-   "caption": "Built for iPhone,<br><em>iPad and Mac.</em>"
+   "caption": "Every recipe you find,<br><em>in one place.</em>"
   },
   {
    "id": "import",
@@ -38,19 +38,23 @@
   {
    "id": "cook",
    "raw": "cook",
-   "caption": "Cook with<br><em>your hands full.</em>"
+   "caption": "Turn the page,<br><em>start the timer.</em>"
   },
   {
    "id": "groceries",
    "raw": "groceries",
    "caption": "Shopping lists that<br><em>stay in sync.</em>"
+  },
+  {
+   "id": "open-source",
+   "card": true
   }
  ],
  "ipad": [
   {
    "id": "devices",
    "lineup": true,
-   "caption": "Built for iPhone,<br><em>iPad and Mac.</em>"
+   "caption": "Every recipe you find,<br><em>in one place.</em>"
   },
   {
    "id": "import",
@@ -80,19 +84,23 @@
   {
    "id": "cook",
    "raw": "cook",
-   "caption": "Step by step,<br><em>in large, clear type.</em>"
+   "caption": "Turn the page,<br><em>start the timer.</em>"
   },
   {
    "id": "groceries",
    "raw": "groceries",
    "caption": "Shopping lists that<br><em>stay in sync.</em>"
+  },
+  {
+   "id": "open-source",
+   "card": true
   }
  ],
  "mac": [
   {
    "id": "devices",
    "lineup": true,
-   "caption": "Built for iPhone,<br><em>iPad and Mac.</em>"
+   "caption": "Every recipe you find,<br><em>in one place.</em>"
   },
   {
    "id": "import",
@@ -128,26 +136,91 @@
    "id": "groceries",
    "raw": "groceries",
    "caption": "Shopping lists that<br><em>stay in sync.</em>"
+  },
+  {
+   "id": "open-source",
+   "card": true
+  }
+ ],
+ "iphone-duo-open": [
+  {
+   "id": "recipe",
+   "raw": "recipe",
+   "caption": "Open it<br><em>like a cookbook.</em>"
+  },
+  {
+   "id": "cook",
+   "raw": "cook",
+   "caption": "Ingredients on one page,<br><em>steps on the other.</em>"
+  },
+  {
+   "id": "plan",
+   "raw": "plan",
+   "caption": "Your queue and your week,<br><em>side by side.</em>"
+  },
+  {
+   "id": "groceries",
+   "raw": "groceries",
+   "caption": "What to buy and<br><em>what's in the basket.</em>"
+  },
+  {
+   "id": "library",
+   "raw": "home",
+   "caption": "Every recipe you find,<br><em>in one place.</em>"
+  },
+  {
+   "id": "open-source",
+   "card": true
+  }
+ ],
+ "iphone-duo": [
+  {
+   "id": "library",
+   "raw": "library",
+   "caption": "Every recipe you find,<br><em>in one place.</em>"
+  },
+  {
+   "id": "import",
+   "raw": "import",
+   "caption": "Save recipes from<br><em>anywhere on the web.</em>"
+  },
+  {
+   "id": "ideas",
+   "raw": "idea",
+   "caption": "Plan your week with<br><em>recipes or ideas.</em>"
+  },
+  {
+   "id": "smart-plan",
+   "raw": "smartplan",
+   "caption": "Apple Intelligence<br><em>plans the gaps.</em>"
+  },
+  {
+   "id": "clean-up",
+   "raw": "cleanup",
+   "caption": "Tidy a messy recipe<br><em>in one tap.</em>"
+  },
+  {
+   "id": "recipe",
+   "raw": "recipe",
+   "caption": "Recipes that<br><em>read like a cookbook.</em>"
+  },
+  {
+   "id": "cook",
+   "raw": "cook",
+   "caption": "Turn the page,<br><em>start the timer.</em>"
+  },
+  {
+   "id": "groceries",
+   "raw": "groceries",
+   "caption": "Shopping lists that<br><em>stay in sync.</em>"
+  },
+  {
+   "id": "open-source",
+   "card": true
   }
  ],
  "card": {
-  "headline": "Open source.<br><em>No account. No ads.</em>",
-  "rows": [
-   {
-    "icon": "code",
-    "title": "Open source",
-    "body": "The code is public under the MIT license. Read it, change it, share it."
-   },
-   {
-    "icon": "cloud",
-    "title": "No account",
-    "body": "Nothing to sign up for. Your recipes are plain files in your own iCloud Drive."
-   },
-   {
-    "icon": "noads",
-    "title": "No ads",
-    "body": "Nothing between you and the recipe."
-   }
-  ]
+  "wordmark": "OpenRecipes",
+  "headline": "Open source.<br><em>No account. No ads.</em>"
  }
 }

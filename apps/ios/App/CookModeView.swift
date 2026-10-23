@@ -26,13 +26,25 @@ struct CookModeView: View {
                 let wide = geometry.size.width >= 860
                 let phone = geometry.size.width < 500
                 let short = geometry.size.height < 500
+                let fold = geometry.verticalFold
                 Group {
                     if let recipe {
-                        if wide {
+                        if wide || fold != nil {
                             HStack(spacing: 0) {
                                 IngredientChecklist(recipe: recipe)
-                                    .frame(width: min(340, geometry.size.width * 0.32))
-                                Divider()
+                                    .frame(width: fold?.minX ?? min(340, geometry.size.width * 0.32))
+                                    #if os(iOS)
+                                    .background { CookbookPaper(spine: .trailing) }
+                                    #endif
+                                if let fold {
+                                    #if os(iOS)
+                                    CookbookPaper(spine: nil).frame(width: fold.width)
+                                    #else
+                                    Color.clear.frame(width: fold.width)
+                                    #endif
+                                } else {
+                                    Divider()
+                                }
                                 stepContent(recipe, fontSize: short ? 28 : 36)
                             }
                         } else {
@@ -97,12 +109,17 @@ struct CookModeView: View {
                 ContentUnavailableView("No steps", systemImage: "list.number")
             } else {
                 #if os(iOS)
-                TabView(selection: Binding(get: { stepIndex(recipe) }, set: { move(recipe, to: $0, count: steps.count) })) {
-                    ForEach(steps.indices, id: \.self) { index in
-                        stepPage(recipe, index: index, fontSize: fontSize).tag(index)
-                    }
+                PageCurl(count: steps.count, index: Binding(get: { stepIndex(recipe) }, set: { move(recipe, to: $0, count: steps.count) })) { index in
+                    // Each page is hosted by UIKit, so it doesn't inherit this view's environment.
+                    stepPage(recipe, index: index, fontSize: fontSize)
+                        .overlay(alignment: .bottom) { pageNumber(index + 1) }
+                        .background { CookbookPaper() }
+                        .environmentObject(library)
+                        .environmentObject(timers)
+                        .appTheme()
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .ignoresSafeArea(edges: [.top, .bottom, .trailing])
+                .id(recipe.id)
                 #else
                 stepPage(recipe, index: stepIndex(recipe), fontSize: fontSize)
                     .background {
@@ -120,7 +137,9 @@ struct CookModeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Step \(index + 1) of \(recipe.steps.count)")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold).smallCaps())
+                    .tracking(1.2)
+                    .foregroundStyle(accent)
                 timerHighlighted(recipe.steps[index], ingredients: recipe.ingredients)
                     .font(.system(size: fontSize))
                     .lineSpacing(fontSize * 0.25)
@@ -143,6 +162,14 @@ struct CookModeView: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private func pageNumber(_ number: Int) -> some View {
+        Text("\(number)")
+            .font(.footnote.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.bottom, 12)
+            .accessibilityHidden(true)
     }
 
     private func timerHighlighted(_ text: String, ingredients: [String]) -> Text {
@@ -208,6 +235,28 @@ struct CookModeView: View {
         session.stepIndex[recipe.id] = min(max(index, 0), count - 1)
     }
 }
+
+#if os(iOS)
+/// A cookbook page: the theme's page color, or warm paper by default, shaded along the spine.
+private struct CookbookPaper: View {
+    var spine: HorizontalEdge? = .leading
+    @Environment(\.appearance) private var appearance
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        let shade = Color.black.opacity(dark ? 0.4 : 0.09)
+        (appearance.canvas ?? (dark ? Color(uiColor: .systemBackground) : Color(red: 0.996, green: 0.984, blue: 0.957)))
+            .overlay(alignment: spine == .trailing ? .trailing : .leading) {
+                if let spine {
+                    LinearGradient(colors: [shade, .clear], startPoint: spine == .leading ? .leading : .trailing, endPoint: spine == .leading ? .trailing : .leading)
+                        .frame(width: 24)
+                }
+            }
+            .ignoresSafeArea()
+    }
+}
+#endif
 
 private struct TimerPill: TextAttribute {}
 
@@ -342,11 +391,17 @@ struct IngredientChecklist: View {
                         }
                         .buttonStyle(.plain)
                         .conversionMenu(for: text)
+                        #if os(iOS)
+                        .listRowBackground(Color.clear)
+                        #endif
                     }
                 }
             }
         }
         .listStyle(.plain)
+        #if os(iOS)
+        .scrollContentBackground(.hidden)
+        #endif
     }
 }
 
@@ -432,11 +487,15 @@ private struct CookModeCover: ViewModifier {
 
     func body(content: Content) -> some View {
         coverBody(content)
-            .onChange(of: router.cookRecipeID, initial: true) { _, id in
-                guard let id, let recipe = library.recipe(id: id) else { return }
-                session.start(recipe)
-                router.cookRecipeID = nil
-            }
+            .onChange(of: router.cookRecipeID, initial: true) { startRequestedRecipe() }
+            .onChange(of: library.recipes.count) { startRequestedRecipe() }
+    }
+
+    /// A link, alarm or reminder can ask to cook before the library has loaded, so this also runs once it has.
+    private func startRequestedRecipe() {
+        guard let id = router.cookRecipeID, let recipe = library.recipe(id: id) else { return }
+        session.start(recipe)
+        router.cookRecipeID = nil
     }
 
     @ViewBuilder

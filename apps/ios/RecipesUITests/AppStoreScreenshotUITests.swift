@@ -22,7 +22,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
 
-        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19'")
+        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '19 recipes'")
         XCTAssertTrue(app.staticTexts.matching(loaded).firstMatch.waitForExistence(timeout: 40), "library should load")
         sleep(3)
         let regular = app.windows.firstMatch.frame.width > 700
@@ -32,19 +32,20 @@ final class AppStoreScreenshotUITests: XCTestCase {
         case "home":
             break
         case "library":
-            if regular { openRecipe(hero) } else { open("All Recipes") }
+            showAllRecipes()
+            if regular, env["APP_STORE_STYLE"] == "list" { openRecipe(hero) }
         case "list":
             open("All Recipes")
         case "recipe":
-            if !regular { open("All Recipes") }
+            showAllRecipes()
             openRecipe(hero)
         case "ingredients":
-            if !regular { open("All Recipes") }
+            showAllRecipes()
             openRecipe(hero)
             app.swipeUp()
             app.swipeUp()
         case "cook":
-            if !regular { open("All Recipes") }
+            showAllRecipes()
             openRecipe(hero)
             tapButton("Cook")
             sleep(3)
@@ -71,8 +72,9 @@ final class AppStoreScreenshotUITests: XCTestCase {
             tapButton("Add Recipe")
             tapButton("Import from Web or YouTube…")
             let field = app.textFields.firstMatch
-            XCTAssertTrue(field.waitForExistence(timeout: 8))
+            XCTAssertTrue(field.waitForExistence(timeout: 15))
             field.tap()
+            sleep(1)
             field.typeText("http://localhost:8765/lemon-herb-gnocchi.html")
             tapButton("Import")
             let previewed = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Lemon Herb Gnocchi' OR value == 'Lemon Herb Gnocchi'")).firstMatch.waitForExistence(timeout: 40)
@@ -88,11 +90,11 @@ final class AppStoreScreenshotUITests: XCTestCase {
             XCTAssertTrue(field.waitForExistence(timeout: 8))
             field.tap()
             field.typeText("Taco night")
-            tapButton("Add")
+            tapIdeaAdd()
             XCTAssertTrue(app.staticTexts["Taco night"].firstMatch.waitForExistence(timeout: 8), "the idea should join the week")
             if regular { openRecipe("Thai Red Curry") }
         case "cleanup":
-            if !regular { open("All Recipes") }
+            showAllRecipes()
             openRecipe(hero)
             tapButton("More")
             tapButton("Edit")
@@ -255,7 +257,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             }
             sleep(1)
             mark("submit")
-            tapButton("Add")
+            tapIdeaAdd()
             XCTAssertTrue(app.staticTexts["Taco night"].firstMatch.waitForExistence(timeout: 8), "the idea should join the week")
             mark("idea")
             sleep(3)
@@ -421,6 +423,11 @@ final class AppStoreScreenshotUITests: XCTestCase {
         openRecipe(title)
     }
 
+    /// Some layouts start on the recipe cards; the others list collections first.
+    private func showAllRecipes() {
+        if !app.staticTexts[hero].firstMatch.waitForExistence(timeout: 3) { open("All Recipes") }
+    }
+
     private func open(_ title: String) {
         let row = app.staticTexts[title].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "No \(title)")
@@ -449,6 +456,13 @@ final class AppStoreScreenshotUITests: XCTestCase {
         }
         print(app.debugDescription)
         XCTFail("No tab \(name)")
+    }
+
+    /// The tab bar has its own Add button (identifier "plus"), so pick the meal sheet's.
+    private func tapIdeaAdd() {
+        let add = app.buttons.matching(NSPredicate(format: "label == 'Add' AND identifier != 'plus'")).firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 8), "No Add button for the idea")
+        add.tap()
     }
 
     private func tapButton(_ name: String) {
