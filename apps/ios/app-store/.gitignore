@@ -1,2 +1,11 @@
 tools/raw/
 __pycache__/
+*.mp4
+preview/node_modules/
+preview/footage/
+preview/renders/
+preview/.cache/
+# Third-party material the videos use but this repository does not redistribute: see preview/README.md.
+preview/seed/lasagna/
+preview/assets/bezel-*.png
+preview/music/*.mp3

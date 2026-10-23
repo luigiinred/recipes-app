@@ -198,6 +198,7 @@ struct CookModeView: View {
                     .accessibilityLabel("Ingredients")
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .bottomTrailing)
             .padding(.horizontal, Self.margin)
             .padding(.bottom, 8)
         }

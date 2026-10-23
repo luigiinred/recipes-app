@@ -15,8 +15,15 @@ struct ConfirmButton: View {
     let action: () -> Void
 
     var body: some View {
+        #if os(iOS)
+        Button(action: action) { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(.white) }
+            .buttonStyle(.glassProminent)
+            .accessibilityLabel(title)
+            .disabled(isDisabled)
+        #else
         Button(action: action) { Label(title, systemImage: "checkmark") }
             .labelStyle(.iconOnly)
             .disabled(isDisabled)
+        #endif
     }
 }
