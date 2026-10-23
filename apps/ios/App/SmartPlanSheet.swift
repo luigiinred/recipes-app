@@ -114,12 +114,9 @@ struct SmartPlanSheet: View {
         }
         .overlay {
             if suggestions.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing to plan", systemImage: "calendar")
-                } description: {
-                    Text("Every slot for those meals is already filled, or there are no recipes to use.")
-                } actions: {
-                    Button("Back") { phase = .options }
+                MascotEmptyState(scene: .sour, character: .lemon, title: "Nothing to plan",
+                                 message: "Every slot for those meals is already filled, or there are no recipes to use.") {
+                    Button("Back") { phase = .options }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)
                 }
             }
         }
