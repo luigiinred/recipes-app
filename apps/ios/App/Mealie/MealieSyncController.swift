@@ -49,11 +49,8 @@ final class MealieSyncController: ObservableObject {
 
     var address: String? { previewAddress ?? connection?.server }
     var username: String? { previewUsername ?? connection?.username }
-    /// The link that pairs another device with this server. Nil in previews, which have no real token.
-    var shareLink: MealieLink? {
-        guard let connection, let server = URL(string: connection.server) else { return nil }
-        return MealieLink(server: server, token: connection.token)
-    }
+    /// False in previews, which have no real connection to mint a token from.
+    var canShareAccess: Bool { connection != nil }
 
     var isConnected: Bool { previewAddress != nil || connection != nil }
 
@@ -69,6 +66,14 @@ final class MealieSyncController: ObservableObject {
         connection = paired
         status = .idle
         request()
+    }
+
+    /// Makes a token just for this share, so access can be revoked without disconnecting any of your own devices.
+    func makeShareLink() async throws -> MealieLink {
+        guard let connection, let server = MealieClient.normalizedServer(connection.server) else { throw MealieError.notMealie }
+        let name = "Recipes shared \(Date().formatted(date: .abbreviated, time: .shortened))"
+        let token = try await MealieClient(server: server, token: connection.token).createAPIToken(name: name)
+        return MealieLink(server: server, token: token)
     }
 
     /// Stops syncing and forgets the token on every device. Recipes already copied either way stay where they are.
