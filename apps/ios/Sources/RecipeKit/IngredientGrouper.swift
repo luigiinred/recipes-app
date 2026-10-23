@@ -75,22 +75,7 @@ public enum IngredientGrouper {
         guard ingredients.count >= 4 else { return .unchanged }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
-            let session = LanguageModelSession(instructions: """
-                You decide whether a recipe's ingredient list needs sections. Most recipes do not: use one section name for every \
-                ingredient unless the method makes a distinct part of the meal separately and then combines or serves it with the \
-                rest, such as a salad's dressing, a pie's filling and crust, or a dish's sauce. Never group by type of ingredient \
-                (spices, produce, dairy, pantry) or by when an ingredient is added; seasonings, oil and garnishes stay with the \
-                part of the meal they flavor. Name each section after the part of the meal it makes, like "Salad" and "Dressing". \
-                Write one assignment for every ingredient, in order, using the same section name for ingredients that belong together.
-
-                Example 1. Ingredients: 1 romaine, 2 cucumber, 3 olive oil, 4 lemon juice, 5 Dijon mustard, 6 salt. Method: toss the \
-                romaine and cucumber; whisk the oil, lemon juice, mustard and salt and pour over. Assignments: 1 Salad, 2 Salad, \
-                3 Dressing, 4 Dressing, 5 Dressing, 6 Dressing.
-
-                Example 2. Ingredients: 1 chicken thighs, 2 onion, 3 garlic, 4 paprika, 5 cumin, 6 salt, 7 olive oil. Method: season \
-                the chicken, then cook it with the onion and garlic in the oil. Assignments: 1 Chicken, 2 Chicken, 3 Chicken, \
-                4 Chicken, 5 Chicken, 6 Chicken, 7 Chicken.
-                """)
+            let session = LanguageModelSession(instructions: AIAction.groupIngredients.instructions())
             let list = ingredients.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
             let method = steps.joined(separator: " ").prefix(1800)
             do {

@@ -17,7 +17,7 @@ public enum TranscriptRecipeExtractor {
     public static func prewarm() {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *), isAvailable {
-            LanguageModelSession(instructions: instructions).prewarm()
+            LanguageModelSession(instructions: Material.captions.instructions).prewarm()
         }
         #endif
     }
@@ -28,19 +28,8 @@ public enum TranscriptRecipeExtractor {
 
         fileprivate var instructions: String {
             switch self {
-            case .captions: """
-                You turn the spoken captions of a cooking video into a written recipe. \
-                Only use what the cook says. Do not invent ingredients, quantities or steps.
-
-                \(RecipeStandards.extractionRules)
-                """
-            case .webPage: """
-                You find the recipe in the text of a web page and write it out. The page may also hold \
-                navigation, comments and ads: ignore them. Only use what the page says. \
-                Do not invent ingredients, quantities or steps.
-
-                \(RecipeStandards.extractionRules)
-                """
+            case .captions: AIAction.videoCaptions.instructions()
+            case .webPage: AIAction.webPage.instructions()
             }
         }
 
@@ -51,8 +40,6 @@ public enum TranscriptRecipeExtractor {
             }
         }
     }
-
-    private static let instructions = Material.captions.instructions
 
     public enum Outcome: Sendable {
         case extracted(Extracted)

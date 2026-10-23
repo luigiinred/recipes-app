@@ -32,10 +32,7 @@ public enum StepSplitter {
     private static func parts(of text: String) async -> [String]? {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
-            let session = LanguageModelSession(instructions: """
-                A recipe's method was pasted as one block. Split it into separate steps in the original order. \
-                Keep the author's words. Do not add, drop or reorder anything. Each step is one action or two related ones.
-                """)
+            let session = LanguageModelSession(instructions: AIAction.splitSteps.instructions())
             do {
                 let response = try await session.respond(to: String(text.prefix(3000)), generating: GeneratedMethod.self)
                 return validated(response.content.steps, original: String(text.prefix(3000)))

@@ -469,6 +469,17 @@ private struct IntelligenceSettingsPage: View {
                     Text(status.explanation + " Smart Plan falls back to a simple rotation, and a video without a written recipe opens as a draft with its captions beside it.")
                 }
             }
+            Section {
+                ForEach(AIAction.allCases) { action in
+                    NavigationLink { PromptSettingsPage(action: action) } label: {
+                        PromptRow(action: action)
+                    }
+                }
+            } header: {
+                Text("Prompts")
+            } footer: {
+                Text("The instructions the on-device model follows for each job. Open one to read it, or turn on Customize to write your own.")
+            }
         }
         .formStyle(.grouped)
         .settingsPage("Apple Intelligence")
@@ -481,6 +492,89 @@ private struct IntelligenceSettingsPage: View {
         } label: {
             Text(title)
         }
+    }
+}
+
+private struct PromptRow: View {
+    let action: AIAction
+    @AppStorage private var customized: Bool
+
+    init(action: AIAction) {
+        self.action = action
+        _customized = AppStorage(wrappedValue: false, action.isCustomizedKey)
+    }
+
+    var body: some View {
+        LabeledContent {
+            Text(customized ? "Custom" : "Default")
+                .foregroundStyle(customized ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary))
+        } label: {
+            Label(action.title, systemImage: action.symbol)
+        }
+    }
+}
+
+private struct PromptSettingsPage: View {
+    let action: AIAction
+    @AppStorage private var customized: Bool
+    @AppStorage private var text: String
+
+    init(action: AIAction) {
+        self.action = action
+        _customized = AppStorage(wrappedValue: false, action.isCustomizedKey)
+        _text = AppStorage(wrappedValue: "", action.textKey)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Customize this prompt", isOn: customizing)
+            } footer: {
+                Text(action.summary)
+            }
+            Section {
+                if customized {
+                    TextEditor(text: $text)
+                        .font(.callout)
+                        .frame(minHeight: 280)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.sentences)
+                        #endif
+                } else {
+                    Text(action.defaultInstructions)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text(customized ? "Your prompt" : "Default prompt")
+            } footer: {
+                if customized {
+                    Text("Only the instructions change. The app still decides what the model hands back, so a prompt can't break an import. Leave it empty to use the default.")
+                } else {
+                    Text("This is what the model is told today. Turn on Customize to start from it and make it your own.")
+                }
+            }
+            if customized {
+                Section {
+                    Button("Reset to Default Prompt", role: .destructive) { text = action.defaultInstructions }
+                        .disabled(text == action.defaultInstructions)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage(action.title)
+    }
+
+    private var customizing: Binding<Bool> {
+        Binding(
+            get: { customized },
+            set: { on in
+                if on, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = action.defaultInstructions }
+                customized = on
+            }
+        )
     }
 }
 

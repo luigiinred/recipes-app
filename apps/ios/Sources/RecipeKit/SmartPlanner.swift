@@ -145,11 +145,7 @@ public enum SmartPlanner {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *), isAvailable, !request.recipes.isEmpty, !request.freeSlots.isEmpty {
             let limited = PlanRequest(days: request.days, meals: request.meals, recipes: Array(request.recipes.prefix(60)), taken: request.taken)
-            let session = LanguageModelSession(instructions: """
-                You plan a week of home cooking from the user's own recipes. Refer to recipes and days only by the numbers given. \
-                Prefer queued recipes and favorites, vary cuisines and ingredients across the week, put quick recipes on busy-sounding weekdays \
-                and longer ones on weekends, and never repeat a recipe on the same day. Breakfast recipes belong at breakfast.
-                """)
+            let session = LanguageModelSession(instructions: AIAction.planWeek.instructions())
             do {
                 let response = try await session.respond(to: prompt(for: limited), generating: GeneratedWeekPlan.self)
                 return validated(response.content.meals.map { ($0.recipeNumber, $0.dayNumber, $0.meal) }, for: limited)
