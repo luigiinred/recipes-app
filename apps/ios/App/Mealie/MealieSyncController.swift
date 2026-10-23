@@ -49,6 +49,12 @@ final class MealieSyncController: ObservableObject {
 
     var address: String? { previewAddress ?? connection?.server }
     var username: String? { previewUsername ?? connection?.username }
+    /// The link that pairs another device with this server. Nil in previews, which have no real token.
+    var shareLink: MealieLink? {
+        guard let connection, let server = URL(string: connection.server) else { return nil }
+        return MealieLink(server: server, token: connection.token)
+    }
+
     var isConnected: Bool { previewAddress != nil || connection != nil }
 
     // MARK: - Connecting

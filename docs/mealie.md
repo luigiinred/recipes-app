@@ -8,6 +8,8 @@ The sync code is `MealieSync` in `apps/ios/Sources/RecipeKit/Mealie`, shared by 
 
 In Mealie, open your profile, choose **API Tokens** and create one. In the app, go to Settings, Mealie, and enter the server address and token. The address and token are kept in one iCloud Keychain item, so pairing one device pairs every device signed in to the same iCloud account, and disconnecting on one disconnects them all. Which things sync (planned meals, groceries, the shopping list name) is still chosen per device. Use `https://`; plain `http://` only works for servers on your local network.
 
+To pair another device, open Settings, Mealie and tap **Share Access**. It sends a `recipes://mealie?server=<address>&token=<token>` link; opening it on a device with the app asks before connecting. The link carries the API token, so anyone who opens it can read and change your Mealie recipes. Send it only to people you trust, and delete the token in Mealie to revoke it. The link only works once the app is installed; if it isn't, install the app and open the link again.
+
 From a terminal:
 
 ```bash

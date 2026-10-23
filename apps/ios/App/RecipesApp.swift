@@ -1,3 +1,4 @@
+import RecipeKit
 import SwiftUI
 
 @main
@@ -16,6 +17,7 @@ struct RecipesApp: App {
         WindowGroup {
             RootView()
                 .onboardingTour()
+                .mealiePairingPrompt()
                 .environmentObject(library)
                 .environmentObject(feeds)
                 .environmentObject(cook)
@@ -33,7 +35,8 @@ struct RecipesApp: App {
                 .onChange(of: library.groceries) { mealie.request() }
                 .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); rescheduleReminders() } }
                 .onOpenURL { url in
-                    if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
+                    if let link = MealieLink(url: url) { router.mealieLink = link }
+                    else if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
                     else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
                     else if let destination = RecipeLink.destination(from: url) { router.destination = destination }
                 }

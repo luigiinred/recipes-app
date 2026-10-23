@@ -115,6 +115,15 @@ struct MealieSettingsPage: View {
         } footer: {
             Text("Groceries go to one Mealie shopping list, made for you if it doesn't exist. Grocery items can also sync with Reminders.")
         }
+        if let link = mealie.shareLink {
+            Section {
+                ShareLink(item: link.url, message: Text("Open this on a phone with Recipes to sync with my Mealie server.")) {
+                    Label("Share Access", systemImage: "square.and.arrow.up")
+                }
+            } footer: {
+                Text("Sends a link that connects Recipes on another device to this server. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust. To revoke it, delete the token in Mealie.")
+            }
+        }
         Section {
             Button("Disconnect", role: .destructive) { isConfirmingDisconnect = true }
         } footer: {
