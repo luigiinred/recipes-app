@@ -32,12 +32,14 @@ struct RecipeDetailView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if geometry.size.width >= 760, !recipe.isIdea {
-                twoColumns(width: geometry.size.width)
+            let fold = geometry.verticalFold
+            if geometry.size.width >= 760 || fold != nil, !recipe.isIdea {
+                twoColumns(width: geometry.size.width, fold: fold, trailingInset: geometry.safeAreaInsets.trailing)
             } else {
                 oneColumn
             }
         }
+        .collapsesSidebarWhenUnfolded()
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
         .background(.background)
@@ -151,8 +153,10 @@ struct RecipeDetailView: View {
     }
 
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
-    private func twoColumns(width: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+    /// On an unfolded Duo the fold divides them, and the ingredients and photo run under the trailing bars.
+    private func twoColumns(width: CGFloat, fold: CGRect?, trailingInset: CGFloat) -> some View {
+        let sideWidth = fold.map { width - $0.maxX } ?? min(420, max(320, width * 0.36))
+        return HStack(alignment: .top, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     if recipe.youTubeVideoID != nil { video }
@@ -165,7 +169,12 @@ struct RecipeDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-            Divider()
+            .frame(width: fold?.minX)
+            if let fold {
+                Color.clear.frame(width: fold.width)
+            } else {
+                Divider()
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if hasArtwork {
@@ -175,7 +184,7 @@ struct RecipeDetailView: View {
                             .overlay { artwork }
                             .clipped()
                     }
-                    ingredients.padding(24)
+                    ingredients.padding(24).padding(.trailing, trailingInset)
                 }
             }
             .ignoresSafeArea(edges: .top)
@@ -183,9 +192,10 @@ struct RecipeDetailView: View {
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 1 } action: { _, scrolled in
                 sidePaneScrolled = scrolled
             }
-            .frame(width: min(420, max(320, width * 0.36)))
+            .frame(width: sideWidth + trailingInset)
             .background(.quaternary.opacity(0.25))
         }
+        .ignoresSafeArea(edges: .trailing)
         .textSelection(.enabled)
     }
 

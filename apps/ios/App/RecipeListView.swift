@@ -271,12 +271,14 @@ struct CategoryScanSheet: View {
 }
 
 /// A titled, adaptive grid: folder tiles on the Recipes home, subcategories and cards in a category.
+/// On an unfolded Duo each page gets its own columns, so no tile sits on the fold.
 struct GridSection<Content: View>: View {
     let title: String?
     let minimum: CGFloat
     let spacing: CGFloat
     var takesCategories = false
     @ViewBuilder let content: Content
+    @State private var space = GridSpace(width: 0, fold: nil)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -284,9 +286,29 @@ struct GridSection<Content: View>: View {
                 if takesCategories { Text(title).font(.title3.weight(.semibold)).categoryRootDrop() }
                 else { Text(title).font(.title3.weight(.semibold)) }
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: spacing)], spacing: spacing) { content }
+            LazyVGrid(columns: columns, spacing: spacing) { content }
+                .onGeometryChange(for: GridSpace.self) { GridSpace(width: $0.size.width, fold: $0.verticalFold) } action: { space = $0 }
         }
     }
+
+    private var columns: [GridItem] {
+        guard let fold = space.fold else { return [GridItem(.adaptive(minimum: minimum), spacing: spacing)] }
+        let leading = page(fold.minX - spacing / 2), trailing = page(space.width - fold.maxX - spacing / 2)
+        let leadingItems = (0..<leading.count).map { index in
+            GridItem(.fixed(leading.width), spacing: index == leading.count - 1 ? fold.width + spacing : spacing)
+        }
+        return leadingItems + Array(repeating: GridItem(.fixed(trailing.width), spacing: spacing), count: trailing.count)
+    }
+
+    private func page(_ width: CGFloat) -> (count: Int, width: CGFloat) {
+        let count = max(1, Int((width + spacing) / (minimum + spacing)))
+        return (count, (width - CGFloat(count - 1) * spacing) / CGFloat(count))
+    }
+}
+
+private struct GridSpace: Equatable {
+    var width: CGFloat
+    var fold: CGRect?
 }
 
 struct FindRecipesAction {

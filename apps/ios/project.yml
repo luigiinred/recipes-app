@@ -54,6 +54,11 @@ targets:
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         LSApplicationCategoryType: public.app-category.food-and-drink
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft

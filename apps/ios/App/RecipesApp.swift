@@ -34,11 +34,10 @@ struct RecipesApp: App {
                 .onChange(of: library.mealPlan) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.groceries) { mealie.request() }
                 .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); rescheduleReminders() } }
-                .onOpenURL { url in
-                    if let link = MealieLink(url: url) { router.mealieLink = link }
-                    else if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
-                    else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
-                    else if let destination = RecipeLink.destination(from: url) { router.destination = destination }
+                .onOpenURL(perform: open)
+                .task {
+                    // App Store captures on an unfolded iPhone Duo can't drive the app with UI tests, so they open a link at launch.
+                    if let link = ProcessInfo.processInfo.environment["RECIPES_OPEN_URL"], let url = URL(string: link) { open(url) }
                 }
         }
         #if os(macOS)
@@ -49,6 +48,13 @@ struct RecipesApp: App {
                 .appTheme()
         }
         #endif
+    }
+
+    private func open(_ url: URL) {
+        if let link = MealieLink(url: url) { router.mealieLink = link }
+        else if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
+        else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
+        else if let destination = RecipeLink.destination(from: url) { router.destination = destination }
     }
 
     private func rescheduleReminders() {

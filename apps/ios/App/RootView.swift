@@ -252,13 +252,21 @@ struct GroceriesTab: View {
 }
 #endif
 
-/// To buy beside completed, for screens wide enough to show both.
+/// To buy beside completed, for screens wide enough to show both; on an unfolded Duo the fold divides them.
 struct GroceriesBoard: View {
     var body: some View {
-        HStack(spacing: 0) {
-            GroceriesView(layout: .toBuy, embedded: true)
-            Divider()
-            GroceriesView(layout: .completed, embedded: true)
+        GeometryReader { geometry in
+            let fold = geometry.verticalFold
+            HStack(spacing: 0) {
+                GroceriesView(layout: .toBuy, embedded: true)
+                    .frame(width: fold?.minX)
+                if let fold {
+                    Color.clear.frame(width: fold.width)
+                } else {
+                    Divider()
+                }
+                GroceriesView(layout: .completed, embedded: true)
+            }
         }
         .navigationTitle("Groceries")
         .toolbar { GroceriesMenu() }
