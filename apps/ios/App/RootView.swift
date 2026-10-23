@@ -449,7 +449,11 @@ struct SidebarView: View {
 
     /// Drop a recipe on a category to file it there; drag a category to reorder or nest it.
     private func categoryRow(_ path: String) -> some View {
-        row(.category(path)).categoryDragAndDrop(path)
+        let collection = RecipeCollection.category(path)
+        // The selection tag must wrap the drag and drop modifiers or a click can't select the row.
+        return Label(collection.title, systemImage: collection.symbol)
+            .categoryDragAndDrop(path)
+            .tag(AppSection.recipes(collection))
     }
 
     private func row(_ collection: RecipeCollection) -> some View {
