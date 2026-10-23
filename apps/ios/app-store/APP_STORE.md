@@ -46,6 +46,8 @@ Marketing ideas not yet done: an **app preview video** (cook mode with a timer, 
 | iPhone screenshots (10) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
 | iPad screenshots (9) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
 | Mac screenshots (9) | [`images/mac/`](images/mac/) | 2880 × 1800 | Mac |
+| iPhone Duo screenshots, open (6) | [`images/iphone-duo-open/`](images/iphone-duo-open/) | 2853 × 2007 | iPhone Duo |
+| iPhone Duo screenshots, closed (9) | [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034 | iPhone Duo, if the open set isn't used |
 | Product page header | [`images/creative/header.png`](images/creative/header.png) | 3840 × 1646 (21:9) | Product page header |
 | Search result image | [`images/creative/search.png`](images/creative/search.png) | 3840 × 2560 (3:2) | Search results |
 | Universal creative | [`images/creative/universal.png`](images/creative/universal.png) | 5244 × 2950 (16:9) | Header and search from one file |
@@ -142,61 +144,45 @@ Welcome to Recipes. Save recipes from the web or a video, plan your week, and co
 
 ## Screenshots and captions
 
-Each screenshot is a real capture of the app using the fictional recipe library in `tools/seed/`, except the devices shot (a composite of three captures) and the closing card (designed, not captured). Captions are set in New York on a dark warm brown, with the emphasized words in orange from the icon's utensils. They live in [`tools/captions.json`](tools/captions.json) so they can be localized without redoing artwork.
+### The story
 
-All three sets follow the same story, the pillars from [Positioning](#positioning) first and the everyday features after:
+Every set tells the same story as the [preview videos](preview/), in the same look: warm paper, a serif caption with its second line in orange, and one orange line that runs under every caption and carries from screenshot to screenshot, ending on a dark card with the icon. Captions live in [`tools/captions.json`](tools/captions.json) so they can be localized without redoing artwork.
 
-1. **Devices.** Built for iPhone, iPad and Mac.
-2. **Import.** Save recipes from anywhere on the web. This is the review screen after importing a fictional recipe page served from this machine (`tools/seed/site`), so no third-party brand, photo or URL appears.
-3. **Ideas.** Plan your week with recipes or ideas. "Taco night" sits in the week beside real recipes.
-4. **Smart Plan.** Apple Intelligence plans the gaps. The Smart Plan sheet, before it runs (see the notes below).
-5. **Clean Up.** Tidy a messy recipe in one tap. The editor's "Clean Up with Apple Intelligence" button and what it does.
-6. onward. Library, recipe, cook mode and groceries, then the closing open-source card.
+1. **The hook.** *Every recipe you find, in one place.* Recipes live in browser tabs, screenshots, videos and cookbooks. The first frame shows them gathered in one library, on every device.
+2. **Save.** *Save recipes from anywhere on the web.* The review screen after importing a fictional page served from this machine (`tools/seed/site`), so no third-party brand, photo or URL appears.
+3. **Plan.** *Plan your week with recipes or ideas.* "Taco night" sits in the week beside real recipes.
+4. **Apple Intelligence.** *Apple Intelligence plans the gaps*, and *tidies a messy recipe in one tap.* The Smart Plan sheet and the editor's Clean Up button (see the notes below).
+5. **Keep.** The library and a recipe page that reads like a cookbook.
+6. **Cook.** *Turn the page, start the timer.* Cook mode turns its steps like the pages of a cookbook, and every time in a step is a timer.
+7. **Shop.** *Shopping lists that stay in sync* with Reminders.
+8. **The close.** *Open source. No account. No ads.* The paper gives way to the dark card with the icon and the OpenRecipes wordmark.
 
-### iPhone (6.9")
+For marketing beyond the store, the same arc in one line: *every recipe you find, saved, planned and cooked from one place, open source and yours.* The pillars and their wording come from [Positioning](#positioning).
 
-| # | File | Caption | Shows |
+### Style
+
+| Role | Value |
+|---|---|
+| Paper | `#FFF1E0`, flat |
+| Ink | `#2B2320` |
+| Accent (caption second line, the line) | `#E8672A` on paper, `#FF8A4C` on the dark card |
+| Closing card | `#2B2320` with a soft `#FF8A4C` glow behind the icon |
+| Type | New York semibold for captions and the wordmark |
+| Screens | Real captures with a warm soft shadow; the iPhone in Apple's Cosmic Orange frame when [`preview/assets`](preview/assets) has it (see [`preview/README.md`](preview/README.md)) |
+
+### Sets
+
+| Set | Size | Upload to | Frames |
 |---|---|---|---|
-| 1 | [`01-devices.jpg`](images/iphone/01-devices.jpg) | Built for iPhone, *iPad and Mac.* | The library on a Mac window, an iPad and an iPhone |
-| 2 | [`02-import.jpg`](images/iphone/02-import.jpg) | Save recipes from *anywhere on the web.* | Import review for the fictional gnocchi page |
-| 3 | [`03-ideas.jpg`](images/iphone/03-ideas.jpg) | Plan your week with *recipes or ideas.* | My Week with "Taco night" among recipes |
-| 4 | [`04-smart-plan.jpg`](images/iphone/04-smart-plan.jpg) | Apple Intelligence *plans the gaps.* | Smart Plan sheet |
-| 5 | [`05-clean-up.jpg`](images/iphone/05-clean-up.jpg) | Tidy a messy recipe *in one tap.* | Recipe editor, Clean Up with Apple Intelligence |
-| 6 | [`06-library.jpg`](images/iphone/06-library.jpg) | Every recipe, *beautifully kept.* | Photo-card library |
-| 7 | [`07-recipe.jpg`](images/iphone/07-recipe.jpg) | Recipes that *read like a cookbook.* | Recipe page with hero photo and ingredients |
-| 8 | [`08-cook.jpg`](images/iphone/08-cook.jpg) | Cook with *your hands full.* | Cook mode, large type, step ingredients |
-| 9 | [`09-groceries.jpg`](images/iphone/09-groceries.jpg) | Shopping lists that *stay in sync.* | Groceries |
-| 10 | [`10-open-source.jpg`](images/iphone/10-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture: MIT license, iCloud Drive files, no ads |
+| [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" | hook (all devices), save, plan, Smart Plan, Clean Up, library, recipe, cook, groceries, card |
+| [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" | hook, save, plan, Smart Plan, Clean Up, library, cook, groceries, card |
+| [`images/mac/`](images/mac/) | 2880 × 1800 | Mac | hook, save, plan, Smart Plan, Clean Up, library, cook, groceries, card |
+| [`images/iphone-duo-open/`](images/iphone-duo-open/) | 2853 × 2007, inner display, book posture | iPhone Duo | recipe across both pages, cook mode as a two-page spread, Up Next beside My Week, groceries, home, card |
+| [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034, outer display | iPhone Duo (alternative) | the iPhone story on the closed device |
 
-### iPad (13", landscape)
+App Store Connect takes one iPhone Duo set per language at either display size. The open, book-posture set is the one to upload: it is what the Duo does that no other iPhone can. Its captions tell the folding version of the story: *Open it like a cookbook*, *Ingredients on one page, steps on the other*, *Your queue and your week, side by side*, *What to buy and what's in the basket*.
 
-| # | File | Caption | Shows |
-|---|---|---|---|
-| 1 | [`01-devices.jpg`](images/ipad/01-devices.jpg) | Built for iPhone, *iPad and Mac.* | Same lineup, laid out for landscape |
-| 2 | [`02-import.jpg`](images/ipad/02-import.jpg) | Save recipes from *anywhere on the web.* | Import review |
-| 3 | [`03-ideas.jpg`](images/ipad/03-ideas.jpg) | Plan your week with *recipes or ideas.* | My Week beside a recipe |
-| 4 | [`04-smart-plan.jpg`](images/ipad/04-smart-plan.jpg) | Apple Intelligence *plans the gaps.* | Smart Plan sheet |
-| 5 | [`05-clean-up.jpg`](images/ipad/05-clean-up.jpg) | Tidy a messy recipe *in one tap.* | Recipe editor |
-| 6 | [`06-library.jpg`](images/ipad/06-library.jpg) | Your whole cookbook, *beautifully laid out.* | Library with the tab bar across the top |
-| 7 | [`07-cook.jpg`](images/ipad/07-cook.jpg) | Step by step, *in large, clear type.* | Cook mode |
-| 8 | [`08-groceries.jpg`](images/ipad/08-groceries.jpg) | Shopping lists that *stay in sync.* | Groceries |
-| 9 | [`09-open-source.jpg`](images/ipad/09-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture |
-
-### Mac (2880 × 1800)
-
-| # | File | Caption | Shows |
-|---|---|---|---|
-| 1 | [`01-devices.jpg`](images/mac/01-devices.jpg) | Built for iPhone, *iPad and Mac.* | Same lineup |
-| 2 | [`02-import.jpg`](images/mac/02-import.jpg) | Save recipes from *anywhere on the web.* | Import review |
-| 3 | [`03-ideas.jpg`](images/mac/03-ideas.jpg) | Plan your week with *recipes or ideas.* | My Week beside a recipe |
-| 4 | [`04-smart-plan.jpg`](images/mac/04-smart-plan.jpg) | Apple Intelligence *plans the gaps.* | Smart Plan sheet |
-| 5 | [`05-clean-up.jpg`](images/mac/05-clean-up.jpg) | Tidy a messy recipe *in one tap.* | Recipe editor |
-| 6 | [`06-library.jpg`](images/mac/06-library.jpg) | Your whole cookbook, *beautifully laid out.* | Three-column window: categories, recipes, recipe |
-| 7 | [`07-cook.jpg`](images/mac/07-cook.jpg) | Step by step, *in large, clear type.* | Cook mode |
-| 8 | [`08-groceries.jpg`](images/mac/08-groceries.jpg) | Shopping lists that *stay in sync.* | Groceries |
-| 9 | [`09-open-source.jpg`](images/mac/09-open-source.jpg) | Open source. *No account. No ads.* | Closing card, not a capture |
-
-Dropped from the first set: the steps-with-ingredients, Up Next, organize and dark-mode shots. Cook mode and the recipe page already show the step ingredients, and a dark shot can come back as a product page optimization variant.
+The Mac set's cook frame keeps *Step by step, in large, clear type*: the page curl is iOS-only.
 
 ### Creative assets
 
@@ -207,7 +193,8 @@ The header, search and universal images use a mosaic of the demo recipe photos b
 - The app UI is the real app. The recipes, plan and grocery list are fictional, and the photos are CC0 images credited [below](#photo-credits).
 - The iPhone and iPad status bar is set to 9:41 with full battery and signal.
 - **Smart Plan and Clean Up show the screen, not a result.** The simulator has no on-device model, so running them would show the fallback (a simple rotation) instead of Apple Intelligence. The sheet and the button text are what the caption claims. To show a result, capture on a Mac or iPhone with Apple Intelligence turned on.
-- The Cook button, ingredient chips, timers and Live Activity are not all visible in stills. An **app preview video** (cook mode with a timer, then the share-sheet import) would sell the app better than any still. Not made.
+- The page turn, timers and Live Activity don't come across in stills; the [preview videos](preview/) show them.
+- **The wordmark says OpenRecipes**, like the videos, while the listing name is "Recipes: Cook, Plan & Shop". Settle on one before submitting.
 - The captions never use price words ("free"), see [Positioning](#positioning).
 
 ## App information
@@ -267,7 +254,7 @@ Verify the Developer Tools path on the final build, and decide whether you want 
 - [ ] **Preview the creative assets** in App Store Connect's template for header, search and universal.
 - [ ] **Localize** `tools/captions.json` and the copy above if you ship in other languages.
 - [ ] **App Privacy answers** (YouTube embed question above).
-- [ ] **Optional:** an app preview video, and a light-background or dark-mode variant of the screenshots for product page optimization tests (`compose.py --style light` exists but its output wasn't reviewed, so it isn't included).
+- [ ] **Optional:** a dark-mode variant of the screenshots for product page optimization tests.
 
 ## Regenerating the assets
 
@@ -282,15 +269,35 @@ xcodegen generate
 ### iPhone and iPad (simulators)
 
 ```bash
-xcrun simctl create "Recipes Shots iPhone" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-26-5
-xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-27-0
+xcrun simctl create "Recipes Shots iPhone" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-27-2
+xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB com.apple.CoreSimulator.SimRuntime.iOS-27-2
+xcrun simctl create "Recipes Shots Duo" com.apple.CoreSimulator.SimDeviceType.iPhone-Duo com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4
 xcodebuild build-for-testing -project Recipes.xcodeproj -scheme Recipes -destination "id=<sim id>" -derivedDataPath /tmp/shots
 # See the widget note below, then:
 app-store/tools/capture.sh iphone <iphone sim id> /tmp/shots import idea smartplan cleanup library recipe cook groceries
 app-store/tools/capture.sh ipad <ipad sim id> /tmp/shots import idea smartplan cleanup library cook groceries
+app-store/tools/capture.sh iphone-duo <duo sim id> /tmp/shots import idea smartplan cleanup library recipe cook groceries   # folded
 ```
 
 Scenes are named in [`AppStoreScreenshotUITests.swift`](../RecipesUITests/AppStoreScreenshotUITests.swift): `home library list recipe ingredients cook plan upnext groceries settings search import idea smartplan cleanup` (add `-dark` to any for dark mode). A scene that fails prints its log path. Build for the simulator you capture on: the iPhone and iPad runs share one derived-data folder, so rebuild when you switch.
+
+### iPhone Duo, open
+
+UI tests launch the app on the main display, which is the outer one even while the Duo is open, so the open set is captured without them: unfold the simulator in DeviceHub and hold it in book posture (landscape), then launch the app on the inner display with a seeded library and a link to open.
+
+```bash
+lib=$(mktemp -d)/library; python3 app-store/tools/seed.py "$lib"
+inner=$(xcrun simctl io <duo sim id> enumerate | awk '/Port:/{p=""} /UUID:/{if(p=="")p=$2} /Default width: 2007/{print p}')
+shot() {   # shot <name> <recipes:// link or "">
+  xcrun simctl terminate <duo sim id> "$RECIPES_BUNDLE_ID"
+  SIMCTL_CHILD_RECIPES_DIR="$lib" SIMCTL_CHILD_RECIPES_OPEN_URL="$2" xcrun simctl launch <duo sim id> "$RECIPES_BUNDLE_ID" \
+    -onboardingCompleted YES -syncGroceriesWithReminders NO -recipeListStyle cards -reviewPromptDismissed YES
+  sleep 9; xcrun simctl io <duo sim id> screenshot --display="$inner" "app-store/tools/raw/iphone-duo-open/$1.png"
+}
+shot home ""; shot recipe "recipes://recipe/<id>"; shot cook "recipes://cook/<id>"; shot plan recipes://plan; shot groceries recipes://groceries
+```
+
+`<id>` is the Brown Butter Chocolate Chip Cookies file name in `$lib/Recipes`. `RECIPES_OPEN_URL` does nothing unless it is set. Don't use `simctl openurl` for this: it leaves an "Open in Recipes?" prompt on screen that only a tap clears.
 
 ### Mac
 
@@ -314,8 +321,7 @@ Why it is built this way:
 ### Compose
 
 ```bash
-python3 app-store/tools/compose.py iphone     # also ipad and mac; the devices shot reads each device's raw library capture
-python3 app-store/tools/card.py               # the closing card, last in each set
+python3 app-store/tools/compose.py iphone     # also ipad, mac, iphone-duo and iphone-duo-open; ends each set on the closing card
 "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" App/AppIcon.icon --export-image \
   --output-file app-store/images/icon/app-icon.png --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
 python3 app-store/tools/creative.py           # after an icon change
@@ -332,6 +338,8 @@ python3 app-store/tools/creative.py           # after an icon change
 - **`xcodebuild` lingers after the test passes.** It sits on package resolution until a timeout, which used to cost two minutes per scene. `capture.sh` and `capture-mac.sh` now stop it as soon as the screenshot exists, so a "failed" message means a real failure.
 - **The UI tests do nothing unless `APP_STORE_SCENE` is set**, so they are safe to leave in the suite.
 - **The import scene needs the fake page.** `capture.sh` and `capture-mac.sh` serve `tools/seed/site` on port 8765 and the test imports `http://localhost:8765/lemon-herb-gnocchi.html`.
+  If another process already listens on `*:8765`, the page 404s and the import never previews. Serve it on the loopback addresses too, which take precedence: `python3 -m http.server 8765 --bind 127.0.0.1` and `--bind ::1`, both from `tools/seed/site`.
+  On iPad the review can appear after the test stops waiting; the screenshot is written before the check, so look at `raw/ipad/import.png` before retrying.
 - **Landscape captures carry an orientation flag.** `capture.sh` ends each scene with `magick -auto-orient`.
 - **Free disk space.** The simulator, Mac and Xcode builds together are several GB, and a full disk fails builds with confusing "database or disk is full" errors.
 - **Both capture sets are safe to commit.** Only fictional data and CC0 photos appear. The raw captures in `tools/raw/` are git-ignored; check any Mac raw capture for other apps' windows before sharing it.

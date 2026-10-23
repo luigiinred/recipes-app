@@ -1,6 +1,6 @@
 #!/bin/bash
 # Captures raw simulator screenshots for the App Store with AppStoreScreenshotUITests.
-# Usage: capture.sh <iphone|ipad> <simulator-udid>  <derived-data-dir> [scene ...]
+# Usage: [LANDSCAPE=1] [DISPLAY_ID=<simctl io display>] capture.sh <iphone|ipad|iphone-duo|iphone-duo-open> <simulator-udid>  <derived-data-dir> [scene ...]
 # Needs: `xcodebuild build-for-testing` for the Recipes scheme into <derived-data-dir>, and the `recipes` CLI built (see seed.py).
 set -euo pipefail
 
@@ -31,12 +31,14 @@ for scene in "${scenes[@]}"; do
   xcrun simctl ui "$udid" appearance "$([[ "$scene" == *-dark ]] && echo dark || echo light)"
   TEST_RUNNER_APP_STORE_SCENE="$scene" TEST_RUNNER_APP_STORE_OUT="$raw" TEST_RUNNER_APP_STORE_LIB="$lib" \
   TEST_RUNNER_APP_STORE_STYLE="$([ "$device" = ipad ] && echo list || echo cards)" \
-  TEST_RUNNER_APP_STORE_LANDSCAPE="$([ "$device" = ipad ] && echo 1 || echo 0)" \
+  TEST_RUNNER_APP_STORE_LANDSCAPE="${LANDSCAPE:-$([ "$device" = ipad ] && echo 1 || echo 0)}" \
     xcodebuild test-without-building -project "$HERE/../../Recipes.xcodeproj" -scheme Recipes -derivedDataPath "$derived" \
       -destination "id=$udid" -only-testing:RecipesUITests/AppStoreScreenshotUITests/testCapture </dev/null >"$raw/$scene.log" 2>&1 &
   run=$!
   # xcodebuild lingers after the test passes, so stop it once the screenshot is written (or after two minutes).
   for _ in $(seq 120); do [ -f "$raw/$scene.png" ] || ! kill -0 $run 2>/dev/null && break; sleep 1; done
+  # The test can only screenshot the main display, which is dark while an iPhone Duo is unfolded.
+  [ -n "${DISPLAY_ID:-}" ] && [ -f "$raw/$scene.png" ] && xcrun simctl io "$udid" screenshot --display="$DISPLAY_ID" "$raw/$scene.png" >/dev/null
   sleep 2; kill $run 2>/dev/null || true; wait $run 2>/dev/null || true
   [ -f "$raw/$scene.png" ] || echo "scene $scene failed, see $raw/$scene.log"
   # Landscape captures carry an orientation flag; bake it into the pixels.
