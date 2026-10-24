@@ -3,6 +3,7 @@ import SwiftUI
 
 enum AppSection: Hashable {
     case recipes(RecipeCollection)
+    case discover(UUID)
     case feed(UUID)
     case plan
     case groceries
@@ -11,11 +12,12 @@ enum AppSection: Hashable {
 #if os(iOS)
 struct RootView: View {
     enum AppTab: Hashable {
-        case recipes, feeds, plan, groceries, settings, search
+        case recipes, feeds, plan, groceries, settings, search, discover
         case collection(RecipeCollection)
     }
 
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
@@ -59,6 +61,10 @@ struct RootView: View {
                     Tab("All Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
                     ForEach(sidebarCollections, id: \.self) { collection in
                         Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
+                            .defaultVisibility(.hidden, for: .tabBar)
+                    }
+                    if !discover.sources.isEmpty {
+                        Tab("Discover", systemImage: "binoculars", value: AppTab.discover) { RecipesTab(root: .discoverHome(discover.sources)) }
                             .defaultVisibility(.hidden, for: .tabBar)
                     }
                     ForEach(library.categoryTree) { node in
@@ -156,15 +162,19 @@ struct RecipesTab: View {
     @EnvironmentObject private var router: AppRouter
     @State private var path: [RecipesRoute]
     @State private var selection: Recipe.ID?
-    private let rootCollection: RecipeCollection?
+    private let root: RecipesRoute?
 
     init(root: RecipeCollection) {
-        rootCollection = root
+        self.init(root: .collection(root))
+    }
+
+    init(root: RecipesRoute) {
+        self.root = root
         _path = State(initialValue: [])
     }
 
     init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
-        rootCollection = nil
+        root = nil
         var path = path
         if path.isEmpty {
             if collection != .all { path.append(.collection(collection)) }
@@ -177,8 +187,7 @@ struct RecipesTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if let rootCollection { RecipeListView(collection: .constant(rootCollection), selection: $selection) }
-                else { RecipesHomeView(selection: $selection) }
+                if let root { destination(root) } else { RecipesHomeView(selection: $selection) }
             }
             .navigationDestination(for: RecipesRoute.self) { destination($0) }
         }
@@ -204,6 +213,10 @@ struct RecipesTab: View {
             RecipeListView(collection: .constant(collection), selection: $selection)
         case .recipe(let id):
             if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+        case .discoverSources:
+            DiscoverSourcesView()
+        case .discover(let source, let route):
+            DiscoverPage(sourceID: source, route: route) { path.append(.discover(source, .recipe($0))) }
         }
     }
 }
@@ -307,7 +320,11 @@ struct RootView: View {
             NavigationStack(path: $path) {
                 sectionRoot
                     .navigationDestination(for: Recipe.ID.self) { id in
-                        if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+                        if case .discover(let source) = section {
+                            DiscoverPage(sourceID: source, route: .recipe(id)) { _ in }.id(id)
+                        } else if let recipe = library.recipe(id: id) {
+                            RecipeDetailView(recipe: recipe).id(id)
+                        }
                     }
             }
         }
@@ -352,6 +369,8 @@ struct RootView: View {
         switch section ?? .recipes(.all) {
         case .recipes:
             RecipeListView(collection: $collection, selection: $selection)
+        case .discover(let source):
+            DiscoverPage(sourceID: source, route: .home) { path.append($0) }.id(source)
         case .feed(let id):
             if let feed = library.feeds.first(where: { $0.id == id }) {
                 HStack(spacing: 0) {
@@ -371,6 +390,7 @@ struct RootView: View {
 
 struct SidebarView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.onboardingCompleted) private var onboarded = false
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
@@ -395,6 +415,13 @@ struct SidebarView: View {
                 }
                 Label("Plan", systemImage: "calendar").tag(AppSection.plan)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
+            }
+            if !discover.sources.isEmpty {
+                Section("Discover") {
+                    ForEach(discover.sources) { source in
+                        Label(source.name, systemImage: "binoculars").lineLimit(1).tag(AppSection.discover(source.id))
+                    }
+                }
             }
             if AppFeatures.feeds {
             Section("Feeds") {

@@ -9,6 +9,8 @@ struct RecipeDetailView: View {
     let recipe: Recipe
     var previewSave: (() -> Void)?
     var previewImage: Data?
+    var previewSaveTitle = "Save Recipe"
+    var previewSaved = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
@@ -53,7 +55,10 @@ struct RecipeDetailView: View {
         #endif
         .toolbar {
             if let previewSave {
-                ToolbarItem { Button("Save Recipe", systemImage: "plus.circle.fill", action: previewSave) }
+                ToolbarItem {
+                    Button(previewSaved ? "Added" : previewSaveTitle, systemImage: previewSaved ? "checkmark.circle.fill" : "plus.circle.fill", action: previewSave)
+                        .disabled(previewSaved)
+                }
             } else {
                 ToolbarItem {
                     Menu {

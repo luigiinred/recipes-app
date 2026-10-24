@@ -21,6 +21,7 @@ enum RecipeListStyle: String, CaseIterable {
 
 struct RecipeListView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.discover) private var scope
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
     var styleOverride: RecipeListStyle?
@@ -124,8 +125,7 @@ struct RecipeListView: View {
                     .listRowSeparator(style == .cards ? .hidden : .automatic)
                     .listRowSeparator(recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
                     .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
-                    .recipeSwipeActions(for: recipe, removingTagFrom: browsedCategory)
-                    .draggable(RecipeDragItem(id: recipe.id))
+                    .libraryRowActions(for: recipe, removingTagFrom: browsedCategory, readOnly: scope != nil)
                     .contextMenu { recipeMenu(recipe) }
                 }
             } header: {
@@ -143,7 +143,9 @@ struct RecipeListView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if library.recipes.isEmpty {
+        if library.recipes.isEmpty, let scope {
+            DiscoverStatusView(catalog: scope.catalog)
+        } else if library.recipes.isEmpty {
             EmptyLibraryView()
         } else if items.isEmpty, search.isEmpty {
             #if os(iOS)
@@ -158,6 +160,15 @@ struct RecipeListView: View {
 
     @ViewBuilder
     private func recipeMenu(_ recipe: Recipe) -> some View {
+        if let scope {
+            DiscoverAddButton(catalog: scope.catalog, scope: scope, id: recipe.id)
+        } else {
+            libraryMenu(recipe)
+        }
+    }
+
+    @ViewBuilder
+    private func libraryMenu(_ recipe: Recipe) -> some View {
         RecipeQuickActions(recipe: recipe)
         Button("Edit", systemImage: "pencil") { editing = recipe }
         if let browsedCategory {
@@ -173,7 +184,9 @@ struct RecipeListView: View {
                 #if os(iOS)
                 if !subcategories.isEmpty {
                     GridSection(title: "Categories", minimum: 240, spacing: 16) {
-                        ForEach(subcategories) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
+                        ForEach(subcategories) {
+                            FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder", recipes: library.recipes, scope: scope)
+                        }
                     }
                 }
                 #endif
@@ -182,7 +195,7 @@ struct RecipeListView: View {
                         ForEach(items) { recipe in
                             Button { selection = recipe.id } label: { RecipeCard(recipe: recipe) }
                                 .buttonStyle(.plain)
-                                .draggable(RecipeDragItem(id: recipe.id))
+                                .recipeDrag(recipe, enabled: scope == nil)
                                 .contextMenu { recipeMenu(recipe) }
                         }
                     }
@@ -320,6 +333,7 @@ struct FindRecipesAction {
 private struct RecipeActionsModifier: ViewModifier {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.discover) private var scope
     @Binding var selection: Recipe.ID?
     var listStyle: Binding<RecipeListStyle>?
     var showsSettings = false
@@ -336,6 +350,10 @@ private struct RecipeActionsModifier: ViewModifier {
     @State private var showingSettings = false
 
     func body(content: Content) -> some View {
+        if scope == nil { actions(content) } else { content }
+    }
+
+    private func actions(_ content: Content) -> some View {
         content
         .overlay {
             if isScanning {
@@ -473,6 +491,21 @@ private struct RecipeActionsModifier: ViewModifier {
 }
 
 extension View {
+    /// Inside Discover a row can only be added to your recipes; otherwise it swipes, drags and files like any of yours.
+    @ViewBuilder
+    func libraryRowActions(for recipe: Recipe, removingTagFrom category: String?, readOnly: Bool) -> some View {
+        if readOnly {
+            self
+        } else {
+            recipeSwipeActions(for: recipe, removingTagFrom: category).draggable(RecipeDragItem(id: recipe.id))
+        }
+    }
+
+    @ViewBuilder
+    func recipeDrag(_ recipe: Recipe, enabled: Bool) -> some View {
+        if enabled { draggable(RecipeDragItem(id: recipe.id)) } else { self }
+    }
+
     func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, showsSettings: Bool = false, findRecipes: FindRecipesAction? = nil) -> some View {
         modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, showsSettings: showsSettings, findRecipes: findRecipes))
     }
@@ -482,14 +515,17 @@ extension View {
 enum RecipesRoute: Hashable {
     case collection(RecipeCollection)
     case recipe(UUID)
+    case discoverSources
+    case discover(UUID, DiscoverRoute)
 }
 
 struct CategoryRow: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.discover) private var scope
     let node: CategoryNode
 
     var body: some View {
-        NavigationLink(value: RecipesRoute.collection(.category(node.path))) {
+        NavigationLink(value: RecipesRoute.opening(.category(node.path), in: scope)) {
             LabeledContent {
                 Text("\(RecipeCollection.category(node.path).filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
             } label: {
@@ -497,30 +533,40 @@ struct CategoryRow: View {
             }
         }
         .themedRow(raised: true)
-        .categoryDragAndDrop(node.path)
+        .categoryDragAndDrop(scope == nil ? node.path : nil)
     }
 }
 
-/// A collection or category to open, as a tile.
+/// A collection, category or Discover to open, as a tile.
 private struct FolderTile: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.appearance) private var appearance
     @Environment(\.appAccent) private var accent
-    let collection: RecipeCollection
-    var symbol: String?
+    @Environment(\.discover) private var scope
+    private let route: RecipesRoute
+    private let title: String
+    private let detail: String?
+    private let symbol: String
+    private let categoryPath: String?
 
-    private var count: Int { collection.filter(library.recipes).count }
+    init(route: RecipesRoute, title: String, detail: String?, symbol: String) {
+        self.route = route
+        self.title = title
+        self.detail = detail
+        self.symbol = symbol
+        categoryPath = nil
+    }
 
     var body: some View {
-        NavigationLink(value: RecipesRoute.collection(collection)) {
+        NavigationLink(value: route) {
             HStack(spacing: 14) {
-                Image(systemName: symbol ?? collection.symbol)
+                Image(systemName: symbol)
                     .font(.title2)
                     .foregroundStyle(accent)
                     .frame(width: 32)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(collection.title).font(.headline).lineLimit(1)
-                    Text(count == 1 ? "1 recipe" : "\(count) recipes").font(.subheadline).foregroundStyle(.secondary)
+                    Text(title).font(.headline).lineLimit(1)
+                    if let detail { Text(detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -531,29 +577,47 @@ private struct FolderTile: View {
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .categoryDragAndDrop(categoryPath, axis: .horizontal)
+        .categoryDragAndDrop(scope == nil ? categoryPath : nil, axis: .horizontal)
     }
+}
 
-    private var categoryPath: String? {
-        if case .category(let path) = collection { path } else { nil }
+extension FolderTile {
+    init(collection: RecipeCollection, symbol: String? = nil, recipes: [Recipe], scope: DiscoverScope?) {
+        let count = collection.filter(recipes).count
+        route = .opening(collection, in: scope)
+        title = collection.title
+        detail = count == 1 ? "1 recipe" : "\(count) recipes"
+        self.symbol = symbol ?? collection.symbol
+        if case .category(let path) = collection { categoryPath = path } else { categoryPath = nil }
     }
 }
 
 /// The top of the Recipes tab: the built-in collections, then categories to drill into.
+/// The top of the Recipes tab: the built-in collections, Discover, then categories to drill into.
+/// Inside Discover it is the same page for the server's recipes, without Discover or anything that changes them.
 struct RecipesHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var discover: DiscoverController
+    @Environment(\.discover) private var scope
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Binding var selection: Recipe.ID?
 
     private var collections: [RecipeCollection] {
+        guard scope == nil else {
+            return [.all, .recent, .uncategorized].filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
+        }
         let liked: RecipeCollection = (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .stars ? .topRated : .favorites
         return [.all, .recent, liked, .uncategorized].filter { $0 == .all || $0 == .recent || $0 == liked || !$0.filter(library.recipes).isEmpty }
     }
 
+    private var showsDiscover: Bool { scope == nil && !discover.sources.isEmpty }
+
     var body: some View {
         Group {
-            if library.recipes.isEmpty {
+            if library.recipes.isEmpty, let scope {
+                DiscoverStatusView(catalog: scope.catalog)
+            } else if library.recipes.isEmpty {
                 EmptyLibraryView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if sizeClass == .regular {
                 grid
@@ -562,7 +626,7 @@ struct RecipesHomeView: View {
             }
         }
         .themedCanvas()
-        .navigationTitle("Recipes")
+        .navigationTitle(scope?.catalog.source.name ?? "Recipes")
         .recipeActions(selection: $selection, listStyle: nil, showsSettings: sizeClass != .regular)
     }
 
@@ -570,7 +634,7 @@ struct RecipesHomeView: View {
         List {
             Section {
                 ForEach(collections, id: \.self) { collection in
-                    NavigationLink(value: RecipesRoute.collection(collection)) {
+                    NavigationLink(value: RecipesRoute.opening(collection, in: scope)) {
                         LabeledContent {
                             Text("\(collection.filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
                         } label: {
@@ -579,33 +643,62 @@ struct RecipesHomeView: View {
                     }
                     .themedRow(raised: true)
                 }
+                if showsDiscover {
+                    NavigationLink(value: RecipesRoute.discoverHome(discover.sources)) {
+                        Label("Discover", systemImage: "binoculars")
+                    }
+                    .themedRow(raised: true)
+                }
             }
             if !library.categoryTree.isEmpty {
                 Section {
                     ForEach(library.categoryTree) { CategoryRow(node: $0) }
                 } header: {
-                    Text("Categories").categoryRootDrop()
+                    categoriesHeader
                 }
             }
         }
         .contentMargins(.top, 16, for: .scrollContent)
+        .refreshable(enabled: scope != nil) { await scope?.catalog.load(force: true) }
+    }
+
+    @ViewBuilder
+    private var categoriesHeader: some View {
+        if scope == nil { Text("Categories").categoryRootDrop() } else { Text("Categories") }
     }
 
     private var grid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 GridSection(title: nil, minimum: 240, spacing: 16) {
-                    ForEach(collections, id: \.self) { FolderTile(collection: $0) }
+                    ForEach(collections, id: \.self) { FolderTile(collection: $0, recipes: library.recipes, scope: scope) }
+                    if showsDiscover {
+                        FolderTile(route: .discoverHome(discover.sources), title: "Discover", detail: discoverDetail, symbol: "binoculars")
+                    }
                 }
                 if !library.categoryTree.isEmpty {
-                    GridSection(title: "Categories", minimum: 240, spacing: 16, takesCategories: true) {
-                        ForEach(library.categoryTree) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
+                    GridSection(title: "Categories", minimum: 240, spacing: 16, takesCategories: scope == nil) {
+                        ForEach(library.categoryTree) {
+                            FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder", recipes: library.recipes, scope: scope)
+                        }
                     }
                 }
             }
             .padding(24)
         }
+        .refreshable(enabled: scope != nil) { await scope?.catalog.load(force: true) }
         .reviewPromptInset()
+    }
+
+    private var discoverDetail: String {
+        discover.sources.count == 1 ? discover.sources[0].name : "\(discover.sources.count) servers"
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func refreshable(enabled: Bool, action: @escaping @Sendable () async -> Void) -> some View {
+        if enabled { refreshable(action: action) } else { self }
     }
 }
 #endif
@@ -651,11 +744,12 @@ struct RecipeBadges: View {
 }
 
 struct RecipeMeta: View {
+    @Environment(\.discover) private var scope
     let recipe: Recipe
 
     var body: some View {
         HStack(spacing: 10) {
-            if recipe.isIdea { Label("Idea", systemImage: "lightbulb") }
+            if recipe.isIdea, scope == nil { Label("Idea", systemImage: "lightbulb") }
             if let minutes = recipe.totalMinutes { Label("\(minutes) min", systemImage: "clock") }
             if !recipe.tags.isEmpty { Label(recipe.tags.prefix(2).map(CategoryTree.displayName).joined(separator: ", "), systemImage: "tag") }
         }
@@ -666,6 +760,7 @@ struct RecipeMeta: View {
 struct RecipeCard: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.appAccent) private var accent
+    @Environment(\.discover) private var scope
     let recipe: Recipe
 
     private var hasPhoto: Bool { library.hasImage(recipe.id) }
@@ -707,7 +802,7 @@ struct RecipeCard: View {
 
     private var details: some View {
         var parts: [String] = []
-        if recipe.isIdea { parts.append("Idea") }
+        if recipe.isIdea, scope == nil { parts.append("Idea") }
         if let minutes = recipe.totalMinutes { parts.append("\(minutes) min") }
         if let tag = recipe.tags.first { parts.append(CategoryTree.displayName(tag)) }
         return Text(parts.joined(separator: "  ·  "))
