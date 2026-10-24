@@ -10,6 +10,14 @@ In Mealie, open your profile, choose **API Tokens** and create one. In the app, 
 
 To pair another device, open Settings, Mealie and tap **Share Access**. The app makes a new API token named "Recipes shared <date>" and sends a `recipes://mealie?server=<address>&token=<token>` link for it; opening the link on a device with the app asks before connecting. Anyone who opens the link can read and change your Mealie recipes, so send it only to people you trust. To revoke it, delete that token under API Tokens in Mealie; your own devices keep working. The link only works once the app is installed; if it isn't, install the app and open the link again.
 
+## Discover
+
+Discover browses someone else's Mealie server without syncing with it. On their device they open Settings, Mealie and tap **Share as Discover**, which makes an API token named "Recipes Discover shared <date>" and sends a `recipes://discover?server=<address>&token=<token>` link. Opening it asks before adding the server; Settings, Mealie, Discover can also add one by address and token. Servers are kept in the iCloud Keychain like your own connection, so they appear on every device.
+
+Once a server is added, a **Discover** row appears on the Recipes home under the built-in collections (a tile on iPad, a sidebar section on Mac). Inside, the server's recipes have the same collections, categories and recipe pages as your own, but nothing can be edited, rated, queued or planned. **Add to My Recipes** (a recipe's toolbar or a row's context menu) saves a copy with its photo as a new recipe of yours. The list is read from Mealie's recipe list and each recipe is read in full when it's opened. Ratings, favorites and the Up Next queue on the server belong to its owner and are left out.
+
+The app never writes with a Discover token, but Mealie tokens carry the full rights of the user who made them, so the token itself could change that user's recipes. Share it only with people you trust, and delete it under API Tokens in Mealie to revoke it.
+
 From a terminal:
 
 ```bash

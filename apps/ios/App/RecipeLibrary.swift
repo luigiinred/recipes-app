@@ -29,6 +29,7 @@ final class RecipeLibrary: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private var library: Library?
+    private var remoteImage: (@Sendable (UUID) async -> Data?)?
     private var reminders: RemindersSync?
     private var remindersChanged = false
     #if os(iOS) && !SHARE_EXTENSION
@@ -64,6 +65,23 @@ final class RecipeLibrary: ObservableObject {
         }
     }
 
+    /// Someone else's recipes, held in memory with no library behind them, so every change is a no-op. Photos are fetched as they're shown.
+    init(browsing remoteImage: @escaping @Sendable (UUID) async -> Data?) {
+        self.remoteImage = remoteImage
+    }
+
+    func browse(_ recipes: [Recipe], imageIDs: Set<UUID>) {
+        guard library == nil else { return }
+        self.recipes = recipes
+        imageStamps = Dictionary(uniqueKeysWithValues: imageIDs.map { ($0, .distantPast) })
+        isLoaded = true
+    }
+
+    func browse(_ recipe: Recipe) {
+        guard library == nil, let index = recipes.firstIndex(where: { $0.id == recipe.id }) else { return }
+        recipes[index] = recipe
+    }
+
     static let thumbnailSize = 1200
 
     var categoryTree: [CategoryNode] { CategoryTree.build(from: recipes.flatMap(\.tags), order: categoryOrder) }
@@ -85,11 +103,18 @@ final class RecipeLibrary: ObservableObject {
     }
 
     func loadThumbnail(for id: UUID) async -> CGImage? {
-        guard let library, let stamp = imageStamps[id] else { return cachedThumbnail(for: id) }
         if let cached = cachedThumbnail(for: id) { return cached }
-        let image = await Task.detached {
-            library.images.data(for: id).flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: Self.thumbnailSize) }
-        }.value
+        guard let stamp = imageStamps[id] else { return nil }
+        let image: CGImage?
+        if let library {
+            image = await Task.detached {
+                library.images.data(for: id).flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: Self.thumbnailSize) }
+            }.value
+        } else if let remoteImage, let data = await remoteImage(id) {
+            image = await Task.detached { RecipeImageProcessing.thumbnail(from: data, maxPixelSize: Self.thumbnailSize) }.value
+        } else {
+            return nil
+        }
         if let image { thumbnails[id] = (stamp, image) }
         return image
     }

@@ -9,6 +9,7 @@ struct RecipesApp: App {
     @StateObject private var timers = TimerCenter()
     @StateObject private var router = AppRouter.shared
     @StateObject private var mealie = MealieSyncController()
+    @StateObject private var discover = DiscoverController()
     @Environment(\.scenePhase) private var scenePhase
 
     init() { ReminderCenter.shared.install() }
@@ -24,6 +25,7 @@ struct RecipesApp: App {
                 .environmentObject(timers)
                 .environmentObject(router)
                 .environmentObject(mealie)
+                .environmentObject(discover)
                 .appTheme()
                 #if os(macOS)
                 .sizedFromEnvironment()
@@ -33,7 +35,7 @@ struct RecipesApp: App {
                 .onChange(of: library.recipes) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.mealPlan) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.groceries) { mealie.request() }
-                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); rescheduleReminders() } }
+                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); discover.refresh(); rescheduleReminders() } }
                 .onOpenURL(perform: open)
                 .task {
                     // App Store captures on an unfolded iPhone Duo can't drive the app with UI tests, so they open a link at launch.
@@ -45,6 +47,7 @@ struct RecipesApp: App {
             SettingsView(inSheet: false)
                 .environmentObject(library)
                 .environmentObject(mealie)
+                .environmentObject(discover)
                 .appTheme()
         }
         #endif
