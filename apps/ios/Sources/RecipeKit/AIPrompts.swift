@@ -2,12 +2,13 @@ import Foundation
 
 /// Something the on-device model does for the app, with the instructions it is given. Each can be replaced in Settings.
 public enum AIAction: String, CaseIterable, Identifiable, Sendable {
-    case videoCaptions, webPage, splitSteps, groupIngredients, planWeek
+    case mealPhoto, videoCaptions, webPage, splitSteps, groupIngredients, planWeek
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
+        case .mealPhoto: "Recipe from a meal photo"
         case .videoCaptions: "Recipe from video captions"
         case .webPage: "Recipe from a web page"
         case .splitSteps: "Split a pasted method into steps"
@@ -18,6 +19,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
 
     public var summary: String {
         switch self {
+        case .mealPhoto: "Names the dish in a photo and writes a recipe for it to start from."
         case .videoCaptions: "Writes a recipe from what the cook says when a video has no written recipe."
         case .webPage: "Finds the recipe in a page's text when the page has no recipe data."
         case .splitSteps: "Breaks a method that was pasted as one block into separate steps."
@@ -28,6 +30,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
 
     public var symbol: String {
         switch self {
+        case .mealPhoto: "camera"
         case .videoCaptions: "play.rectangle"
         case .webPage: "doc.text"
         case .splitSteps: "list.number"
@@ -42,6 +45,16 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
     /// The instructions the app ships with.
     public var defaultInstructions: String {
         switch self {
+        case .mealPhoto: """
+            You write a home recipe for a dish from a photo of it, as a starting point the cook will edit. \
+            Name the dish plainly, the way a cook would, such as "Chicken Fried Rice". List the ingredients you can see \
+            plus the ones the dish usually needs, with everyday amounts for the servings you choose. \
+            Write the steps a home cook would follow to make it.
+
+            - ingredients: one per ingredient, with an amount and a unit from the list, such as "1 1/2 cups flour". \
+            Use digits and fractions like 1/2. Put preparation after a comma in the item.
+            - steps: short imperative sentences, with no numbering.
+            """
         case .videoCaptions: """
             You turn the spoken captions of a cooking video into a written recipe. \
             Only use what the cook says. Do not invent ingredients, quantities or steps.

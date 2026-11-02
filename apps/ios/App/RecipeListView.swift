@@ -1,4 +1,5 @@
 import RecipeKit
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -331,17 +332,20 @@ private struct RecipeActionsModifier: ViewModifier {
     @State private var showingFileImporter = false
     @State private var showingScanner = false
     @State private var draft: ScanDraft?
-    @State private var isScanning = false
+    @State private var showingMealCamera = false
+    @State private var showingMealLibrary = false
+    @State private var mealPhotoItem: PhotosPickerItem?
+    @State private var progressMessage: String?
     @State private var scanError: String?
     @State private var showingSettings = false
 
     func body(content: Content) -> some View {
         content
         .overlay {
-            if isScanning {
+            if let progressMessage {
                 VStack(spacing: 4) {
                     MascotLoader(height: 120)
-                    Text("Reading recipe…").font(.headline)
+                    Text(progressMessage).font(.headline)
                 }
                 .padding(20)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -415,7 +419,29 @@ private struct RecipeActionsModifier: ViewModifier {
             )
             .ignoresSafeArea()
         }
+        .fullScreenCover(isPresented: $showingMealCamera) {
+            MealCamera(
+                onFinish: { data in
+                    showingMealCamera = false
+                    writeRecipe(fromMealPhoto: data)
+                },
+                onCancel: { showingMealCamera = false }
+            )
+            .ignoresSafeArea()
+        }
         #endif
+        .photosPicker(isPresented: $showingMealLibrary, selection: $mealPhotoItem, matching: .images)
+        .onChange(of: mealPhotoItem) { _, item in
+            guard let item else { return }
+            mealPhotoItem = nil
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    writeRecipe(fromMealPhoto: data)
+                } else {
+                    scanError = "Couldn't load that photo."
+                }
+            }
+        }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.image, .pdf]) { result in
             guard case .success(let url) = result else { return }
             scan {
@@ -451,13 +477,46 @@ private struct RecipeActionsModifier: ViewModifier {
         }
         #endif
         Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
+        #if os(iOS)
+        Menu("Recipe from Meal Photo", systemImage: "fork.knife.circle") {
+            if MealCamera.isAvailable {
+                Button("Take Photo", systemImage: "camera") { showingMealCamera = true }
+            }
+            Button("Choose Photo", systemImage: "photo") { showingMealLibrary = true }
+        }
+        #else
+        Button("Recipe from Meal Photo…", systemImage: "fork.knife.circle") { showingMealLibrary = true }
+        #endif
+    }
+
+    /// Opens the editor on a draft written from the photo, or on just the photo when Apple Intelligence can't help.
+    private func writeRecipe(fromMealPhoto data: Data) {
+        progressMessage = "Looking at your meal…"
+        Task {
+            let outcome = await MealPhotoRecipeWriter.run(imageData: data)
+            progressMessage = nil
+            let recipe: Recipe
+            let notice: String
+            switch outcome {
+            case .written(let written):
+                recipe = written
+                notice = "Apple Intelligence wrote this from your photo. Check the ingredients and amounts."
+            case .unavailable(let status):
+                recipe = Recipe(title: "")
+                notice = status.explanation
+            case .failed(let reason):
+                recipe = Recipe(title: "")
+                notice = reason
+            }
+            draft = ScanDraft(recipe: recipe, notice: notice, imageData: RecipeImageProcessing.jpegData(from: data))
+        }
     }
 
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
-        isScanning = true
+        progressMessage = "Reading recipe…"
         Task {
             let result = await Task.detached { Result { try recognize() } }.value
-            isScanning = false
+            progressMessage = nil
             switch result {
             case .success(let text):
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
