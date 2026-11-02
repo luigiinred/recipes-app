@@ -36,7 +36,7 @@ targets:
         CFBundleDisplayName: Recipes
         NSRemindersFullAccessUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
         NSRemindersUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
-        NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts.
+        NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts and to turn photos of meals into recipes.
         CFBundleIconName: AppIcon
         RecipesICloudContainer: "$(RECIPES_ICLOUD_CONTAINER)"
         RecipesAppGroup: "$(RECIPES_APP_GROUP)"
