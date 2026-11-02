@@ -19,9 +19,7 @@ struct TagEditor: View {
                                 Image(systemName: "xmark").font(.caption2.weight(.bold))
                             }
                             .font(.callout.weight(.medium))
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Theme.accent.opacity(0.14), in: Capsule())
-                            .foregroundStyle(Theme.accent)
+                            .tagChip()
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Remove \(CategoryTree.displayName(tag))")
@@ -94,4 +92,67 @@ struct TagEditor: View {
     private func remove(_ tag: String) {
         tags.removeAll { $0 == tag }
     }
+}
+
+/// Edits a recipe's tags on their own, saving only on Done.
+struct TagsSheet: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.dismiss) private var dismiss
+    let recipe: Recipe
+    @State private var tags: [String]
+
+    init(recipe: Recipe) {
+        self.recipe = recipe
+        _tags = State(initialValue: recipe.tags)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TagEditor(tags: $tags)
+                } footer: {
+                    Text("Use a slash to nest one, like Dinner/Pasta.")
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Tags")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { CancelButton() }
+                ToolbarItem(placement: .confirmationAction) {
+                    ConfirmButton {
+                        if tags != recipe.tags {
+                            var changed = library.recipe(id: recipe.id) ?? recipe
+                            changed.tags = tags
+                            Task { await library.save(changed) }
+                        }
+                        dismiss()
+                    }
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 380, minHeight: 320)
+        #endif
+    }
+}
+
+/// The capsule a tag sits in: a faint tint in light mode, and a stronger one with lighter text in dark mode so it reads against the page.
+struct TagChip: ViewModifier {
+    @Environment(\.appAccent) private var accent
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(accent.opacity(colorScheme == .dark ? 0.24 : 0.09), in: Capsule())
+            .foregroundStyle(colorScheme == .dark ? accent.mix(with: .white, by: 0.35) : accent)
+    }
+}
+
+extension View {
+    func tagChip() -> some View { modifier(TagChip()) }
 }

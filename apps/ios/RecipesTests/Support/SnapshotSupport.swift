@@ -154,7 +154,7 @@ func assertPageSnapshots<Page: View>(
         for style in styles {
             assertSnapshot(
                 of: root,
-                as: .wait(for: 0.9, on: .image(drawHierarchyInKeyWindow: true, precision: 0.98, perceptualPrecision: 0.97, layout: .device(config: device.config(style)))),
+                as: Snapshotting.wait(for: 0.9, on: .image(drawHierarchyInKeyWindow: true, precision: 0.98, perceptualPrecision: 0.97, layout: .device(config: device.config(style)))).decodedAsStored,
                 named: snapshotName(device.prefix, style == .dark ? "dark" : "light"),
                 record: record,
                 fileID: fileID, file: filePath, testName: testName, line: line, column: column
@@ -188,6 +188,18 @@ func assertPageSnapshots<Page: View>(
     }
     #endif
 }
+
+#if os(iOS)
+extension Snapshotting where Format == UIImage {
+    /// The perceptual diff misreads a fresh render against a decoded PNG as a large mismatch
+    /// once any pixel differs, so compare the render as it would be stored.
+    var decodedAsStored: Snapshotting {
+        Snapshotting(pathExtension: pathExtension, diffing: diffing, asyncSnapshot: { value in
+            snapshot(value).map { image in image.pngData().flatMap { UIImage(data: $0, scale: image.scale) } ?? image }
+        })
+    }
+}
+#endif
 
 /// Reference images only compare on the OS version they were drawn on.
 func isPinnedOSVersion() -> Bool {

@@ -70,13 +70,15 @@ Snapshots use [swift-snapshot-testing](https://github.com/pointfreeco/swift-snap
 
 ```bash
 # iOS (iPhone 17 simulator, iOS 27.0 only)
-xcodebuild test -project Recipes.xcodeproj -scheme Recipes -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -derivedDataPath build-ios CODE_SIGNING_ALLOWED=NO -only-testing:RecipesTests
+xcodebuild test -project Recipes.xcodeproj -scheme Recipes -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -derivedDataPath build-ios CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:RecipesTests
 
 # macOS 27.0 only (ad-hoc signed and unsandboxed so references can be written into the repo)
-xcodebuild test -project Recipes.xcodeproj -scheme Recipes -destination 'platform=macOS' -derivedDataPath build-mac CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER= DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= ENABLE_APP_SANDBOX=NO -only-testing:RecipesTests
+xcodebuild test -project Recipes.xcodeproj -scheme Recipes -destination 'platform=macOS' -derivedDataPath build-mac CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER= DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= ENABLE_APP_SANDBOX=NO -parallel-testing-enabled NO -only-testing:RecipesTests
 
 # UI tests: click the Mac sidebar, and tap the iPhone search button, in the real app (same flags, with -only-testing:RecipesUITests)
 ```
+
+Keep `-parallel-testing-enabled NO`: suites share `SampleData.defaults`, and without it Swift Testing runs them side by side, so one suite's appearance or accent leaks into another's capture.
 
 Missing references are recorded on the first run (that run reports a failure); run again to verify. To re-record after an intended UI change, delete the PNGs or prefix the command with `TEST_RUNNER_SNAPSHOT_TESTING_RECORD=all`.
 
