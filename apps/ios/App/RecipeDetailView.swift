@@ -4,6 +4,7 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     @Environment(\.appAccent) private var accent
+    @Environment(\.appearance) private var appearance
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     let recipe: Recipe
@@ -18,6 +19,7 @@ struct RecipeDetailView: View {
     @State private var generatingImage = false
     @State private var viewportHeight: CGFloat = 0
     @State private var scrolled: CGFloat = 0
+    @State private var pageOffset = PageOffset()
     @State private var topInset: CGFloat = 0
     @State private var sidePaneScrolled = false
     @State private var titleScrolledAway = false
@@ -107,7 +109,8 @@ struct RecipeDetailView: View {
                 if recipe.youTubeVideoID != nil {
                     video.padding([.horizontal, .top], 24)
                 } else if hasArtwork {
-                    photoBanner
+                    PhotoBanner(offset: pageOffset, height: Self.bannerHeight + topInset) { artwork }
+                        .padding(.bottom, -Self.cardRadius)
                 }
                 VStack(alignment: .leading, spacing: 24) {
                     header
@@ -124,26 +127,26 @@ struct RecipeDetailView: View {
                 .padding(24)
                 .frame(maxWidth: 900, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
             }
             .textSelection(.enabled)
         }
         .ignoresSafeArea(edges: hasArtwork ? .top : [])
+        .scrollEdgeEffectHidden(hasArtwork && !titleScrolledAway, for: .top)
         .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
         .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? Self.bannerHeight : 0) + 60 } action: { _, scrolledAway in
             titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
         }
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
+            pageOffset.y = y
+        }
     }
 
     private static let bannerHeight: CGFloat = 240
+    private static let cardRadius: CGFloat = 28
 
-    /// The photo at the top of the page, which runs up behind the navigation bar.
-    private var photoBanner: some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .frame(height: Self.bannerHeight + topInset)
-            .overlay { artwork }
-            .clipped()
-            .backgroundExtensionEffect()
+    private var pageStyle: AnyShapeStyle {
+        appearance.canvas.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.background)
     }
 
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
@@ -486,5 +489,33 @@ private extension View {
         } action: { _, value in
             scrolled.wrappedValue = value
         }
+    }
+}
+
+/// How far the page has scrolled, kept apart so only the photo redraws as it moves.
+@Observable
+private final class PageOffset {
+    var y: CGFloat = 0
+}
+
+/// The photo at the top of the page, which runs up behind the navigation bar.
+/// Scrolling moves it at half speed, so what's left in view stays centered as the page covers it;
+/// pulling past the top grows it from its bottom edge, cropping the sides, so no gap opens above.
+private struct PhotoBanner<Artwork: View>: View {
+    let offset: PageOffset
+    let height: CGFloat
+    @ViewBuilder let artwork: Artwork
+
+    var body: some View {
+        let y = offset.y
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .overlay {
+                artwork
+                    .scaleEffect(y < 0 ? 1 - y / height : 1, anchor: .bottom)
+                    .offset(y: y > 0 ? y / 2 : 0)
+            }
+            .mask(alignment: .bottom) { Rectangle().frame(height: 10_000) }
     }
 }

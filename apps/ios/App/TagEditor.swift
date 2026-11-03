@@ -130,6 +130,7 @@ struct TagsSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Tags")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -209,7 +209,7 @@ struct RecipeEditorView: View {
     @ViewBuilder
     private func container<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         #if os(iOS)
-        Form { content() }
+        Form { content() }.scrollDismissesKeyboard(.immediately)
         #else
         Form { content() }.formStyle(.grouped)
         #endif
