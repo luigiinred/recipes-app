@@ -5,6 +5,13 @@ import SwiftUI
 enum ReviewPrompt {
     static let recipeThreshold = 5
 
+    static var isTestFlight: Bool {
+        get async {
+            guard case .verified(let transaction) = try? await AppTransaction.shared else { return false }
+            return transaction.environment == .sandbox
+        }
+    }
+
     static func isDue(recipes: [Recipe], onboarded: Bool, dismissed: Bool) -> Bool {
         onboarded && !dismissed && recipes.filter { !$0.isIdea }.count >= recipeThreshold
     }
@@ -19,8 +26,10 @@ struct ReviewPromptBanner: View {
         HStack(spacing: 8) {
             Button {
                 dismissed = true
-                // StoreKit may silently skip its rating sheet (always on TestFlight), so a tap opens the App Store composer.
-                if let url = AppStoreLink.writeReview { openURL(url) } else { requestReview() }
+                Task {
+                    // StoreKit never shows its rating sheet on TestFlight, so there the App Store composer opens instead.
+                    if await ReviewPrompt.isTestFlight, let url = AppStoreLink.writeReview { openURL(url) } else { requestReview() }
+                }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "star.bubble.fill").foregroundStyle(Theme.accent)
