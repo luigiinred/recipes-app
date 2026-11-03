@@ -12,13 +12,15 @@ enum ReviewPrompt {
 
 struct ReviewPromptBanner: View {
     @Environment(\.requestReview) private var requestReview
+    @Environment(\.openURL) private var openURL
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var dismissed = false
 
     var body: some View {
         HStack(spacing: 8) {
             Button {
                 dismissed = true
-                requestReview()
+                // StoreKit may silently skip its rating sheet (always on TestFlight), so a tap opens the App Store composer.
+                if let url = AppStoreLink.writeReview { openURL(url) } else { requestReview() }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "star.bubble.fill").foregroundStyle(Theme.accent)
