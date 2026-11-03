@@ -108,7 +108,7 @@ struct TagEditor: View {
     }
 }
 
-/// Edits a recipe's tags on their own, saving only on Done.
+/// Edits a recipe's tags on their own, saving whenever the sheet closes.
 struct TagsSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
@@ -136,22 +136,20 @@ struct TagsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { CancelButton() }
-                ToolbarItem(placement: .confirmationAction) {
-                    ConfirmButton {
-                        if tags != recipe.tags {
-                            var changed = library.recipe(id: recipe.id) ?? recipe
-                            changed.tags = tags
-                            Task { await library.save(changed) }
-                        }
-                        dismiss()
-                    }
-                }
+                ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } }
             }
         }
+        .onDisappear(perform: save)
         #if os(macOS)
         .frame(minWidth: 380, minHeight: 320)
         #endif
+    }
+
+    private func save() {
+        guard tags != recipe.tags else { return }
+        var changed = library.recipe(id: recipe.id) ?? recipe
+        changed.tags = tags
+        Task { await library.save(changed) }
     }
 }
 
