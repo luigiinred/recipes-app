@@ -42,7 +42,7 @@ struct SettingsView: View {
                 .themedCanvas()
                 .navigationTitle("Settings")
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(inSheet ? .inline : .large)
                 #endif
                 .toolbar {
                     if inSheet { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
@@ -140,6 +140,11 @@ private struct RecipesSettingsPage: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
+    @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
+    #if os(iOS)
+    @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
+    @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
+    #endif
 
     var body: some View {
         Form {
@@ -155,6 +160,49 @@ private struct RecipesSettingsPage: View {
             } footer: {
                 Text("Favorites are a heart on the recipes you love. Star ratings give each recipe one to five stars, and Top Rated lists the 4 and 5 star ones. Both are always in a recipe’s ⋯ menu, and switching never deletes either.")
             }
+            Section {
+                ForEach(RecipeDetail.allCases, id: \.self) { detail in
+                    Toggle(isOn: Binding(
+                        get: { RecipeDetail.parse(recipeDetailsRaw).contains(detail) },
+                        set: { on in
+                            var details = RecipeDetail.parse(recipeDetailsRaw)
+                            if on { details.insert(detail) } else { details.remove(detail) }
+                            recipeDetailsRaw = RecipeDetail.raw(details)
+                        }
+                    )) {
+                        Label(detail.title, systemImage: detail.symbol)
+                    }
+                }
+            } header: {
+                Text("Recipe details")
+            } footer: {
+                Text("What shows under each recipe's title in cards and lists.")
+            }
+            #if os(iOS)
+            Section {
+                NavigationLink { QuickFiltersSettingsPage() } label: {
+                    Label("Quick Filters", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            } header: {
+                Text("Search")
+            } footer: {
+                Text("The buttons above the search bar. Choose which filters and tags they show and in what order.")
+            }
+            Section {
+                Toggle("Remember last sort", isOn: $remembersSort)
+                if !remembersSort {
+                    Picker("Default sort", selection: $defaultSort) {
+                        ForEach(RecipeSort.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                    }
+                }
+            } header: {
+                Text("Sorting")
+            } footer: {
+                Text(remembersSort
+                     ? "The Recipes home keeps the last sort you chose."
+                     : "The Recipes home opens sorted this way each time, and a sort you choose lasts until you leave the app.")
+            }
+            #endif
             Section {
                 Toggle("Show Delete", isOn: $showDeleteSwipe)
             } header: {
@@ -174,6 +222,74 @@ private struct RecipesSettingsPage: View {
         .settingsPage("Recipes")
     }
 }
+
+#if os(iOS)
+/// Which quick filter chips the Search tab shows, in order: the built-in filters and any tags.
+private struct QuickFiltersSettingsPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.quickChips) private var raw = QuickChip.raw(QuickChip.defaults)
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+
+    private var style: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
+    private var chips: [QuickChip] { QuickChip.parse(raw) }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(chips, id: \.self) { chip in
+                    Label(chip.title(style), systemImage: chip.symbol(style))
+                }
+                .onMove { from, to in
+                    var chips = chips
+                    chips.move(fromOffsets: from, toOffset: to)
+                    raw = QuickChip.raw(chips)
+                }
+                .onDelete { offsets in
+                    var chips = chips
+                    chips.remove(atOffsets: offsets)
+                    raw = QuickChip.raw(chips)
+                }
+            } header: {
+                Text("Shown")
+            } footer: {
+                Text(chips.isEmpty ? "No quick filters show above the search bar." : "Drag to reorder. Filters that are on move to the front as icons.")
+            }
+            let filters = QuickFilter.allCases.map(QuickChip.filter).filter { !chips.contains($0) }
+            if !filters.isEmpty {
+                Section("Filters") {
+                    ForEach(filters, id: \.self) { add($0) }
+                }
+            }
+            let tags = flattened(library.categoryTree).map { QuickChip.tag($0.path) }.filter { !chips.contains($0) }
+            if !tags.isEmpty {
+                Section("Tags") {
+                    ForEach(tags, id: \.self) { chip in
+                        if case .tag(let path) = chip { add(chip, title: CategoryTree.displayName(path)) }
+                    }
+                }
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .settingsPage("Quick Filters")
+    }
+
+    private func add(_ chip: QuickChip, title: String? = nil) -> some View {
+        Button {
+            withAnimation { raw = QuickChip.raw(chips + [chip]) }
+        } label: {
+            Label {
+                Text(title ?? chip.title(style)).foregroundStyle(.primary)
+            } icon: {
+                Image(systemName: "plus.circle.fill").foregroundStyle(.green)
+            }
+        }
+    }
+
+    private func flattened(_ nodes: [CategoryNode]) -> [CategoryNode] {
+        nodes.flatMap { [$0] + flattened($0.children) }
+    }
+}
+#endif
 
 private struct PlannerSettingsPage: View {
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue

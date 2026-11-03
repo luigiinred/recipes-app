@@ -35,7 +35,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             showAllRecipes()
             if regular, env["APP_STORE_STYLE"] == "list" { openRecipe(hero) }
         case "list":
-            open("All Recipes")
+            break
         case "recipe":
             showAllRecipes()
             openRecipe(hero)
@@ -134,9 +134,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             if ProcessInfo.processInfo.environment["APP_PREVIEW_PRIME"] == "1" {
                 // Start one timer so the system's one-time alarm question is answered before anything is recorded, then cancel it.
                 let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-                first.staticTexts.matching(NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'All Recipes'")).firstMatch.waitForExistence(timeout: 30)
-                let row = first.staticTexts["All Recipes"].firstMatch
-                if row.waitForExistence(timeout: 10) { row.tap(); sleep(1) }
+                first.staticTexts.matching(NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes'")).firstMatch.waitForExistence(timeout: 30)
                 for _ in 0..<16 where !(first.staticTexts["World's Best Lasagna"].firstMatch.exists && first.staticTexts["World's Best Lasagna"].firstMatch.isHittable) { first.swipeUp(); usleep(400_000) }
                 first.staticTexts["World's Best Lasagna"].firstMatch.tap(); sleep(2)
                 first.buttons["Cook"].firstMatch.tap(); sleep(3)
@@ -164,7 +162,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
 
-        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'All Recipes'")
+        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes'")
         // System questions (Reminders, alarms) can cover the app on a fresh install: answer them until the library shows.
         let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         var ready = false
@@ -186,7 +184,6 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
         switch scene {
         case "hero":
-            if !regular { open("All Recipes") }
             sleep(2)
             mark("library")
             for _ in 0..<10 { app.swipeUp(velocity: .slow); mark("swipe"); sleep(1) }
@@ -281,7 +278,6 @@ final class AppStoreScreenshotUITests: XCTestCase {
             for _ in 0..<2 { app.swipeUp(velocity: .default); mark("glide"); sleep(1) }
             sleep(2)
         case "cleanup":
-            if !regular { open("All Recipes") }
             scrollToRecipe(lasagna)
             sleep(2)
             tapButton("More")
@@ -307,7 +303,6 @@ final class AppStoreScreenshotUITests: XCTestCase {
         case "cook":
             // Step 4 has "8 to 10 minutes", a timer pill. Three swipes get there from step 1.
             let at = (env["APP_PREVIEW_PILL"] ?? "0.59,0.314").split(separator: ",").map { Double($0)! }
-            if !regular { open("All Recipes") }
             scrollToRecipe(lasagna)
             sleep(2)
             mark("recipe")
@@ -425,7 +420,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
     /// Some layouts start on the recipe cards; the others list collections first.
     private func showAllRecipes() {
-        if !app.staticTexts[hero].firstMatch.waitForExistence(timeout: 3) { open("All Recipes") }
+        XCTAssertTrue(app.staticTexts[hero].firstMatch.waitForExistence(timeout: 10), "No \(hero)")
     }
 
     private func open(_ title: String) {

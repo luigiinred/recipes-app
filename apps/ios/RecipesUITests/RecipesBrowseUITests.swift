@@ -22,36 +22,56 @@ final class RecipesBrowseUITests: XCTestCase {
         try? FileManager.default.removeItem(at: library)
     }
 
+    private func tile(_ app: XCUIApplication, _ label: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
+    }
+
+    private func gone(_ element: XCUIElement) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: 5) == .completed
+    }
+
     private func shot(_ app: XCUIApplication, _ name: String) {
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "\(shots)/\(name).png"))
     }
 
-    func testDrillDownThroughCategories() {
+    func testHomeNarrowsByTagAndFilters() {
         let app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-rememberRecipeSort", "YES", "-recipeHomeSort", "recent"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15), "home lists the built-in collections")
-        XCTAssertTrue(app.staticTexts["Favorites"].exists)
-        XCTAssertTrue(app.staticTexts["Dessert"].exists, "categories are listed on the home screen")
-        XCTAssertTrue(app.staticTexts["Vegetarian"].exists)
+        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15), "home lists every recipe")
+        XCTAssertTrue(app.staticTexts["Apple Pie"].exists)
+        XCTAssertTrue(app.staticTexts["Black Bean Chili"].exists)
+        XCTAssertTrue(tile(app, "Dessert, 3 recipes").exists, "each tag counts the recipes it would show")
         shot(app, "1-home")
 
-        app.staticTexts["Dessert"].firstMatch.tap()
-        sleep(1)
-        shot(app, "2a-after-tap")
-        if !app.staticTexts["Cookies"].waitForExistence(timeout: 5) { print("TREE:\n" + app.debugDescription) }
-        XCTAssertTrue(app.staticTexts["Cookies"].exists, "Dessert shows its subcategory")
-        XCTAssertTrue(app.staticTexts["Apple Pie"].exists, "and the recipes filed directly in it")
-        XCTAssertFalse(app.staticTexts["Chocolate Chip Cookies"].exists, "recipes in a subcategory stay in the subcategory")
+        tile(app, "Dessert").tap()
+        XCTAssertTrue(app.staticTexts["Chocolate Chip Cookies"].waitForExistence(timeout: 5), "a tag includes its subtags")
+        XCTAssertTrue(gone(app.staticTexts["Black Bean Chili"]), "other tags drop out")
         shot(app, "2-dessert")
+        tile(app, "Dessert").tap()
+        XCTAssertTrue(app.staticTexts["Black Bean Chili"].waitForExistence(timeout: 5), "tapping the tag again clears it")
 
-        app.staticTexts["Cookies"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Chocolate Chip Cookies"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Oatmeal Cookies"].exists)
-        shot(app, "3-cookies")
+        app.tabBars.buttons["Search"].tap()
+        let filters = app.buttons["Filters"].firstMatch
+        XCTAssertTrue(filters.waitForExistence(timeout: 5), "the search row leads with the filter button")
+        filters.tap()
+        XCTAssertTrue(app.buttons["Show 4 Recipes"].waitForExistence(timeout: 5), "the sheet shows how many recipes are left")
+        tile(app, "Dessert").tap()
+        XCTAssertTrue(app.buttons["Show 3 Recipes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(tile(app, "Cookies, 2 recipes").waitForExistence(timeout: 5), "choosing a tag shows its subtags")
+        tile(app, "Cookies").tap()
+        XCTAssertTrue(app.buttons["Show 2 Recipes"].waitForExistence(timeout: 5))
+        app.switches["Favorites"].firstMatch.switches.firstMatch.tap()
+        XCTAssertTrue(app.buttons["No Recipes Match"].waitForExistence(timeout: 5), "Show only combines with the tag")
+        app.switches["Favorites"].firstMatch.switches.firstMatch.tap()
+        shot(app, "3-filters")
+        app.buttons["Show 2 Recipes"].firstMatch.tap()
 
+        XCTAssertTrue(app.staticTexts["Oatmeal Cookies"].waitForExistence(timeout: 5))
+        XCTAssertTrue(gone(app.staticTexts["Apple Pie"]), "the page follows the filters")
         app.staticTexts["Chocolate Chip Cookies"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["2 cups flour"].waitForExistence(timeout: 5), "tapping a recipe opens it")
         shot(app, "4-recipe")
@@ -62,7 +82,7 @@ final class RecipesBrowseUITests: XCTestCase {
         app.launchEnvironment["RECIPES_DIR"] = library.path
         app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
 
         XCUIDevice.shared.system.open(URL(string: "recipes://recipe/\(pieID.uuidString.lowercased())")!)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

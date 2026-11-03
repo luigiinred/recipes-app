@@ -1,0 +1,855 @@
+#if os(iOS)
+import RecipeKit
+import SwiftUI
+
+enum RecipeSort: String, CaseIterable {
+    case recent, title, rating, quickest, lastCooked, shuffle
+
+    var title: String {
+        switch self {
+        case .recent: "Most Recent"
+        case .title: "Name"
+        case .rating: "Rating"
+        case .quickest: "Quickest"
+        case .lastCooked: "Last Cooked"
+        case .shuffle: "Shuffle"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .recent: "clock"
+        case .title: "textformat"
+        case .rating: "star"
+        case .quickest: "timer"
+        case .lastCooked: "frying.pan"
+        case .shuffle: "shuffle"
+        }
+    }
+
+    /// `seed` keeps a shuffle in the same order until it is shuffled again.
+    func sorted(_ recipes: [Recipe], seed: Int = 0) -> [Recipe] {
+        switch self {
+        case .recent:
+            recipes.sorted { $0.createdAt > $1.createdAt }
+        case .title:
+            recipes.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        case .rating:
+            recipes.sorted { ($0.rating ?? 0, $0.isFavorite ? 1 : 0, $0.createdAt) > ($1.rating ?? 0, $1.isFavorite ? 1 : 0, $1.createdAt) }
+        case .quickest:
+            recipes.sorted { ($0.totalMinutes ?? .max, $0.title) < ($1.totalMinutes ?? .max, $1.title) }
+        case .lastCooked:
+            recipes.sorted { ($0.lastMade ?? .distantPast, $0.createdAt) > ($1.lastMade ?? .distantPast, $1.createdAt) }
+        case .shuffle:
+            recipes.sorted { Self.rank($0.id, seed) < Self.rank($1.id, seed) }
+        }
+    }
+
+    private static func rank(_ id: UUID, _ seed: Int) -> Int {
+        var hasher = Hasher()
+        hasher.combine(seed)
+        hasher.combine(id)
+        return hasher.finalize()
+    }
+}
+
+/// A "Show only" filter in the Recipes home's filter sheet.
+enum QuickFilter: String, CaseIterable {
+    case under30, under60, liked, upNext, ideas, notMade, videos
+
+    func title(_ style: RatingStyle) -> String {
+        switch self {
+        case .under30: "Under 30 min"
+        case .under60: "Under 1 hour"
+        case .liked: style == .stars ? "Top Rated" : "Favorites"
+        case .upNext: "Up Next"
+        case .ideas: "Ideas"
+        case .notMade: "Not Made Yet"
+        case .videos: "Videos"
+        }
+    }
+
+    func symbol(_ style: RatingStyle) -> String {
+        switch self {
+        case .under30: "clock"
+        case .under60: "hourglass"
+        case .liked: style == .stars ? "star" : "heart"
+        case .upNext: "text.line.first.and.arrowtriangle.forward"
+        case .ideas: "lightbulb"
+        case .notMade: "sparkles"
+        case .videos: "play.rectangle"
+        }
+    }
+
+    func matches(_ recipe: Recipe, _ style: RatingStyle) -> Bool {
+        switch self {
+        case .under30: (recipe.totalMinutes ?? .max) <= 30
+        case .under60: (recipe.totalMinutes ?? .max) <= 60
+        case .liked: style == .stars ? (recipe.rating ?? 0) >= 4 : recipe.isFavorite
+        case .upNext: recipe.wantToCook
+        case .ideas: recipe.isIdea
+        case .notMade: recipe.timeline.isEmpty && !recipe.isIdea
+        case .videos: recipe.youTubeVideoID != nil
+        }
+    }
+}
+
+
+/// A chip in the Search tab's quick filter row: a "Show only" filter or a tag. Settings picks them and their order.
+enum QuickChip: Hashable {
+    case filter(QuickFilter)
+    case tag(String)
+
+    static let defaults: [QuickChip] = [.liked, .upNext, .under30, .under60, .ideas, .notMade, .videos].map { .filter($0) }
+
+    static func parse(_ raw: String) -> [QuickChip] {
+        raw.split(separator: "\n").compactMap { QuickChip(token: String($0)) }
+    }
+
+    static func raw(_ chips: [QuickChip]) -> String { chips.map(\.token).joined(separator: "\n") }
+
+    init?(token: String) {
+        if token.hasPrefix("tag:") { self = .tag(String(token.dropFirst(4))) }
+        else if let filter = QuickFilter(rawValue: token) { self = .filter(filter) }
+        else { return nil }
+    }
+
+    var token: String {
+        switch self {
+        case .filter(let filter): filter.rawValue
+        case .tag(let path): "tag:\(path)"
+        }
+    }
+
+    func title(_ style: RatingStyle) -> String {
+        switch self {
+        case .filter(let filter): filter.title(style)
+        case .tag(let path): CategoryTree.components(path).last ?? path
+        }
+    }
+
+    func symbol(_ style: RatingStyle) -> String {
+        switch self {
+        case .filter(let filter): filter.symbol(style)
+        case .tag: "tag"
+        }
+    }
+}
+
+/// Everything narrowing the Recipes home: a category, quick filters and a total time range.
+struct HomeFilter: Equatable {
+    static let timeStep = 10
+    static let timeLimit = 120
+
+    var scope = RecipeCollection.all
+    var quick: Set<QuickFilter> = []
+    /// Tags turned on from quick filter chips; a recipe needs every one.
+    var tags: Set<String> = []
+    var query = ""
+    /// `timeLimit` means no maximum.
+    var maxMinutes = HomeFilter.timeLimit
+
+    var limitsTime: Bool { maxMinutes < Self.timeLimit }
+    /// Search text doesn't count: Reset and the Filters badge leave it alone.
+    var isActive: Bool { self != HomeFilter(query: query) }
+
+    func apply(_ recipes: [Recipe], style: RatingStyle) -> [Recipe] {
+        scope.filter(recipes).filter { recipe in
+            quick.allSatisfy { $0.matches(recipe, style) } && fitsTime(recipe) && recipe.matches(query)
+                && tags.allSatisfy { tag in recipe.tags.contains { CategoryTree.tag($0, isIn: tag) } }
+        }
+    }
+
+    func contains(_ chip: QuickChip) -> Bool {
+        switch chip {
+        case .filter(let filter): quick.contains(filter)
+        case .tag(let path): tags.contains(path)
+        }
+    }
+
+    mutating func toggle(_ chip: QuickChip) {
+        switch chip {
+        case .filter(let filter): if quick.contains(filter) { quick.remove(filter) } else { quick.insert(filter) }
+        case .tag(let path): if tags.contains(path) { tags.remove(path) } else { tags.insert(path) }
+        }
+    }
+
+    func fitsTime(_ recipe: Recipe) -> Bool {
+        guard limitsTime else { return true }
+        guard let minutes = recipe.totalMinutes else { return false }
+        return minutes <= maxMinutes
+    }
+
+    var timeTitle: String { limitsTime ? "Up to \(Self.minutes(maxMinutes))" : "Any time" }
+
+    static func minutes(_ value: Int) -> String {
+        value >= 60 && value % 60 == 0 ? "\(value / 60) hr" : "\(value) min"
+    }
+}
+
+/// What the Recipes home is narrowed and sorted by, shared by the Recipes and Search tabs.
+@Observable
+final class HomeBrowsing {
+    var filter = HomeFilter()
+    var chosenSort: RecipeSort?
+    var shuffleSeed = Int.random(in: .min ... .max)
+}
+
+/// The top of the Recipes tab (and the Search tab, with its query): every recipe, narrowed and sorted from the navigation bar.
+struct RecipesHomeView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @AppStorage(AppSettings.Key.listStyle) private var style = RecipeListStyle.list
+    @AppStorage(AppSettings.Key.homeSort) private var savedSort = RecipeSort.recent
+    @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
+    @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
+    @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(HomeBrowsing.self) private var browsing
+    @Environment(\.appAccent) private var accent
+    @Binding var selection: Recipe.ID?
+    var query = ""
+    var showsQuickFilters = false
+    var isSearching = false
+    var onScroll: (() -> Void)?
+
+    private var filter: HomeFilter {
+        get {
+            var filter = browsing.filter
+            filter.query = query
+            return filter
+        }
+        nonmutating set {
+            var filter = newValue
+            filter.query = ""
+            browsing.filter = filter
+        }
+    }
+    private var chosenSort: RecipeSort? {
+        get { browsing.chosenSort }
+        nonmutating set { browsing.chosenSort = newValue }
+    }
+    private var shuffleSeed: Int {
+        get { browsing.shuffleSeed }
+        nonmutating set { browsing.shuffleSeed = newValue }
+    }
+    @State private var choosingFilter = false
+    @State private var pinnedWidth: CGFloat = 0
+    /// A line of chip text, so icon-only chips are as tall as the labeled ones.
+    @ScaledMetric(relativeTo: .body) private var chipLine: CGFloat = 22
+    @State private var showsAllTags = false
+    @State private var titleInBar = false
+    @State private var tagShelfWidth: CGFloat = 0
+    @State private var tagRowWidth: CGFloat = 0
+    @State private var tagScroll = ScrollPosition(edge: .leading)
+    @State private var editing: Recipe?
+
+    private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
+    private var isRegular: Bool { sizeClass == .regular }
+    private var margin: CGFloat { isRegular ? 28 : 20 }
+    private var sort: RecipeSort { remembersSort ? savedSort : chosenSort ?? defaultSort }
+    private var sortBinding: Binding<RecipeSort> {
+        Binding(get: { sort }, set: choose)
+    }
+
+    private var items: [Recipe] { sort.sorted(filter.apply(library.recipes, style: ratingStyle), seed: shuffleSeed) }
+
+    var body: some View {
+        Group {
+            if library.recipes.isEmpty {
+                EmptyLibraryView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if isRegular {
+                grid
+            } else {
+                list
+            }
+        }
+        .themedCanvas()
+        .navigationTitle(titleInBar ? (filter.scope == .all ? "My Recipes" : filter.scope.title) : "")
+        .navigationSubtitle(titleInBar ? Self.countText(items.count) : "")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .recipeActions(selection: $selection, listStyle: nil)
+        .toolbar {
+            if !library.recipes.isEmpty {
+                ToolbarItem(placement: .primaryAction) { sortMenu }
+            }
+        }
+        .safeAreaBar(edge: .bottom) {
+            if showsQuickFilters, !library.recipes.isEmpty { quickFilterBar }
+        }
+        .sheet(isPresented: $choosingFilter) {
+            HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
+        }
+        .sheet(item: $editing) { recipe in
+            RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
+        }
+    }
+
+    private var list: some View {
+        let items = items
+        return List(selection: $selection) {
+            Section {
+                header(count: items.count)
+                    .listRowInsets(EdgeInsets(top: 8, leading: margin, bottom: 12, trailing: margin))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+                if showsTags {
+                    tagsRow
+                        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 20, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
+                ForEach(items) { recipe in
+                    Group {
+                        switch style {
+                        case .cards: RecipeCard(recipe: recipe)
+                        case .list: RecipeRow(recipe: recipe)
+                        }
+                    }
+                    .tag(recipe.id)
+                    .themedRow()
+                    .listRowSeparator(style == .cards || recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
+                    .listRowSeparator(style == .cards ? .hidden : .automatic, edges: .bottom)
+                    .listRowInsets(style == .cards ? EdgeInsets(top: 12, leading: margin, bottom: 20, trailing: margin) : EdgeInsets(top: 8, leading: margin, bottom: 8, trailing: margin))
+                    .recipeSwipeActions(for: recipe)
+                    .draggable(RecipeDragItem(id: recipe.id))
+                    .contextMenu { recipeMenu(recipe) }
+                }
+                if items.isEmpty { noMatches.listRowSeparator(.hidden).themedRow() }
+            }
+            .listSectionSeparator(.hidden)
+        }
+        .listStyle(.plain)
+        .scrollDismissesKeyboard(.immediately)
+        .onScrollPhaseChange { _, phase in if phase == .interacting { onScroll?() } }
+        .refreshable { await refresh() }
+        .animation(.snappy, value: items.map(\.id))
+    }
+
+    private var grid: some View {
+        let items = items
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                header(count: items.count).padding(.horizontal, margin)
+                if showsTags { tagsRow }
+                GridSection(title: nil, minimum: 260, spacing: 24) {
+                    ForEach(items) { recipe in
+                        Button { selection = recipe.id } label: { RecipeCard(recipe: recipe) }
+                            .buttonStyle(.plain)
+                            .draggable(RecipeDragItem(id: recipe.id))
+                            .contextMenu { recipeMenu(recipe) }
+                    }
+                }
+                .padding(.horizontal, margin)
+                if items.isEmpty { noMatches }
+            }
+            .padding(.vertical, 16)
+        }
+        .scrollDismissesKeyboard(.immediately)
+        .onScrollPhaseChange { _, phase in if phase == .interacting { onScroll?() } }
+        .refreshable { await refresh() }
+        .animation(.snappy, value: items.map(\.id))
+        .reviewPromptInset()
+    }
+
+    /// Searching hides the tags unless one is already narrowing the results.
+    private var showsTags: Bool {
+        !library.categoryTree.isEmpty && (!showsQuickFilters || filter.scope != .all)
+    }
+
+    private var tagsOverflow: Bool { tagRowWidth > tagShelfWidth - 2 * margin }
+
+    private var tagsRow: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button(action: toggleAllTags) {
+                HStack {
+                    Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary)
+                    Spacer()
+                    if tagsOverflow || showsAllTags {
+                        HStack(spacing: 4) {
+                            Text(showsAllTags ? "Show Less" : "Show All").contentTransition(.interpolate)
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .rotationEffect(.degrees(showsAllTags ? 180 : 0))
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.tint)
+                        .transition(.opacity)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!tagsOverflow && !showsAllTags)
+            .accessibilityLabel("Tags")
+            .accessibilityValue(tagsOverflow || showsAllTags ? (showsAllTags ? "Showing all" : "Showing one row") : "")
+            .padding(.horizontal, margin)
+            ScrollView(.horizontal, showsIndicators: false) {
+                TagShelf(wraps: showsAllTags, width: tagShelfWidth - 2 * margin, spacing: 16) { tagTiles }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                        if !showsAllTags { tagRowWidth = width }
+                    }
+            }
+            .contentMargins(.horizontal, margin, for: .scrollContent)
+            .scrollPosition($tagScroll)
+            .scrollDisabled(showsAllTags || !tagsOverflow)
+            .scrollClipDisabled()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagShelfWidth = $0 }
+        }
+    }
+
+    private func toggleAllTags() {
+        withAnimation(.spring(duration: 0.5, bounce: 0.2)) {
+            tagScroll.scrollTo(edge: .leading)
+            showsAllTags.toggle()
+        }
+    }
+
+    private var tagTiles: some View {
+        ForEach(library.categoryTree) { node in
+            let collection = RecipeCollection.category(node.path)
+            TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                    count: count(in: collection), isOn: isWithin(node)) {
+                filter.scope = isWithin(node) ? .all : collection
+            }
+        }
+    }
+
+    private func isWithin(_ node: CategoryNode) -> Bool {
+        guard case .category(let path) = filter.scope else { return false }
+        return CategoryTree.tag(path, isIn: node.path)
+    }
+
+    private func count(in collection: RecipeCollection) -> Int {
+        var narrowed = filter
+        narrowed.scope = collection
+        return narrowed.apply(library.recipes, style: ratingStyle).count
+    }
+
+    /// Chosen filters shrink to icons pinned at the leading edge; the rest scroll under them and fade out.
+    private var quickFilterBar: some View {
+        let shown = QuickChip.parse(quickChipsRaw)
+        let extra = filter.quick.map(QuickChip.filter).sorted { $0.token < $1.token } + filter.tags.sorted().map(QuickChip.tag)
+        let chosen = (shown + extra.filter { !shown.contains($0) }).filter { filter.contains($0) }
+        let others = shown.filter { !filter.contains($0) }
+        let inset = margin + pinnedWidth + 8
+        return ZStack(alignment: .leading) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(others, id: \.self) { quick in
+                            Button { filter.toggle(quick) } label: {
+                                Label(quick.title(ratingStyle), systemImage: quick.symbol(ratingStyle))
+                            }
+                            .glassButton(isOn: false)
+                        }
+                    }
+                }
+            }
+            .contentMargins(.leading, inset, for: .scrollContent)
+            .contentMargins(.trailing, margin, for: .scrollContent)
+            .scrollClipDisabled()
+            .mask {
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: max(inset - 20, 0))
+                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing).frame(width: 20)
+                    Color.black
+                }
+                .padding(.vertical, -20)
+            }
+            Group {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button { choosingFilter = true } label: {
+                            Label("Filters", systemImage: "line.3.horizontal.decrease")
+                                .labelStyle(.iconOnly)
+                                .frame(width: chipLine, height: chipLine)
+                        }
+                        .glassButton(isOn: filter.limitsTime || filter.scope != .all)
+                        .buttonBorderShape(.circle)
+                        .tint(filter.limitsTime || filter.scope != .all ? accent : nil)
+                        ForEach(chosen, id: \.self) { quick in
+                            Button { filter.toggle(quick) } label: {
+                                Label(quick.title(ratingStyle), systemImage: quick.symbol(ratingStyle))
+                                    .labelStyle(.iconOnly)
+                                    .frame(width: chipLine, height: chipLine)
+                            }
+                            .glassButton(isOn: true)
+                            .buttonBorderShape(.circle)
+                            .tint(accent)
+                            .accessibilityAddTraits(.isSelected)
+                        }
+                    }
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pinnedWidth = $0 }
+                .padding(.leading, margin)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.top, 6)
+        // The open search field floats over the bottom safe area instead of shrinking it.
+        .padding(.bottom, isSearching ? 70 : 6)
+        .animation(.snappy, value: filter)
+        .animation(.snappy, value: isSearching)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort By", selection: sortBinding) {
+                ForEach(RecipeSort.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+            }
+            if sort == .shuffle {
+                Button("Shuffle Again", systemImage: "arrow.trianglehead.2.clockwise") { choose(.shuffle) }
+            }
+        } label: {
+            Label("Sort", systemImage: sort.symbol)
+                .labelStyle(.iconOnly)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .accessibilityValue(sort.title)
+    }
+
+    static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
+
+    /// The page title sits here; once it scrolls under the bar, the bar shows it instead.
+    private func header(count: Int) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(filter.scope == .all ? "My Recipes" : filter.scope.title)
+                    .font(.largeTitle.bold())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityAddTraits(.isHeader)
+                Text(Self.countText(count))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 0)
+            if !isRegular {
+                Picker("View as", selection: $style) {
+                    ForEach(RecipeListStyle.allCases, id: \.self) { option in
+                        Image(systemName: option.symbol).accessibilityLabel(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
+        }
+        .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).midY < 0 } action: { hidden in
+            withAnimation(.easeInOut(duration: 0.2)) { titleInBar = hidden }
+        }
+    }
+
+    @ViewBuilder
+    private var noMatches: some View {
+        if !filter.isActive, !query.isEmpty {
+            ContentUnavailableView.search(text: query).frame(maxWidth: .infinity)
+        } else {
+            filteredOut
+        }
+    }
+
+    private var filteredOut: some View {
+        ContentUnavailableView {
+            Label("No Matches", systemImage: "line.3.horizontal.decrease.circle")
+        } description: {
+            Text("No recipes match these filters.")
+        } actions: {
+            Button("Clear Filters") { filter = HomeFilter() }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func recipeMenu(_ recipe: Recipe) -> some View {
+        RecipeQuickActions(recipe: recipe)
+        Button("Edit", systemImage: "pencil") { editing = recipe }
+    }
+
+    private func refresh() async {
+        await library.reload()
+        if sort == .shuffle { withAnimation(.snappy) { shuffleSeed = .random(in: .min ... .max) } }
+    }
+
+    private func choose(_ newSort: RecipeSort) {
+        if newSort == .shuffle { shuffleSeed = .random(in: .min ... .max) }
+        if remembersSort { savedSort = newSort } else { chosenSort = newSort }
+    }
+
+}
+
+private extension View {
+    @ViewBuilder
+    func glassButton(isOn: Bool) -> some View {
+        if isOn { buttonStyle(.glassProminent) } else { buttonStyle(.glass).foregroundStyle(.primary) }
+    }
+}
+
+/// Tag tiles in one row, or wrapped to `width` so every tag shows; the same tiles move between the two.
+private struct TagShelf: Layout {
+    var wraps: Bool
+    var width: CGFloat
+    var spacing: CGFloat = 14
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let frames = frames(subviews)
+        return CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (subview, frame) in zip(subviews, frames(subviews)) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+        }
+    }
+
+    private func frames(_ subviews: Subviews) -> [CGRect] {
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        return subviews.map { subview in
+            let size = subview.sizeThatFits(.unspecified)
+            if wraps, x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            defer {
+                x += size.width + spacing
+                rowHeight = max(rowHeight, size.height)
+            }
+            return CGRect(origin: CGPoint(x: x, y: y), size: size)
+        }
+    }
+}
+
+/// A tag as a photo tile, from the newest recipe in it that has one, with how many recipes choosing it shows.
+private struct TagTile: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.appAccent) private var accent
+    let title: String
+    let collection: RecipeCollection
+    let symbol: String
+    let count: Int
+    let isOn: Bool
+    let action: () -> Void
+
+    private var cover: Recipe? {
+        collection.filter(library.recipes)
+            .sorted { $0.createdAt > $1.createdAt }
+            .first { library.hasImage($0.id) }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Group {
+                    if let cover {
+                        RecipeImageView(recipe: cover)
+                    } else {
+                        Image(systemName: symbol)
+                            .font(.title2)
+                            .foregroundStyle(accent)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                }
+                .frame(width: 68, height: 68)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(isOn ? accent : .clear, lineWidth: 3)
+                }
+                .padding(.bottom, 2)
+                Text(title)
+                    .font(.footnote.weight(isOn ? .semibold : .regular))
+                    .foregroundStyle(isOn ? .primary : .secondary)
+                    .lineLimit(1)
+                Text(count == 1 ? "1 recipe" : "\(count) recipes")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            .frame(width: 76)
+            .opacity(count == 0 && !isOn ? 0.45 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(count == 1 ? "1 recipe" : "\(count) recipes")")
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Every way to narrow the home, applied as it changes, with the count of what's left.
+private struct HomeFilterSheet: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.dismiss) private var dismiss
+    @Binding var filter: HomeFilter
+    let ratingStyle: RatingStyle
+
+    private var remaining: Int { filter.apply(library.recipes, style: ratingStyle).count }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if !library.categoryTree.isEmpty {
+                    Section("Tags") {
+                        ForEach(tagLevels.indices, id: \.self) { level in
+                            tagRow(tagLevels[level], showsUncategorized: level == 0)
+                                .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
+                        }
+                    }
+                }
+                Section {
+                    TimeHistogram(recipes: timeCandidates, filter: filter)
+                        .frame(height: 72)
+                        .listRowSeparator(.hidden)
+                    Slider(value: maxMinutes, in: Double(HomeFilter.timeStep)...Double(HomeFilter.timeLimit), step: Double(HomeFilter.timeStep)) {
+                        Text("Maximum time")
+                    } minimumValueLabel: {
+                        Text(HomeFilter.minutes(HomeFilter.timeStep)).font(.caption).foregroundStyle(.secondary)
+                    } maximumValueLabel: {
+                        Text("Any").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .accessibilityValue(filter.timeTitle)
+                } header: {
+                    HStack {
+                        Text("Total time")
+                        Spacer()
+                        Text(filter.timeTitle).foregroundStyle(filter.limitsTime ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    }
+                }
+                Section("Show only") {
+                    ForEach(QuickFilter.allCases, id: \.self) { quick in
+                        Toggle(isOn: Binding(
+                            get: { filter.quick.contains(quick) },
+                            set: { if $0 { filter.quick.insert(quick) } else { filter.quick.remove(quick) } }
+                        )) {
+                            Label(quick.title(ratingStyle), systemImage: quick.symbol(ratingStyle))
+                        }
+                    }
+                }
+            }
+            .safeAreaBar(edge: .bottom) {
+                Button { dismiss() } label: {
+                    Text(remaining == 0 ? "No Recipes Match" : remaining == 1 ? "Show 1 Recipe" : "Show \(remaining) Recipes")
+                        .contentTransition(.numericText())
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.extraLarge)
+                .disabled(remaining == 0)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+            }
+            .navigationTitle("Filters")
+            .navigationSubtitle("\(remaining) of \(library.recipes.count) recipes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close) { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Reset") { withAnimation(.snappy) { filter = HomeFilter(query: filter.query) } }
+                        .disabled(!filter.isActive)
+                }
+            }
+            .animation(.snappy, value: remaining)
+        }
+    }
+
+    private var maxMinutes: Binding<Double> {
+        Binding(get: { Double(filter.maxMinutes) }, set: { filter.maxMinutes = Int($0) })
+    }
+
+    /// The top-level tags, then the subtags of each chosen one.
+    private var tagLevels: [[CategoryNode]] {
+        var levels = [library.categoryTree]
+        while let chosen = levels.last?.first(where: { isOn($0) }), !chosen.children.isEmpty {
+            levels.append(chosen.children)
+        }
+        return levels
+    }
+
+    private func isOn(_ node: CategoryNode) -> Bool {
+        guard case .category(let path) = filter.scope else { return false }
+        return CategoryTree.tag(path, isIn: node.path)
+    }
+
+    private func tagRow(_ nodes: [CategoryNode], showsUncategorized: Bool) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 14) {
+                ForEach(nodes) { node in
+                    let collection = RecipeCollection.category(node.path)
+                    TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                            count: count(in: collection), isOn: isOn(node)) {
+                        withAnimation(.snappy) { filter.scope = filter.scope == collection ? parent(of: node) : collection }
+                    }
+                }
+                if showsUncategorized, !RecipeCollection.uncategorized.filter(library.recipes).isEmpty {
+                    TagTile(title: RecipeCollection.uncategorized.title, collection: .uncategorized, symbol: RecipeCollection.uncategorized.symbol,
+                            count: count(in: .uncategorized), isOn: filter.scope == .uncategorized) {
+                        withAnimation(.snappy) { filter.scope = filter.scope == .uncategorized ? .all : .uncategorized }
+                    }
+                }
+            }
+        }
+        .contentMargins(.horizontal, 20, for: .scrollContent)
+    }
+
+    private func parent(of node: CategoryNode) -> RecipeCollection {
+        let parts = CategoryTree.components(node.path)
+        return parts.count > 1 ? .category(parts.dropLast().joined(separator: "/")) : .all
+    }
+
+    private func count(in collection: RecipeCollection) -> Int {
+        var narrowed = filter
+        narrowed.scope = collection
+        return narrowed.apply(library.recipes, style: ratingStyle).count
+    }
+
+    /// The recipes the other filters leave, so the histogram shows what the time limit would choose from.
+    private var timeCandidates: [Recipe] {
+        var others = filter
+        others.maxMinutes = HomeFilter.timeLimit
+        return others.apply(library.recipes, style: ratingStyle)
+    }
+}
+
+/// How many recipes take each stretch of time, with the time limit's share in the accent color.
+private struct TimeHistogram: View {
+    @Environment(\.appAccent) private var accent
+    let recipes: [Recipe]
+    let filter: HomeFilter
+
+    private static let binCount = HomeFilter.timeLimit / HomeFilter.timeStep + 1
+
+    private var bins: [Int] {
+        var bins = Array(repeating: 0, count: Self.binCount)
+        for minutes in recipes.compactMap(\.totalMinutes) { bins[min(minutes / HomeFilter.timeStep, Self.binCount - 1)] += 1 }
+        return bins
+    }
+
+    var body: some View {
+        let bins = bins
+        let tallest = max(bins.max() ?? 0, 1)
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(bins.indices, id: \.self) { index in
+                let start = index * HomeFilter.timeStep
+                let inRange = !filter.limitsTime || start < filter.maxMinutes
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(inRange ? accent : accent.opacity(0.2))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: max(4, 72 * CGFloat(bins[index]) / CGFloat(tallest)))
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .bottom)
+        .padding(.horizontal, 14)
+        .animation(.snappy, value: filter)
+        .accessibilityHidden(true)
+    }
+}
+
+#endif
