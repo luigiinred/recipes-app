@@ -371,9 +371,9 @@ final class RecipeLibrary: ObservableObject {
         }
     }
 
-    func addIdea(title: String, notes: String) async -> Recipe {
+    func addIdea(title: String, notes: String, image: Data? = nil) async -> Recipe {
         let idea = Recipe(title: title, notes: notes)
-        await save(idea)
+        await save(idea, image: image.map(ImageChange.set) ?? .unchanged)
         return idea
     }
 

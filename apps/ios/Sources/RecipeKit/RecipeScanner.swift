@@ -18,6 +18,31 @@ public enum RecipeScanner {
         return pages.joined(separator: "\n")
     }
 
+    /// The largest text in a photo, such as the product name on a box. Blocking: call off the main thread.
+    public static func prominentTitle(in image: CGImage) throws -> String? {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        try VNImageRequestHandler(cgImage: image).perform([request])
+        let lines = (request.results ?? []).compactMap { observation in
+            observation.topCandidates(1).first.map { (text: $0.string, height: Double(observation.boundingBox.height)) }
+        }
+        return prominentTitle(from: lines)
+    }
+
+    static func prominentTitle(from lines: [(text: String, height: Double)]) -> String? {
+        let words = lines
+            .map { (text: $0.text.trimmingCharacters(in: .whitespacesAndNewlines), height: $0.height) }
+            .filter { $0.text.filter(\.isLetter).count >= 3 }
+        guard let tallest = words.map(\.height).max() else { return nil }
+        let title = words
+            .filter { $0.height >= tallest * 0.75 }
+            .prefix(3)
+            .map { $0.text == $0.text.uppercased() ? $0.text.capitalized : $0.text }
+            .joined(separator: " ")
+        return String(title.prefix(60))
+    }
+
     public static func recipe(fromImageAt url: URL) throws -> (recipe: Recipe, text: String) {
         let text = try recognizeText(in: try images(from: url))
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

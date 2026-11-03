@@ -5,12 +5,19 @@ import Vision
 import FoundationModels
 #endif
 
-/// Writes a draft recipe for the dish in a photo with the on-device model.
-public enum MealPhotoRecipeWriter {
+/// Names the dish or packaged food in a photo, so it can be saved as an idea.
+public enum MealPhotoNamer {
+    /// Tries the on-device model, then the largest printed text, such as the name on a box. Nil when neither finds a name.
+    public static func name(imageData: Data) async -> String? {
+        if case .named(let name) = await run(imageData: imageData) { return name }
+        guard let image = RecipeImageProcessing.thumbnail(from: imageData, maxPixelSize: 1600) else { return nil }
+        return await Task.detached { try? RecipeScanner.prominentTitle(in: image) }.value
+    }
+
     public enum Outcome: Sendable {
-        case written(Recipe)
+        case named(String)
         case unavailable(AppleIntelligence.Status)
-        /// The model was ready but couldn't write a recipe; the text says why.
+        /// The model was ready but couldn't name the dish; the text says why.
         case failed(String)
     }
 
@@ -44,7 +51,7 @@ public enum MealPhotoRecipeWriter {
             .prefix(10)
             .map { "\($0.identifier.replacingOccurrences(of: "_", with: " ")) (\(Int(($0.confidence * 100).rounded()))%)" }
         guard !seen.isEmpty else { return nil }
-        return "Image recognition looked at a photo of a meal and saw, most likely first: \(seen.joined(separator: ", ")). Write a recipe for the dish."
+        return "Image recognition looked at a photo of a meal and saw, most likely first: \(seen.joined(separator: ", ")). Name the dish."
     }
 
     private static func classify(_ image: CGImage, orientation: CGImagePropertyOrientation) throws -> [(identifier: String, confidence: Float)] {
@@ -59,7 +66,7 @@ public enum MealPhotoRecipeWriter {
     private static func looking(at image: CGImage, orientation: CGImagePropertyOrientation) async -> Outcome? {
         do {
             return try await generate {
-                "Write a recipe for the dish in this photo."
+                "Name the dish or food in this photo."
                 Attachment(image, orientation: orientation)
             }
         } catch let error as LanguageModelError {
@@ -93,16 +100,10 @@ public enum MealPhotoRecipeWriter {
 
     @available(macOS 26.0, iOS 26.0, *)
     private static func generate(@PromptBuilder _ prompt: () throws -> Prompt) async throws -> Outcome {
-        let session = LanguageModelSession(instructions: AIAction.mealPhoto.instructions())
-        let content = try await session.respond(generating: GeneratedMealRecipe.self, prompt: prompt).content
-        let title = content.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return .written(Recipe(
-            title: title.isEmpty ? "Untitled Meal" : title,
-            summary: content.summary,
-            servings: content.servings > 0 ? content.servings : nil,
-            ingredients: content.ingredients.map { Ingredient(parsing: $0).text }.filter { !$0.isEmpty },
-            steps: content.steps.map(RecipeStandards.standardStep).filter { !$0.isEmpty }
-        ))
+        let session = LanguageModelSession(instructions: AIAction.mealPhotoName.instructions())
+        let title = try await session.respond(generating: GeneratedMealName.self, prompt: prompt).content.title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? .failed("Couldn't tell what's in that photo.") : .named(title)
     }
     #endif
 }
@@ -110,16 +111,8 @@ public enum MealPhotoRecipeWriter {
 #if canImport(FoundationModels)
 @available(macOS 26.0, iOS 26.0, *)
 @Generable
-struct GeneratedMealRecipe {
-    @Guide(description: "The dish's name in title case, such as 'Chicken Fried Rice'.")
+struct GeneratedMealName {
+    @Guide(description: "The dish's name in title case, such as 'Chicken Fried Rice' or 'Frozen Meat Lasagna'.")
     var title: String
-    @Guide(description: "One sentence describing the dish.")
-    var summary: String
-    @Guide(description: "How many servings the amounts make.")
-    var servings: Int
-    @Guide(description: "Every ingredient in the order they are used, each written as amount, unit and item, such as '1 1/2 cups flour', '2 eggs' or '1 clove garlic, minced'.")
-    var ingredients: [String]
-    @Guide(description: "The cooking steps in order, each a short imperative sentence or two, with no numbering.")
-    var steps: [String]
 }
 #endif
