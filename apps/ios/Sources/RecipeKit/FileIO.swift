@@ -32,10 +32,15 @@ enum FileIO {
         try result.get()
     }
 
+    static func isPlaceholder(_ url: URL) -> Bool {
+        let name = url.lastPathComponent
+        return name.hasPrefix(".") && name.hasSuffix(".icloud")
+    }
+
     /// Asks iCloud to fetch files that are only placeholders on this device.
     static func startDownloadIfPlaceholder(_ url: URL, in directory: URL) -> Bool {
+        guard isPlaceholder(url) else { return false }
         let name = url.lastPathComponent
-        guard name.hasPrefix("."), name.hasSuffix(".icloud") else { return false }
         let real = String(name.dropFirst().dropLast(".icloud".count))
         try? FileManager.default.startDownloadingUbiquitousItem(at: directory.appendingPathComponent(real))
         return true
