@@ -461,7 +461,7 @@ private struct IntelligenceSettingsPage: View {
             Section {
                 statusRow("Smart Plan for My Week", ready: status.isAvailable)
                 statusRow("Recipes from video captions", ready: status.isAvailable)
-                statusRow("Recipes from meal photos", ready: status.isAvailable)
+                statusRow("Ideas from meal photos", ready: status.isAvailable)
                 statusRow("Photos with Image Playground", ready: override?.imagePlayground ?? supportsImagePlayground)
             } footer: {
                 if status.isAvailable {

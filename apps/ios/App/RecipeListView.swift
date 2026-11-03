@@ -327,7 +327,7 @@ private struct RecipeActionsModifier: ViewModifier {
     var findRecipes: FindRecipesAction?
 
     @State private var showingNew = false
-    @State private var showingIdea = false
+    @State private var ideaDraft: IdeaDraft?
     @State private var showingImport = false
     @State private var showingFileImporter = false
     @State private var showingScanner = false
@@ -388,8 +388,8 @@ private struct RecipeActionsModifier: ViewModifier {
                 selection = saved.id
             }
         }
-        .sheet(isPresented: $showingIdea) {
-            NewIdeaSheet { selection = $0.id }
+        .sheet(item: $ideaDraft) { draft in
+            NewIdeaSheet(photo: draft.photo) { selection = $0.id }
         }
         .sheet(isPresented: $showingImport) {
             ImportURLView(
@@ -423,7 +423,7 @@ private struct RecipeActionsModifier: ViewModifier {
             MealCamera(
                 onFinish: { data in
                     showingMealCamera = false
-                    writeRecipe(fromMealPhoto: data)
+                    ideaDraft = IdeaDraft(photo: data)
                 },
                 onCancel: { showingMealCamera = false }
             )
@@ -436,7 +436,7 @@ private struct RecipeActionsModifier: ViewModifier {
             mealPhotoItem = nil
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self) {
-                    writeRecipe(fromMealPhoto: data)
+                    ideaDraft = IdeaDraft(photo: data)
                 } else {
                     scanError = "Couldn't load that photo."
                 }
@@ -469,7 +469,7 @@ private struct RecipeActionsModifier: ViewModifier {
     @ViewBuilder
     private var addItems: some View {
         Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
-        Button("New Idea…", systemImage: "lightbulb") { showingIdea = true }
+        Button("New Idea…", systemImage: "lightbulb") { ideaDraft = IdeaDraft() }
         Button("Import from Web or YouTube…", systemImage: "globe") { showingImport = true }
         #if os(iOS)
         Button("Scan Recipe…", systemImage: "doc.viewfinder") {
@@ -478,38 +478,15 @@ private struct RecipeActionsModifier: ViewModifier {
         #endif
         Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
         #if os(iOS)
-        Menu("Recipe from Meal Photo", systemImage: "fork.knife.circle") {
+        Menu("Idea from Photo", systemImage: "fork.knife.circle") {
             if MealCamera.isAvailable {
                 Button("Take Photo", systemImage: "camera") { showingMealCamera = true }
             }
             Button("Choose Photo", systemImage: "photo") { showingMealLibrary = true }
         }
         #else
-        Button("Recipe from Meal Photo…", systemImage: "fork.knife.circle") { showingMealLibrary = true }
+        Button("Idea from Photo…", systemImage: "fork.knife.circle") { showingMealLibrary = true }
         #endif
-    }
-
-    /// Opens the editor on a draft written from the photo, or on just the photo when Apple Intelligence can't help.
-    private func writeRecipe(fromMealPhoto data: Data) {
-        progressMessage = "Looking at your meal…"
-        Task {
-            let outcome = await MealPhotoRecipeWriter.run(imageData: data)
-            progressMessage = nil
-            let recipe: Recipe
-            let notice: String
-            switch outcome {
-            case .written(let written):
-                recipe = written
-                notice = "Apple Intelligence wrote this from your photo. Check the ingredients and amounts."
-            case .unavailable(let status):
-                recipe = Recipe(title: "")
-                notice = status.explanation
-            case .failed(let reason):
-                recipe = Recipe(title: "")
-                notice = reason
-            }
-            draft = ScanDraft(recipe: recipe, notice: notice, imageData: RecipeImageProcessing.jpegData(from: data))
-        }
     }
 
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
