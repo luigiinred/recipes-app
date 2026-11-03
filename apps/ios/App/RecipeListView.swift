@@ -555,8 +555,9 @@ struct CategoryRow: View {
                 Label(node.name, systemImage: node.children.isEmpty ? "tag" : "folder")
             }
         }
-        .themedRow(raised: true)
+        // The row background only reaches the list from the outermost modifier.
         .categoryDragAndDrop(node.path)
+        .themedRow(raised: true)
     }
 }
 

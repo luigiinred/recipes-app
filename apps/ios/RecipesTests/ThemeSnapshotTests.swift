@@ -38,6 +38,13 @@ struct ThemeSnapshotTests {
         with(.dark) { assertPageSnapshots(of: GroceriesView(layout: .combined)) }
     }
 
+    #if os(iOS)
+    @Test("dark: collections and categories on the Recipes home match")
+    func darkRecipesHome() {
+        with(.dark) { assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false) }
+    }
+    #endif
+
     @Test("sepia")
     func sepia() {
         with(.sepia) { assertPageSnapshots(of: GroceriesView(layout: .combined), coverage: .sheet) }

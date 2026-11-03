@@ -4,6 +4,7 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     @Environment(\.appAccent) private var accent
+    @Environment(\.appearance) private var appearance
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     let recipe: Recipe
@@ -18,6 +19,7 @@ struct RecipeDetailView: View {
     @State private var generatingImage = false
     @State private var viewportHeight: CGFloat = 0
     @State private var scrolled: CGFloat = 0
+    @State private var pageOffset = PageOffset()
     @State private var topInset: CGFloat = 0
     @State private var sidePaneScrolled = false
     @State private var titleScrolledAway = false
@@ -25,6 +27,7 @@ struct RecipeDetailView: View {
     @State private var addingToGroceries = false
     @State private var addingToCalendar = false
     @State private var showingTimeline = false
+    @State private var editingTags = false
     @State private var scale = 1.0
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
@@ -87,6 +90,7 @@ struct RecipeDetailView: View {
             RecipeEditorView(recipe: recipe, onDelete: { dismiss() }) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
         .sheet(isPresented: $showingTimeline) { RecipeTimelineSheet(recipeID: recipe.id) }
+        .sheet(isPresented: $editingTags) { TagsSheet(recipe: recipe) }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {
             Button("OK") { timestampMessage = nil }
         } message: {
@@ -105,10 +109,11 @@ struct RecipeDetailView: View {
                 if recipe.youTubeVideoID != nil {
                     video.padding([.horizontal, .top], 24)
                 } else if hasArtwork {
-                    titleBanner
+                    PhotoBanner(offset: pageOffset, height: Self.bannerHeight + topInset) { artwork }
+                        .padding(.bottom, -Self.cardRadius)
                 }
                 VStack(alignment: .leading, spacing: 24) {
-                    header(showsTitle: !hasArtwork)
+                    header
                     if recipe.isIdea {
                         ideaNote
                     } else {
@@ -122,34 +127,26 @@ struct RecipeDetailView: View {
                 .padding(24)
                 .frame(maxWidth: 900, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
             }
             .textSelection(.enabled)
         }
         .ignoresSafeArea(edges: hasArtwork ? .top : [])
+        .scrollEdgeEffectHidden(hasArtwork && !titleScrolledAway, for: .top)
         .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 60 } action: { _, scrolledAway in
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? Self.bannerHeight : 0) + 60 } action: { _, scrolledAway in
             titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
+            pageOffset.y = y
         }
     }
 
-    /// The title at the top of the page over the photo, which runs up behind the navigation bar.
-    private var titleBanner: some View {
-        Text(recipe.title)
-            .font(.system(.largeTitle, weight: .bold))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
-            .lineLimit(4)
-            .padding(24)
-            .padding(.top, topInset)
-            .frame(maxWidth: .infinity, minHeight: 200 + topInset, alignment: .topLeading)
-            .background {
-                ZStack {
-                    Color.clear.overlay { artwork }.clipped()
-                    LinearGradient(colors: [.black.opacity(0.55), .black.opacity(0.1)], startPoint: .top, endPoint: .bottom)
-                }
-            }
-            .backgroundExtensionEffect()
-            .accessibilityAddTraits(.isHeader)
+    private static let bannerHeight: CGFloat = 240
+    private static let cardRadius: CGFloat = 28
+
+    private var pageStyle: AnyShapeStyle {
+        appearance.canvas.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.background)
     }
 
     /// With room to spare the recipe and its ingredients scroll on their own, so both stay in view while cooking.
@@ -160,7 +157,7 @@ struct RecipeDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     if recipe.youTubeVideoID != nil { video }
-                    header(showsTitle: true)
+                    header
                     steps
                     footer
                 }
@@ -232,10 +229,13 @@ struct RecipeDetailView: View {
         }
     }
 
-    private func header(showsTitle: Bool) -> some View {
+    private var header: some View {
         VStack(alignment: .leading, spacing: 18) {
-            if showsTitle {
-                Text(recipe.title).font(.system(.largeTitle, weight: .bold))
+            VStack(alignment: .leading, spacing: 12) {
+                Text(recipe.title)
+                    .font(.system(.largeTitle, weight: .bold))
+                    .accessibilityAddTraits(.isHeader)
+                tagChips
             }
             statsRow
             if previewSave == nil, ratingStyle == .stars || recipe.rating != nil {
@@ -245,18 +245,39 @@ struct RecipeDetailView: View {
             if !recipe.summary.isEmpty {
                 Text(recipe.summary).font(.callout).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var tagChips: some View {
+        if previewSave != nil {
             if !recipe.tags.isEmpty {
-                ChipFlow(spacing: 8) {
-                    ForEach(recipe.tags, id: \.self) { tag in
-                        Text(CategoryTree.displayName(tag))
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Theme.accent.opacity(0.12), in: Capsule())
-                            .foregroundStyle(Theme.accent)
-                    }
+                ChipFlow { ForEach(recipe.tags, id: \.self) { tagChip($0) } }
+            }
+        } else {
+            ChipFlow {
+                ForEach(recipe.tags, id: \.self) { tag in
+                    Button { editingTags = true } label: { tagChip(tag) }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Edits tags")
                 }
+                Button { editingTags = true } label: {
+                    Label(recipe.tags.isEmpty ? "Add Tags" : "Add", systemImage: "plus")
+                        .font(.footnote.weight(.medium))
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .overlay { Capsule().strokeBorder(Theme.accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private func tagChip(_ tag: String) -> some View {
+        Text(CategoryTree.displayName(tag))
+            .font(.footnote.weight(.medium))
+            .tagChip()
     }
 
     @ViewBuilder
@@ -468,5 +489,33 @@ private extension View {
         } action: { _, value in
             scrolled.wrappedValue = value
         }
+    }
+}
+
+/// How far the page has scrolled, kept apart so only the photo redraws as it moves.
+@Observable
+private final class PageOffset {
+    var y: CGFloat = 0
+}
+
+/// The photo at the top of the page, which runs up behind the navigation bar.
+/// Scrolling moves it at half speed, so what's left in view stays centered as the page covers it;
+/// pulling past the top grows it from its bottom edge, cropping the sides, so no gap opens above.
+private struct PhotoBanner<Artwork: View>: View {
+    let offset: PageOffset
+    let height: CGFloat
+    @ViewBuilder let artwork: Artwork
+
+    var body: some View {
+        let y = offset.y
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .overlay {
+                artwork
+                    .scaleEffect(y < 0 ? 1 - y / height : 1, anchor: .bottom)
+                    .offset(y: y > 0 ? y / 2 : 0)
+            }
+            .mask(alignment: .bottom) { Rectangle().frame(height: 10_000) }
     }
 }
