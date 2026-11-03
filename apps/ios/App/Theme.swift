@@ -24,7 +24,7 @@ struct AccentStyle: ShapeStyle {
 }
 
 enum Appearance: String, CaseIterable, Identifiable {
-    case system, light, dark, black, sepia, butter, linen, olive, rose, crema, mint, chai, cocoa, custom
+    case system, light, dark, black, sepia, butter, linen, olive, rose, crema, mint, blueberry, chai, cocoa, custom
 
     var id: String { rawValue }
 
@@ -41,6 +41,7 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .rose: "Vintage Rose"
         case .crema: "Crema"
         case .mint: "Mint"
+        case .blueberry: "Blueberry"
         case .chai: "Red Chai"
         case .cocoa: "Cowhide Cocoa"
         case .custom: "Custom"
@@ -60,6 +61,7 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .rose: "camera.macro"
         case .crema: "cup.and.heat.waves"
         case .mint: "leaf.circle"
+        case .blueberry: "circle.grid.cross"
         case .chai: "cup.and.saucer"
         case .cocoa: "mug"
         case .custom: "paintbrush"
@@ -69,7 +71,7 @@ enum Appearance: String, CaseIterable, Identifiable {
     var colorScheme: ColorScheme? {
         switch self {
         case .system, .custom: nil
-        case .light, .sepia, .butter, .linen, .olive, .rose, .crema, .mint: .light
+        case .light, .sepia, .butter, .linen, .olive, .rose, .crema, .mint, .blueberry: .light
         case .dark, .black, .chai, .cocoa: .dark
         }
     }
@@ -86,6 +88,7 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .rose: Color(hex: "F6E2DE")
         case .crema: Color(hex: "F2E7CB")
         case .mint: Color(hex: "E4EBDD")
+        case .blueberry: Color(hex: "E6E8F3")
         case .chai: Color(hex: "2E1412")
         case .cocoa: Color(hex: "2A1C15")
         default: nil
@@ -104,6 +107,7 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .rose: Color(hex: "FCF1EF")
         case .crema: Color(hex: "FAF5E8")
         case .mint: Color(hex: "F4F7F0")
+        case .blueberry: Color(hex: "F4F5FB")
         case .chai: Color(hex: "441E1A")
         case .cocoa: Color(hex: "3B2820")
         default: nil
@@ -119,6 +123,7 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .rose: AccentPreset.burgundy
         case .crema: AccentPreset.paprika
         case .mint: AccentPreset.mint
+        case .blueberry: AccentPreset.blueberry
         case .chai: AccentPreset.cinnamon
         case .cocoa: AccentPreset.caramel
         default: nil
@@ -173,6 +178,7 @@ struct AccentPreset: Identifiable {
     var id: String { hex }
     var color: Color { Color(hex: hex) ?? .red }
 
+    static let blueberry = "3B6FD6"
     static let rust = "BA3801"
     static let cherry = "C8250C"
     static let olive = "7D7F52"
@@ -188,7 +194,7 @@ struct AccentPreset: Identifiable {
         AccentPreset(name: "Saffron", hex: "D9A011"),
         AccentPreset(name: "Basil", hex: "3E8E5A"),
         AccentPreset(name: "Teal", hex: "1F9D9A"),
-        AccentPreset(name: "Blueberry", hex: "3B6FD6"),
+        AccentPreset(name: "Blueberry", hex: blueberry),
         AccentPreset(name: "Plum", hex: "8E4FC1"),
         AccentPreset(name: "Rose", hex: "D6457F"),
         AccentPreset(name: "Graphite", hex: "5C6670"),

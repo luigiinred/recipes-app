@@ -50,7 +50,7 @@ struct ThemeSnapshotTests {
         with(.sepia) { assertPageSnapshots(of: GroceriesView(layout: .combined), coverage: .sheet) }
     }
 
-    @Test("cookbook palettes", arguments: [Appearance.butter, .linen, .olive, .rose, .crema, .mint, .chai, .cocoa])
+    @Test("cookbook palettes", arguments: [Appearance.butter, .linen, .olive, .rose, .crema, .mint, .blueberry, .chai, .cocoa])
     func palette(_ appearance: Appearance) {
         SampleData.defaults.set(appearance.accentHex, forKey: AppSettings.Key.accentColor)
         defer { SampleData.defaults.removeObject(forKey: AppSettings.Key.accentColor) }
