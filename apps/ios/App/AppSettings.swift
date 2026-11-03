@@ -23,6 +23,9 @@ enum AppSettings {
         static let appearance = "appearance"
         static let fontStyle = "fontStyle"
         static let accentColor = "accentColorHex"
+        static let customThemeDark = "customThemeDark"
+        static let customThemeCanvas = "customThemeCanvasHex"
+        static let customThemeSurface = "customThemeSurfaceHex"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }

@@ -45,7 +45,7 @@ struct RecipeDetailView: View {
         .collapsesSidebarWhenUnfolded()
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
-        .background(.background)
+        .background(pageStyle)
         .themedCanvas()
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }

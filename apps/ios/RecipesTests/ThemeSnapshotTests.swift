@@ -50,6 +50,32 @@ struct ThemeSnapshotTests {
         with(.sepia) { assertPageSnapshots(of: GroceriesView(layout: .combined), coverage: .sheet) }
     }
 
+    @Test("cookbook palettes", arguments: [Appearance.butter, .linen, .olive, .rose, .crema, .mint, .chai, .cocoa])
+    func palette(_ appearance: Appearance) {
+        SampleData.defaults.set(appearance.accentHex, forKey: AppSettings.Key.accentColor)
+        defer { SampleData.defaults.removeObject(forKey: AppSettings.Key.accentColor) }
+        with(appearance) { assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.shakshuka), named: appearance.rawValue, coverage: appearance.colorScheme == .dark ? .screen : .sheet, testName: "palette") }
+    }
+
+    @Test("a custom theme on the recipe page and its builder")
+    func custom() {
+        let keys = [AppSettings.Key.customThemeDark, AppSettings.Key.customThemeCanvas, AppSettings.Key.customThemeSurface, AppSettings.Key.accentColor]
+        SampleData.defaults.set(true, forKey: AppSettings.Key.customThemeDark)
+        SampleData.defaults.set("2F2E24", forKey: AppSettings.Key.customThemeCanvas)
+        SampleData.defaults.set("3E3D31", forKey: AppSettings.Key.customThemeSurface)
+        SampleData.defaults.set("B5A865", forKey: AppSettings.Key.accentColor)
+        defer { keys.forEach { SampleData.defaults.removeObject(forKey: $0) } }
+        with(.custom) {
+            assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.shakshuka), named: "recipe")
+            assertPageSnapshots(of: CustomThemePage(), named: "builder", macSize: SnapshotEnvironment.macSheetSize)
+        }
+    }
+
+    @Test("sepia reaches the bottom of an idea")
+    func sepiaIdea() {
+        with(.sepia) { assertPageSnapshots(of: RecipeDetailView(recipe: Recipe(title: "Sunday Sauce", summary: "Nonna's, from memory.")), coverage: .sheet) }
+    }
+
     @Test("a recipe's timeline")
     func timeline() {
         assertPageSnapshots(of: RecipeTimelineSheet(recipeID: SampleData.chili.id), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
