@@ -23,7 +23,7 @@ final class TabSearchUITests: XCTestCase {
         app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.searchFields.firstMatch.exists, "the recipes tab should not show a search bar at the top")
 
         let searchTab = app.tabBars.buttons["Search"].firstMatch
@@ -34,11 +34,12 @@ final class TabSearchUITests: XCTestCase {
         if !app.searchFields.firstMatch.exists { print("UI TREE AFTER TAP:\n" + app.debugDescription) }
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5), "tapping search should expand into a search field")
+        XCTAssertTrue(app.staticTexts["Roasted Soup"].waitForExistence(timeout: 5), "search starts by showing every recipe")
         field.tap()
         field.typeText("shak")
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/private/tmp/claude-501/search-expanded.png"))
         XCTAssertTrue(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Roasted Soup"].exists, "results should be filtered by the query")
+        XCTAssertTrue(app.staticTexts["Roasted Soup"].waitForNonExistence(timeout: 5), "results should be filtered by the query")
     }
 }
 #endif

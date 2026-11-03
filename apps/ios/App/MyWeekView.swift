@@ -236,7 +236,7 @@ struct AddMealSheet: View {
                     }
                 }
             }
-            .searchable(text: $search, prompt: "Search recipes")
+            .searchable(text: $search, prompt: "Search My Recipes")
             .navigationTitle(day.formatted(.dateTime.weekday(.wide).month().day()))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

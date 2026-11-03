@@ -165,7 +165,7 @@ struct UpNextPickerSheet: View {
             .overlay {
                 if candidates.isEmpty { ContentUnavailableView.search(text: search) }
             }
-            .searchable(text: $search, prompt: "Search recipes")
+            .searchable(text: $search, prompt: "Search My Recipes")
             .navigationTitle("Add to Up Next")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

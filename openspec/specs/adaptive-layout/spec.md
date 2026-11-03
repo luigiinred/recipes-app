@@ -6,33 +6,33 @@ How the app arranges itself for the space it has on iPhone, iPad and Mac: a tab 
 ## Requirements
 
 ### Requirement: Tabs on iPhone and iPad
-On iPhone and iPad, the system SHALL organize the app into the tabs Recipes, Plan, Groceries and Search, plus Settings when the width is regular. Search is a separate search-role tab. On iPad the tab bar is built into a sidebar the user can switch to a tab bar across the top; where the system supports it, iPad starts with the sidebar showing.
+On iPhone and iPad, the system SHALL organize the app into the tabs Recipes, Plan, Groceries and Settings, plus a separate search-role Search tab in compact width. In regular width there is no Search tab; the Recipes home has its own search field instead (see recipe-browsing). Folding or unfolding a Duo keeps the open recipe: a recipe opened from Search moves to the Recipes tab when the Search tab goes away, and a sidebar collection opens in the Recipes tab when the sidebar goes away. On iPad the tab bar is built into a sidebar the user can switch to a tab bar across the top; where the system supports it, iPad starts with the sidebar showing.
 
 #### Scenario: iPhone tabs
 - **GIVEN** an iPhone in portrait
 - **WHEN** the app opens
-- **THEN** the tabs are Recipes, Plan, Groceries and Search, and Settings is reached from the gear on the Recipes home
+- **THEN** the tabs are Recipes, Plan, Groceries, Settings and Search
 
 #### Scenario: iPad tabs
 - **GIVEN** an iPad in regular width
 - **WHEN** the app opens
-- **THEN** a Settings tab is listed with Recipes, Plan, Groceries and Search
+- **THEN** a Settings tab is listed with Recipes, Plan and Groceries, and there is no Search tab
 
 ### Requirement: Recipes group in the iPad sidebar
-In regular width on iPad, the system SHALL show a collapsible "Recipes" group in the sidebar holding All Recipes (the Recipes home), Most Recent, the liked collection, Uncategorized (only when it has recipes) and the top-level categories, each opening that collection or category directly. The group sits below Plan, Groceries, Settings and Search, and its collections and categories are not shown in the top tab bar, which keeps a single Recipes tab.
+In regular width on iPad, the system SHALL show a collapsible "Recipes" group in the sidebar holding All Recipes (the Recipes home), Most Recent, the liked collection, Uncategorized (only when it has recipes) and the top-level categories, each opening that collection or category directly. The group sits below Plan, Groceries and Settings, and its collections and categories are not shown in the top tab bar, which keeps a single Recipes tab.
 
 #### Scenario: Open a category from the sidebar
 - **GIVEN** an iPad sidebar listing the category Dessert
 - **WHEN** the user selects Dessert
 - **THEN** the Dessert category opens as the root of that tab
 
-### Requirement: Add button in the compact tab bar
-In compact width on the Plan and Groceries tabs, the system SHALL turn the tab bar's search button into an "Add" button that stays on the current tab and starts adding there: on Plan it opens the add sheet for Up Next or for today in My Week (see meal-planning), and on Groceries it focuses the "Add item" field (see groceries). On the other tabs it remains Search.
+### Requirement: Add buttons on Plan and Groceries
+The system SHALL show an "Add" (+) button at the leading edge of the navigation bar on the Plan tab, and on the Groceries tab in compact width, that starts adding there: on Plan it opens the add sheet for Up Next or for today in My Week (see meal-planning), and on Groceries it focuses the "Add item" field (see groceries). The Add Recipe (+) menu sits at the leading edge on the recipe lists too.
 
 #### Scenario: Add on Groceries
 - **GIVEN** an iPhone on the Groceries tab
-- **WHEN** the user taps Add in the tab bar
-- **THEN** the Groceries tab stays selected and the Add item field is focused
+- **WHEN** the user taps Add in the navigation bar
+- **THEN** the Add item field is focused
 
 ### Requirement: Recipes tab is one navigation stack
 On iPhone and iPad, the system SHALL push the Recipes home, a collection or category, and a recipe onto one navigation stack, so a recipe opened from a collection fills the screen and Back returns to the collection.
@@ -43,7 +43,7 @@ On iPhone and iPad, the system SHALL push the Recipes home, a collection or cate
 - **THEN** the recipe page fills the screen, with Back returning to the category
 
 ### Requirement: Grids in regular width
-When the width is regular on iPhone or iPad, the system SHALL show the Recipes home as a grid of tiles (icon, title, recipe count; at least 240 points wide) for the collections and then the top-level categories, and a category as a grid of subcategory tiles followed by its recipes as photo cards at least 300 points wide. In compact width these screens are lists. On Mac a collection is always a grid of photo cards.
+When the width is regular on iPhone or iPad, the system SHALL show the Recipes home's recipes as photo cards at least 300 points wide, and a category as a grid of subcategory tiles followed by its recipes as photo cards at least 300 points wide. In compact width these screens are lists. On Mac a collection is always a grid of photo cards.
 
 #### Scenario: Unfolded canvas shows a grid
 - **GIVEN** an unfolded dual-screen canvas with regular width

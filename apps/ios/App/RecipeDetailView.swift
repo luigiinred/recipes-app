@@ -21,6 +21,7 @@ struct RecipeDetailView: View {
     @State private var scrolled: CGFloat = 0
     @State private var pageOffset = PageOffset()
     @State private var topInset: CGFloat = 0
+    @State private var sideInsets = EdgeInsets()
     @State private var sidePaneScrolled = false
     @State private var titleScrolledAway = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
@@ -44,6 +45,7 @@ struct RecipeDetailView: View {
         }
         .collapsesSidebarWhenUnfolded()
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
+        .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { sideInsets = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
         .background(pageStyle)
         .themedCanvas()
@@ -127,11 +129,14 @@ struct RecipeDetailView: View {
                 .padding(24)
                 .frame(maxWidth: 900, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                .padding(.leading, hasArtwork ? sideInsets.leading : 0)
+                .padding(.trailing, hasArtwork ? sideInsets.trailing : 0)
                 .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
             }
             .textSelection(.enabled)
         }
-        .ignoresSafeArea(edges: hasArtwork ? .top : [])
+        // The photo and the card's corners reach the screen edges; the text keeps to the safe area above.
+        .ignoresSafeArea(edges: hasArtwork ? [.top, .horizontal] : [])
         .scrollEdgeEffectHidden(hasArtwork && !titleScrolledAway, for: .top)
         .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
         .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? Self.bannerHeight : 0) + 60 } action: { _, scrolledAway in
