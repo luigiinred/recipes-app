@@ -6,7 +6,7 @@ The app's Settings on iPhone, iPad and Mac: pages of preferences for recipes, th
 ## Requirements
 
 ### Requirement: Where Settings opens
-The system SHALL open Settings from a gear button on the Recipes home on iPhone (as a sheet with a Done button), from a Settings tab on iPad (pages in a sidebar beside the selected page, opening on Recipes), and on Mac from the app's Settings window (⌘,) or the gear at the bottom of the sidebar. Settings applies the chosen theme itself, so theme changes show immediately.
+The system SHALL open Settings from a Settings tab on iPhone (pages pushed onto a stack) and on iPad (pages in a sidebar beside the selected page, opening on Recipes), and on Mac from the app's Settings window (⌘,) or the gear at the bottom of the sidebar. Settings applies the chosen theme itself, so theme changes show immediately.
 
 #### Scenario: iPad settings tab
 - **GIVEN** an iPad in regular width

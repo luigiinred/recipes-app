@@ -16,7 +16,7 @@ final class TabAddUITests: XCTestCase {
         app.launchEnvironment["RECIPES_DIR"] = library.path
         app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
     }
 
     override func tearDown() {
@@ -30,26 +30,25 @@ final class TabAddUITests: XCTestCase {
 
     func testPlanTabButtonAddsToUpNext() {
         app.tabBars.buttons["Plan"].tap()
-        let add = app.tabBars.buttons["Add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5), "the search button should become Add on Plan")
-        XCTAssertFalse(app.tabBars.buttons["Search"].exists)
+        let add = app.navigationBars.buttons["Add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "Plan has its own Add button")
         add.tap()
         XCTAssertTrue(app.navigationBars["Add to Up Next"].waitForExistence(timeout: 5))
     }
 
     func testGroceriesTabButtonFocusesNewItemField() {
         app.tabBars.buttons["Groceries"].tap()
-        let add = app.tabBars.buttons["Add"]
+        let add = app.navigationBars.buttons["Add"]
         XCTAssertTrue(add.waitForExistence(timeout: 5))
         add.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the Add item field should take focus")
     }
 
-    func testSearchComesBackAfterLeavingPlan() {
+    func testSearchStaysSearchOnPlan() {
         app.tabBars.buttons["Plan"].tap()
-        XCTAssertTrue(app.tabBars.buttons["Add"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["Recipes"].tap()
-        XCTAssertTrue(app.tabBars.buttons["Search"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars.buttons["Add"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Search"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Add"].exists)
     }
 
     func testUpNextReorderIsAnIconNotText() {

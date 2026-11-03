@@ -17,7 +17,7 @@ enum RecipeListStyle: String, CaseIterable {
     case cards, list
 
     var title: String { self == .cards ? "Photo Cards" : "Compact List" }
-    var symbol: String { self == .cards ? "square.grid.2x2" : "list.bullet" }
+    var symbol: String { self == .cards ? "rectangle.grid.1x2" : "list.bullet" }
 }
 
 struct RecipeListView: View {
@@ -25,7 +25,6 @@ struct RecipeListView: View {
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
     var styleOverride: RecipeListStyle?
-    var showsSettings = false
 
     @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
     #if os(iOS)
@@ -52,12 +51,11 @@ struct RecipeListView: View {
 
     var body: some View {
         content
-            .macSearchable(text: $search, prompt: "Search recipes")
+            .macSearchable(text: $search, prompt: "Search My Recipes")
             .navigationTitle(collection.title)
             .recipeActions(
                 selection: $selection,
                 listStyle: usesGrid ? nil : Binding(get: { style }, set: { storedStyle = $0 }),
-                showsSettings: showsSettings,
                 findRecipes: browsedCategory != nil && !library.recipes.isEmpty ? FindRecipesAction(title: collection.title) { scanning = true } : nil
             )
             .sheet(item: $editing) { recipe in
@@ -179,7 +177,7 @@ struct RecipeListView: View {
                 }
                 #endif
                 if !items.isEmpty {
-                    GridSection(title: hasSubcategories ? "Recipes" : nil, minimum: 300, spacing: 24) {
+                    GridSection(title: hasSubcategories ? "Recipes" : nil, minimum: 260, spacing: 20) {
                         ForEach(items) { recipe in
                             Button { selection = recipe.id } label: { RecipeCard(recipe: recipe) }
                                 .buttonStyle(.plain)
@@ -338,7 +336,6 @@ private struct RecipeActionsModifier: ViewModifier {
     @EnvironmentObject private var router: AppRouter
     @Binding var selection: Recipe.ID?
     var listStyle: Binding<RecipeListStyle>?
-    var showsSettings = false
     var findRecipes: FindRecipesAction?
 
     @State private var showingNew = false
@@ -352,7 +349,6 @@ private struct RecipeActionsModifier: ViewModifier {
     @State private var mealPhotoItem: PhotosPickerItem?
     @State private var progressMessage: String?
     @State private var scanError: String?
-    @State private var showingSettings = false
 
     func body(content: Content) -> some View {
         content
@@ -367,13 +363,6 @@ private struct RecipeActionsModifier: ViewModifier {
             }
         }
         .toolbar {
-            #if os(iOS)
-            if showsSettings {
-                ToolbarItem(placement: .navigation) {
-                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
-                }
-            }
-            #endif
             if let findRecipes {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -386,7 +375,7 @@ private struct RecipeActionsModifier: ViewModifier {
                 if let listStyle {
                     ToolbarItem(placement: .primaryAction) { listStyleButton(listStyle) }
                 }
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: addPlacement) {
                     Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
                 }
             }
@@ -396,7 +385,6 @@ private struct RecipeActionsModifier: ViewModifier {
             showingImport = true
             router.reminder = nil
         }
-        .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingNew) {
             RecipeEditorView(recipe: Recipe(title: "")) { saved, image, steps in
                 Task { await library.save(saved, image: image, steps: steps) }
@@ -472,6 +460,14 @@ private struct RecipeActionsModifier: ViewModifier {
         }
     }
 
+    private var addPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .primaryAction
+        #endif
+    }
+
     private func listStyleButton(_ listStyle: Binding<RecipeListStyle>) -> some View {
         Button {
             listStyle.wrappedValue = listStyle.wrappedValue == .cards ? .list : .cards
@@ -524,8 +520,8 @@ private struct RecipeActionsModifier: ViewModifier {
 }
 
 extension View {
-    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, showsSettings: Bool = false, findRecipes: FindRecipesAction? = nil) -> some View {
-        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, showsSettings: showsSettings, findRecipes: findRecipes))
+    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, findRecipes: FindRecipesAction? = nil) -> some View {
+        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, findRecipes: findRecipes))
     }
 }
 
@@ -591,75 +587,6 @@ private struct FolderTile: View {
     }
 }
 
-/// The top of the Recipes tab: the built-in collections, then categories to drill into.
-struct RecipesHomeView: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    @Binding var selection: Recipe.ID?
-
-    private var collections: [RecipeCollection] {
-        let liked: RecipeCollection = (RatingStyle(rawValue: ratingStyleRaw) ?? .favorites) == .stars ? .topRated : .favorites
-        return [.all, .recent, liked, .uncategorized].filter { $0 == .all || $0 == .recent || $0 == liked || !$0.filter(library.recipes).isEmpty }
-    }
-
-    var body: some View {
-        Group {
-            if library.recipes.isEmpty {
-                EmptyLibraryView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if sizeClass == .regular {
-                grid
-            } else {
-                list
-            }
-        }
-        .themedCanvas()
-        .navigationTitle("Recipes")
-        .recipeActions(selection: $selection, listStyle: nil, showsSettings: sizeClass != .regular)
-    }
-
-    private var list: some View {
-        List {
-            Section {
-                ForEach(collections, id: \.self) { collection in
-                    NavigationLink(value: RecipesRoute.collection(collection)) {
-                        LabeledContent {
-                            Text("\(collection.filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
-                        } label: {
-                            Label(collection.title, systemImage: collection.symbol)
-                        }
-                    }
-                    .themedRow(raised: true)
-                }
-            }
-            if !library.categoryTree.isEmpty {
-                Section {
-                    ForEach(library.categoryTree) { CategoryRow(node: $0) }
-                } header: {
-                    Text("Categories").categoryRootDrop()
-                }
-            }
-        }
-        .contentMargins(.top, 16, for: .scrollContent)
-    }
-
-    private var grid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                GridSection(title: nil, minimum: 240, spacing: 16) {
-                    ForEach(collections, id: \.self) { FolderTile(collection: $0) }
-                }
-                if !library.categoryTree.isEmpty {
-                    GridSection(title: "Categories", minimum: 240, spacing: 16, takesCategories: true) {
-                        ForEach(library.categoryTree) { FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder") }
-                    }
-                }
-            }
-            .padding(24)
-        }
-        .reviewPromptInset()
-    }
-}
 #endif
 
 extension View {
@@ -681,107 +608,110 @@ extension View {
     }
 }
 
-struct RecipeBadges: View {
-    let recipe: Recipe
+/// One piece of the line under a recipe's title. Settings picks which ones show.
+enum RecipeDetail: String, CaseIterable {
+    case rating, favorite, upNext, tags, time, lastMade
 
-    var body: some View {
-        HStack(spacing: 6) {
-            if recipe.isFavorite { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Theme.accent) }
-            if let rating = recipe.rating {
-                HStack(spacing: 2) {
-                    Image(systemName: "star.fill")
-                    Text("\(rating)").monospacedDigit()
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.accent)
-            }
-            if recipe.wantToCook {
-                Image(systemName: "text.line.first.and.arrowtriangle.forward").font(.caption).foregroundStyle(.secondary)
-            }
+    static let defaults: [RecipeDetail] = [.rating, .favorite, .upNext, .tags]
+
+    static func parse(_ raw: String) -> Set<RecipeDetail> {
+        Set(raw.split(separator: ",").compactMap { RecipeDetail(rawValue: String($0)) })
+    }
+
+    static func raw(_ details: some Sequence<RecipeDetail>) -> String {
+        allCases.filter(Set(details).contains).map(\.rawValue).joined(separator: ",")
+    }
+
+    var title: String {
+        switch self {
+        case .rating: "Rating"
+        case .favorite: "Favorite"
+        case .upNext: "Up Next"
+        case .tags: "Tags"
+        case .time: "Total time"
+        case .lastMade: "Last made"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .rating: "star"
+        case .favorite: "heart"
+        case .upNext: "text.line.first.and.arrowtriangle.forward"
+        case .tags: "tag"
+        case .time: "clock"
+        case .lastMade: "frying.pan"
         }
     }
 }
 
-struct RecipeMeta: View {
+/// The marks and facts under a recipe's title, as chosen in Settings.
+struct RecipeFacts: View {
+    @AppStorage(AppSettings.Key.recipeDetails) private var raw = RecipeDetail.raw(RecipeDetail.defaults)
+    @Environment(\.appAccent) private var accent
     let recipe: Recipe
 
     var body: some View {
-        HStack(spacing: 10) {
-            if recipe.isIdea { Label("Idea", systemImage: "lightbulb") }
-            if let minutes = recipe.totalMinutes { Label("\(minutes) min", systemImage: "clock") }
-            if !recipe.tags.isEmpty { Label(recipe.tags.prefix(2).map(CategoryTree.displayName).joined(separator: ", "), systemImage: "tag") }
+        line
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+
+    private var line: Text {
+        let groups = [marks, facts].filter { !$0.isEmpty }.map { $0.dropFirst().reduce($0[0]) { $0 + Text("  ") + $1 } }
+        guard let first = groups.first else { return Text(verbatim: "") }
+        return groups.dropFirst().reduce(first) { $0 + Text("  ·  ").foregroundStyle(.tertiary) + $1 }
+    }
+
+    private var marks: [Text] {
+        let shown = RecipeDetail.parse(raw)
+        var marks: [Text] = []
+        if shown.contains(.rating), let rating = recipe.rating {
+            marks.append(Text("\(Image(systemName: "star.fill")) \(rating)").fontWeight(.semibold).foregroundStyle(.primary))
         }
-        .font(.caption).foregroundStyle(.secondary).labelStyle(.titleAndIcon)
+        if shown.contains(.favorite), recipe.isFavorite {
+            marks.append(Text(Image(systemName: "heart.fill")).foregroundStyle(accent))
+        }
+        if shown.contains(.upNext), recipe.wantToCook {
+            marks.append(Text(Image(systemName: "text.line.first.and.arrowtriangle.forward")).foregroundStyle(.primary))
+        }
+        return marks
+    }
+
+    private var facts: [Text] {
+        let shown = RecipeDetail.parse(raw)
+        var facts: [Text] = []
+        if recipe.isIdea { facts.append(Text("Idea")) }
+        if shown.contains(.tags), !recipe.tags.isEmpty {
+            facts.append(Text(recipe.tags.map { CategoryTree.components($0).last ?? $0 }.joined(separator: ", ")))
+        }
+        if shown.contains(.time), let minutes = recipe.totalMinutes { facts.append(Text("\(minutes) min")) }
+        if shown.contains(.lastMade), let made = recipe.lastMade {
+            facts.append(Text("Made \(made, format: .relative(presentation: .named))"))
+        }
+        return facts
     }
 }
 
 struct RecipeCard: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.appAccent) private var accent
     let recipe: Recipe
 
-    private var hasPhoto: Bool { library.hasImage(recipe.id) }
-
     var body: some View {
-        Color.clear
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .overlay { backdrop }
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(recipe.title)
-                        .font(.system(.title2, weight: .semibold))
-                        .lineLimit(2)
-                        .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
-                    details
-                }
-                .foregroundStyle(.white)
-                .padding(16)
+        VStack(alignment: .leading, spacing: 12) {
+            Color.clear
+                .aspectRatio(16 / 10, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay { RecipeImageView(recipe: recipe) }
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recipe.title).font(.title3.weight(.semibold)).lineLimit(2)
+                RecipeFacts(recipe: recipe)
             }
-            .overlay(alignment: .topTrailing) { badges.padding(12) }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
-            .accessibilityElement(children: .combine)
-    }
-
-    private var backdrop: some View {
-        ZStack {
-            if hasPhoto {
-                RecipeImageView(recipe: recipe)
-            } else {
-                LinearGradient(colors: [accent, accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 56)).foregroundStyle(.white.opacity(0.22))
-            }
-            LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
+            .padding(.horizontal, 4)
         }
-    }
-
-    private var details: some View {
-        var parts: [String] = []
-        if recipe.isIdea { parts.append("Idea") }
-        if let minutes = recipe.totalMinutes { parts.append("\(minutes) min") }
-        if let tag = recipe.tags.first { parts.append(CategoryTree.displayName(tag)) }
-        return Text(parts.joined(separator: "  ·  "))
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.88))
-            .lineLimit(1)
-    }
-
-    @ViewBuilder
-    private var badges: some View {
-        if recipe.isFavorite || recipe.wantToCook || recipe.rating != nil {
-            HStack(spacing: 8) {
-                if recipe.isFavorite { Image(systemName: "heart.fill").foregroundStyle(Theme.accent) }
-                if let rating = recipe.rating {
-                    Label("\(rating)", systemImage: "star.fill").foregroundStyle(Theme.accent).monospacedDigit()
-                }
-                if recipe.wantToCook { Image(systemName: "text.line.first.and.arrowtriangle.forward").foregroundStyle(.primary) }
-            }
-            .font(.footnote.weight(.semibold))
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .glassEffect(.regular, in: Capsule())
-        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -792,17 +722,12 @@ struct RecipeRow: View {
         HStack(spacing: 12) {
             RecipeImageView(recipe: recipe)
                 .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(recipe.title).font(.system(.headline)).lineLimit(2)
-                    RecipeBadges(recipe: recipe)
-                }
-                if !recipe.summary.isEmpty {
-                    Text(recipe.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                }
-                RecipeMeta(recipe: recipe)
+                Text(recipe.title).font(.headline).lineLimit(2)
+                RecipeFacts(recipe: recipe)
             }
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 3)
     }

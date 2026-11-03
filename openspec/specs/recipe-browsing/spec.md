@@ -27,12 +27,28 @@ The system MUST show exactly one liked-recipes collection, chosen by the "Mark r
 - **THEN** Top Rated appears and Favorites does not
 
 ### Requirement: Recipes home on iPhone and iPad
-On iPhone and iPad, the Recipes tab SHALL open on a home titled "Recipes" listing All Recipes, Most Recent and the liked collection, plus Uncategorized only when it has recipes, each with its recipe count, followed by a "Categories" section with the top-level categories.
+On iPhone and iPad, the Recipes tab SHALL open on every recipe under a "My Recipes" heading with the recipe count; once the heading scrolls away, the navigation bar shows it as the title with the count as its subtitle. A "Tags" row shows each top-level tag as a photo tile with the number of recipes choosing it would show; tapping a tile narrows to that tag and tapping it again clears it. When the tiles don't fit on one row, the row scrolls and a "Show All" control in the Tags header (the whole header is tappable) wraps them onto as many rows as needed, with "Show Less" returning to one row. Sort is in the navigation bar and offers Most Recent, Name, Rating, Quickest, Last Cooked and Shuffle; its button shows the chosen sort's symbol, and pulling to refresh reloads the library and deals a new shuffle. By default the last chosen sort is remembered; with that setting off, the home opens on the default sort chosen in Settings. In compact width a segmented control beside the count switches between photo cards and the compact list; in regular width recipes are photo cards in columns at least 260 points wide.
 
-#### Scenario: Uncategorized hidden when empty
-- **GIVEN** every recipe has at least one tag
+#### Scenario: Filtering by a tag tile
+- **GIVEN** recipes tagged "Dessert", "Dessert/Cookies" and "Dinner"
+- **WHEN** the user taps the Dessert tag on the Recipes home
+- **THEN** the Dessert and Dessert/Cookies recipes are listed and the Dinner recipe is not
+
+#### Scenario: Default sort
+- **GIVEN** the user has never chosen a sort and the default sort is Most Recent
 - **WHEN** the user opens the Recipes tab
-- **THEN** the home lists All Recipes, Most Recent and Favorites (or Top Rated) but not Uncategorized
+- **THEN** the newest recipe is listed first
+
+### Requirement: Filter sheet
+The system SHALL offer a "Filters" sheet that narrows the Recipes home by a tag at any depth (top-level tiles, then a row of subtags for the chosen tag, plus Uncategorized), a maximum total time (a histogram of recipe times above a slider, from 10 minutes to "Any"), and "Show only" toggles (Under 30 min, Under 1 hour, Favorites or Top Rated, Up Next, Ideas, Not Made Yet, Videos). Changes apply as they are made; the title's subtitle reads "N of M recipes", Reset clears everything but the search text, and a "Show N Recipes" button (or "No Recipes Match") closes the sheet. The sheet opens from the round filter button at the start of the quick filter row.
+
+#### Scenario: Count follows the filters
+- **GIVEN** four recipes, two tagged "Dessert/Cookies"
+- **WHEN** the user picks Dessert and then Cookies in the filter sheet
+- **THEN** the button reads "Show 2 Recipes"
+
+### Requirement: Recipe details line
+Under each recipe's title in cards and rows, the system SHALL show one line with the rating, a heart for favorites and the Up Next mark, then "Idea" for ideas and the recipe's tags (by their last component), and optionally the total time and when it was last made. Settings → Recipes → Recipe details chooses which of Rating, Favorite, Up Next, Tags, Total time and Last made show; the first four are on by default. Photo cards show only the photo above the title.
 
 ### Requirement: Library loading and empty states
 The system SHALL show "Syncing recipes…" in place of the recipes until the library's first load finishes, "No recipes yet" with a hint to tap +, share from Safari, or use the command-line tool once it has loaded empty, and "Couldn't load recipes" with the error if loading fails.
@@ -83,7 +99,7 @@ The system SHALL let the user favorite or unfavorite a recipe, rate it 1 to 5 st
 - **THEN** the recipe's `rating` is saved as 4 and the 4 Stars item shows a checkmark next time
 
 ### Requirement: Swipe actions
-In recipe lists, the system SHALL offer trailing swipe actions that stay open until tapped (no full swipe): Up Next (or Unqueue), Favorite (or Unfavorite) only when the rating style is Favorites, Delete only when "Show Delete" is on in Settings, and Remove Tag when browsing a category. Delete asks for confirmation ("This can't be undone. The recipe and its photo are removed from all your devices.") before deleting. Remove Tag drops the recipe's tags in that category and beneath it.
+In recipe lists, the system SHALL offer trailing swipe actions that stay open until tapped (no full swipe): Up Next (a plus icon to add it, a minus icon to remove it), Favorite (or Unfavorite) only when the rating style is Favorites, Delete only when "Show Delete" is on in Settings, and Remove Tag when browsing a category. Delete asks for confirmation ("This can't be undone. The recipe and its photo are removed from all your devices.") before deleting. Remove Tag drops the recipe's tags in that category and beneath it.
 
 #### Scenario: Delete hidden by default
 - **GIVEN** "Show Delete" is off
@@ -150,7 +166,7 @@ When browsing a category in a non-empty library, the system SHALL offer "Find Re
 - **THEN** Tomato Soup is tagged "Soup"
 
 ### Requirement: Search
-The system SHALL match a recipe when every space-separated word of the query appears, case-insensitively, in its title, summary, notes, ingredients or tags. On iPhone and iPad, search is a Search tab across the whole library: an empty query shows "Search Recipes" ("Find a recipe by name, ingredient, or category."), and a query with no matches shows a no-results state. On Mac, a search field on the recipe list filters the current collection.
+The system SHALL match a recipe when every space-separated word of the query appears, case-insensitively, in its title, summary, notes, ingredients or tags. On iPhone and iPad, search narrows the Recipes home as one more filter, starting from every recipe: in compact width from the Search tab, which shows the same page and shares its filters and sort, and in regular width from a search field on the Recipes home. While searching, a row of quick filter chips sits above the search field, led by the round filter button; chips that are on shrink to icons pinned at the leading edge while the rest scroll beneath them, and the Tags row hides unless a tag is chosen. Settings → Recipes → Quick Filters chooses which filters and tags the chips offer and their order; tag chips require every chosen tag. Scrolling or opening a recipe dismisses the keyboard and keeps the query. A query with no matches shows a no-results state. On Mac, a search field on the recipe list filters the current collection. Search prompts read "Search My Recipes".
 
 #### Scenario: Multi-word search
 - **GIVEN** a recipe "Tomato Soup" with the ingredient "fresh basil"
