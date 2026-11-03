@@ -211,10 +211,25 @@ struct EmptyLibraryView: View {
             VStack(spacing: 4) {
                 MascotLoader(height: 120)
                 Text("Syncing recipes…").font(.headline)
+                if let detail = progressDetail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: library.loadProgress)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .combine)
         }
+    }
+
+    private var progressDetail: String? {
+        guard let progress = library.loadProgress, progress.total > 0 else { return nil }
+        let noun = progress.total == 1 ? "recipe" : "recipes"
+        if progress.done == 0 { return "Found \(progress.total) \(noun)" }
+        return "\(progress.done) of \(progress.total) \(noun) downloaded"
     }
 }
 
