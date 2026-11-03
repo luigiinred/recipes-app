@@ -1,7 +1,7 @@
 import RecipeKit
 import SwiftUI
 
-/// Chips for the current categories, a field that adds one on Return or comma, and common or most-used ones to tap.
+/// Chips for the current tags, a field that adds one on Return or comma, and every tag in the library to tap.
 struct TagEditor: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Binding var tags: [String]
@@ -26,17 +26,33 @@ struct TagEditor: View {
                     }
                 }
             }
-            TextField("Add category", text: $draft)
-                .focused($focused)
-                .onSubmit { commit(); focused = true }
-                .onChange(of: draft) { _, value in
-                    if value.contains(",") { commit() }
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill").foregroundStyle(Theme.accent)
+                TextField("Add a new tag", text: $draft)
+                    .focused($focused)
+                    .onSubmit { commit(); focused = true }
+                    .onChange(of: draft) { _, value in
+                        if value.contains(",") { commit() }
+                    }
+                    #if os(iOS)
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    #endif
+                if !CategoryTree.normalized(draft).isEmpty {
+                    Button("Add") { commit() }
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .buttonStyle(.plain)
                 }
-                #if os(iOS)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.done)
-                #endif
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture { focused = true }
             if !suggestions.isEmpty {
+                Text(libraryTags.isEmpty ? "Suggestions" : "Your tags")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
                 ChipFlow {
                     ForEach(suggestions, id: \.self) { tag in
                         Button { add(tag) } label: {
@@ -60,18 +76,16 @@ struct TagEditor: View {
         .padding(.vertical, 4)
     }
 
+    private var libraryTags: [String] { library.tags }
+
+    /// Every tag already on a recipe; the starter vocabulary only until the library has some.
     private var suggestions: [String] {
-        let counts = library.recipes.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        let used = counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map(\.key)
         let query = draft.trimmingCharacters(in: .whitespaces)
         var seen = Set<String>()
-        return (RecipeTags.vocabulary + used)
-            .filter { tag in
-                !contains(tag) && seen.insert(tag.lowercased()).inserted
-                    && (query.isEmpty || CategoryTree.displayName(tag).localizedCaseInsensitiveContains(query))
-            }
-            .prefix(10)
-            .map { $0 }
+        return (libraryTags.isEmpty ? RecipeTags.vocabulary : libraryTags).filter { tag in
+            !contains(tag) && seen.insert(tag.lowercased()).inserted
+                && (query.isEmpty || CategoryTree.displayName(tag).localizedCaseInsensitiveContains(query))
+        }
     }
 
     private func contains(_ tag: String) -> Bool {
