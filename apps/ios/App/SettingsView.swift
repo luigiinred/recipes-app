@@ -509,7 +509,7 @@ struct ThemeSettingsPage: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page. The cookbook palettes, from Butter on, come with a matching accent color. Build Your Own picks every color yourself.")
+                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page. The cookbook palettes, from Butter on, follow your device between light and dark and come with a matching accent color. Build Your Own picks every color yourself.")
             }
             Section {
                 Picker("Font", selection: $fontStyle) {
@@ -605,7 +605,7 @@ struct CustomThemePage: View {
         Binding(get: { dark }, set: { dark = $0; appearance = Appearance.custom.rawValue })
     }
 
-    private var starters: [Appearance] { Appearance.allCases.filter { $0.canvas != nil } }
+    private var starters: [Appearance] { Appearance.allCases.filter { $0.swatch(for: .light) != nil } }
 
     var body: some View {
         Form {
@@ -647,10 +647,13 @@ struct CustomThemePage: View {
     }
 
     private func start(from starter: Appearance) {
-        if let canvas = starter.canvas { canvasHex = canvas.hex(in: environment) }
-        if let surface = starter.surface { surfaceHex = surface.hex(in: environment) }
-        dark = starter.colorScheme == .dark
-        if let hex = starter.accentHex { accentHex = hex }
+        let scheme = starter.colorScheme ?? environment.colorScheme
+        if let swatch = starter.swatch(for: scheme) {
+            canvasHex = swatch.canvas.hex(in: environment)
+            surfaceHex = swatch.surface.hex(in: environment)
+        }
+        dark = scheme == .dark
+        if let hex = starter.accentHex { accentHex = starter.accentHex(chosen: hex, for: scheme) }
         appearance = Appearance.custom.rawValue
     }
 }

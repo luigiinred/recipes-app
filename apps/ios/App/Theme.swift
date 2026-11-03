@@ -68,49 +68,32 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The cookbook palettes have a light and a dark version and follow the device between them.
     var colorScheme: ColorScheme? {
         switch self {
-        case .system, .custom: nil
-        case .light, .sepia, .butter, .linen, .olive, .rose, .crema, .mint, .blueberry: .light
-        case .dark, .black, .chai, .cocoa: .dark
-        }
-    }
-
-    /// The page color for the themes that bring their own; the others use the system's.
-    var canvas: Color? {
-        switch self {
-        case .dark: Color(white: 0.15)
-        case .black: .black
-        case .sepia: Color(red: 0.957, green: 0.925, blue: 0.847)
-        case .butter: Color(hex: "FBF0C8")
-        case .linen: Color(hex: "EEE8DC")
-        case .olive: Color(hex: "EDEBE0")
-        case .rose: Color(hex: "F6E2DE")
-        case .crema: Color(hex: "F2E7CB")
-        case .mint: Color(hex: "E4EBDD")
-        case .blueberry: Color(hex: "E6E8F3")
-        case .chai: Color(hex: "2E1412")
-        case .cocoa: Color(hex: "2A1C15")
+        case .light, .sepia: .light
+        case .dark, .black: .dark
         default: nil
         }
     }
 
-    /// Cards, rows and fields sitting on the canvas.
-    var surface: Color? {
-        switch self {
-        case .dark: Color(white: 0.21)
-        case .black: Color(white: 0.09)
-        case .sepia: Color(red: 0.984, green: 0.965, blue: 0.918)
-        case .butter: Color(hex: "FFF9E6")
-        case .linen: Color(hex: "F8F5EE")
-        case .olive: Color(hex: "F7F6F0")
-        case .rose: Color(hex: "FCF1EF")
-        case .crema: Color(hex: "FAF5E8")
-        case .mint: Color(hex: "F4F7F0")
-        case .blueberry: Color(hex: "F4F5FB")
-        case .chai: Color(hex: "441E1A")
-        case .cocoa: Color(hex: "3B2820")
-        default: nil
+    /// The page and card colors for the themes that bring their own; the others use the system's.
+    func swatch(for scheme: ColorScheme) -> Swatch? {
+        let dark = scheme == .dark
+        return switch self {
+        case .dark: Swatch(canvas: Color(white: 0.15), surface: Color(white: 0.21))
+        case .black: Swatch(canvas: .black, surface: Color(white: 0.09))
+        case .sepia: Swatch(canvas: Color(red: 0.957, green: 0.925, blue: 0.847), surface: Color(red: 0.984, green: 0.965, blue: 0.918))
+        case .butter: dark ? Swatch("2A2414", "3A321D", accent: "D9772F") : Swatch("FBF0C8", "FFF9E6", accent: AccentPreset.rust)
+        case .linen: dark ? Swatch("22201C", "302D28", accent: "E0533A") : Swatch("EEE8DC", "F8F5EE", accent: AccentPreset.cherry)
+        case .olive: dark ? Swatch("23241D", "31322A", accent: "999C66") : Swatch("EDEBE0", "F7F6F0", accent: AccentPreset.olive)
+        case .rose: dark ? Swatch("2A1A1D", "3A2528", accent: "D46A7A") : Swatch("F6E2DE", "FCF1EF", accent: AccentPreset.burgundy)
+        case .crema: dark ? Swatch("29231A", "383024", accent: "E07250") : Swatch("F2E7CB", "FAF5E8", accent: AccentPreset.paprika)
+        case .mint: dark ? Swatch("1C241E", "28322A", accent: "7FA877") : Swatch("E4EBDD", "F4F7F0", accent: AccentPreset.mint)
+        case .blueberry: dark ? Swatch("1B1D2E", "272A40", accent: "6E8FEA") : Swatch("E6E8F3", "F4F5FB", accent: AccentPreset.blueberry)
+        case .chai: dark ? Swatch("2E1412", "441E1A", accent: AccentPreset.cinnamon) : Swatch("F4E6E1", "FBF3F0", accent: "9B3025")
+        case .cocoa: dark ? Swatch("2A1C15", "3B2820", accent: AccentPreset.caramel) : Swatch("F1E6DA", "FAF4EE", accent: "84592B")
+        case .system, .light, .custom: nil
         }
     }
 
@@ -130,7 +113,29 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
-    var palette: ThemePalette { ThemePalette(colorScheme: colorScheme, canvas: canvas, surface: surface) }
+    /// While the theme's own accent is chosen, it shifts with the page so it stays readable in light and dark.
+    func accentHex(chosen: String, for scheme: ColorScheme) -> String {
+        guard let own = accentHex, chosen.caseInsensitiveCompare(own) == .orderedSame else { return chosen }
+        return swatch(for: scheme)?.accentHex ?? chosen
+    }
+
+    func palette(for scheme: ColorScheme) -> ThemePalette {
+        let swatch = swatch(for: scheme)
+        return ThemePalette(colorScheme: colorScheme, canvas: swatch?.canvas, surface: swatch?.surface)
+    }
+}
+
+struct Swatch {
+    var canvas: Color
+    /// Cards, rows and fields sitting on the canvas.
+    var surface: Color
+    var accentHex: String?
+}
+
+extension Swatch {
+    init(_ canvasHex: String, _ surfaceHex: String, accent: String) {
+        self.init(canvas: Color(hex: canvasHex) ?? .clear, surface: Color(hex: surfaceHex) ?? .clear, accentHex: accent)
+    }
 }
 
 /// The colors a screen paints with, so the Custom theme reads exactly like the built-in ones.
@@ -236,16 +241,20 @@ private struct AppThemeModifier: ViewModifier {
     @AppStorage(AppSettings.Key.customThemeDark) private var customDark = false
     @AppStorage(AppSettings.Key.customThemeCanvas) private var customCanvasHex = CustomTheme.defaultCanvasHex
     @AppStorage(AppSettings.Key.customThemeSurface) private var customSurfaceHex = CustomTheme.defaultSurfaceHex
+    @Environment(\.colorScheme) private var systemScheme
+
+    private var appearance: Appearance { Appearance(rawValue: appearanceRaw) ?? .system }
+    private var scheme: ColorScheme { appearance.colorScheme ?? systemScheme }
 
     private var palette: ThemePalette {
-        let appearance = Appearance(rawValue: appearanceRaw) ?? .system
-        guard appearance == .custom else { return appearance.palette }
+        guard appearance == .custom else { return appearance.palette(for: scheme) }
         return ThemePalette(colorScheme: customDark ? .dark : .light, canvas: Color(hex: customCanvasHex), surface: Color(hex: customSurfaceHex))
     }
 
     func body(content: Content) -> some View {
         let palette = palette
-        let accent = Color(hex: accentHex) ?? Theme.defaultAccent
+        let resolvedHex = appearance.accentHex(chosen: accentHex, for: scheme)
+        let accent = Color(hex: resolvedHex) ?? Theme.defaultAccent
         content
             .environment(\.appearance, palette)
             .environment(\.appAccent, accent)
@@ -254,7 +263,7 @@ private struct AppThemeModifier: ViewModifier {
             .preferredColorScheme(palette.colorScheme)
             #if os(iOS) && !SHARE_EXTENSION
             .onChange(of: fontRaw, initial: true) { _, raw in ThemeFonts.apply(FontStyle(rawValue: raw) ?? .serif) }
-            .onChange(of: accentHex, initial: true) { _, hex in ThemeTint.apply(Color(hex: hex) ?? Theme.defaultAccent) }
+            .onChange(of: resolvedHex, initial: true) { _, hex in ThemeTint.apply(Color(hex: hex) ?? Theme.defaultAccent) }
             #endif
     }
 }
