@@ -54,7 +54,7 @@ struct ThemeSnapshotTests {
     func palette(_ appearance: Appearance) {
         SampleData.defaults.set(appearance.accentHex, forKey: AppSettings.Key.accentColor)
         defer { SampleData.defaults.removeObject(forKey: AppSettings.Key.accentColor) }
-        with(appearance) { assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.shakshuka), named: appearance.rawValue, coverage: appearance.colorScheme == .dark ? .screen : .sheet, testName: "palette") }
+        with(appearance) { assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.shakshuka), named: appearance.rawValue, coverage: .screen, testName: "palette") }
     }
 
     @Test("a custom theme on the recipe page and its builder")
