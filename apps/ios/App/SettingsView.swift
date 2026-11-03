@@ -484,21 +484,32 @@ struct ThemeSettingsPage: View {
         )
     }
 
+    private var palette: Binding<String> {
+        Binding(
+            get: { appearance },
+            set: { raw in
+                appearance = raw
+                if let hex = Appearance(rawValue: raw)?.accentHex { accentHex = hex }
+            }
+        )
+    }
+
     var body: some View {
         Form {
             Section {
-                preview
+                ThemePreview().themedRow(raised: true)
             }
             Section {
-                Picker("Appearance", selection: $appearance) {
+                Picker("Appearance", selection: palette) {
                     ForEach(Appearance.allCases) { Label($0.title, systemImage: $0.symbol).tag($0.rawValue) }
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+                NavigationLink { CustomThemePage() } label: { Label("Build Your Own", systemImage: "slider.horizontal.3") }
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page.")
+                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page. The cookbook palettes, from Butter on, come with a matching accent color. Build Your Own picks every color yourself.")
             }
             Section {
                 Picker("Font", selection: $fontStyle) {
@@ -544,8 +555,10 @@ struct ThemeSettingsPage: View {
         .formStyle(.grouped)
         .settingsPage("Theme")
     }
+}
 
-    private var preview: some View {
+private struct ThemePreview: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Sunday Sauce").font(.system(.title2, weight: .bold))
             IngredientLine(text: "2 tbsp olive oil, plus more for serving")
@@ -564,6 +577,81 @@ struct ThemeSettingsPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+struct CustomThemePage: View {
+    @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
+    @AppStorage(AppSettings.Key.customThemeDark) private var dark = false
+    @AppStorage(AppSettings.Key.customThemeCanvas) private var canvasHex = CustomTheme.defaultCanvasHex
+    @AppStorage(AppSettings.Key.customThemeSurface) private var surfaceHex = CustomTheme.defaultSurfaceHex
+    @Environment(\.self) private var environment
+
+    private var isOn: Bool { appearance == Appearance.custom.rawValue }
+
+    /// Any edit switches to the Custom theme, so the change shows straight away.
+    private func color(_ hex: Binding<String>, fallback: String) -> Binding<Color> {
+        Binding(
+            get: { Color(hex: hex.wrappedValue) ?? Color(hex: fallback) ?? .white },
+            set: {
+                hex.wrappedValue = $0.hex(in: environment)
+                appearance = Appearance.custom.rawValue
+            }
+        )
+    }
+
+    private var text: Binding<Bool> {
+        Binding(get: { dark }, set: { dark = $0; appearance = Appearance.custom.rawValue })
+    }
+
+    private var starters: [Appearance] { Appearance.allCases.filter { $0.canvas != nil } }
+
+    var body: some View {
+        Form {
+            Section {
+                ThemePreview().themedRow(raised: true)
+            }
+            Section {
+                Picker("Text", selection: text) {
+                    Text("Dark on Light").tag(false)
+                    Text("Light on Dark").tag(true)
+                }
+                ColorPicker("Page", selection: color($canvasHex, fallback: CustomTheme.defaultCanvasHex), supportsOpacity: false)
+                ColorPicker("Cards", selection: color($surfaceHex, fallback: CustomTheme.defaultSurfaceHex), supportsOpacity: false)
+                ColorPicker("Accent", selection: color($accentHex, fallback: Theme.defaultAccentHex), supportsOpacity: false)
+            } header: {
+                Text("Colors")
+            } footer: {
+                Text("The page sits behind every screen, cards and rows sit on it, and the accent colors buttons, links and ratings. Pick a text style that reads well on your page color.")
+            }
+            Section {
+                Menu {
+                    ForEach(starters) { starter in
+                        Button(starter.title, systemImage: starter.symbol) { start(from: starter) }
+                    }
+                } label: {
+                    Label("Start From a Theme", systemImage: "square.on.square")
+                }
+            } footer: {
+                Text("Copies a theme's colors here to tweak.")
+            }
+            if !isOn {
+                Section {
+                    Button("Use Custom Theme") { appearance = Appearance.custom.rawValue }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Build Your Own")
+    }
+
+    private func start(from starter: Appearance) {
+        if let canvas = starter.canvas { canvasHex = canvas.hex(in: environment) }
+        if let surface = starter.surface { surfaceHex = surface.hex(in: environment) }
+        dark = starter.colorScheme == .dark
+        if let hex = starter.accentHex { accentHex = hex }
+        appearance = Appearance.custom.rawValue
     }
 }
 

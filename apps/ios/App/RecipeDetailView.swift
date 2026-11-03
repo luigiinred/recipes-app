@@ -47,7 +47,7 @@ struct RecipeDetailView: View {
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { sideInsets = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
-        .background(.background)
+        .background(pageStyle)
         .themedCanvas()
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }

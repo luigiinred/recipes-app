@@ -24,7 +24,7 @@ struct AccentStyle: ShapeStyle {
 }
 
 enum Appearance: String, CaseIterable, Identifiable {
-    case system, light, dark, black, sepia
+    case system, light, dark, black, sepia, butter, linen, olive, rose, crema, mint, blueberry, chai, cocoa, custom
 
     var id: String { rawValue }
 
@@ -35,6 +35,16 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .dark: "Dark"
         case .black: "Pitch Black"
         case .sepia: "Sepia"
+        case .butter: "Butter"
+        case .linen: "Washed Linen"
+        case .olive: "Olive Grove"
+        case .rose: "Vintage Rose"
+        case .crema: "Crema"
+        case .mint: "Mint"
+        case .blueberry: "Blueberry"
+        case .chai: "Red Chai"
+        case .cocoa: "Cowhide Cocoa"
+        case .custom: "Custom"
         }
     }
 
@@ -45,14 +55,24 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .dark: "moon"
         case .black: "moon.fill"
         case .sepia: "book"
+        case .butter: "sun.haze"
+        case .linen: "square.grid.3x3"
+        case .olive: "leaf"
+        case .rose: "camera.macro"
+        case .crema: "cup.and.heat.waves"
+        case .mint: "leaf.circle"
+        case .blueberry: "circle.grid.cross"
+        case .chai: "cup.and.saucer"
+        case .cocoa: "mug"
+        case .custom: "paintbrush"
         }
     }
 
     var colorScheme: ColorScheme? {
         switch self {
-        case .system: nil
-        case .light, .sepia: .light
-        case .dark, .black: .dark
+        case .system, .custom: nil
+        case .light, .sepia, .butter, .linen, .olive, .rose, .crema, .mint, .blueberry: .light
+        case .dark, .black, .chai, .cocoa: .dark
         }
     }
 
@@ -62,6 +82,15 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .dark: Color(white: 0.15)
         case .black: .black
         case .sepia: Color(red: 0.957, green: 0.925, blue: 0.847)
+        case .butter: Color(hex: "FBF0C8")
+        case .linen: Color(hex: "EEE8DC")
+        case .olive: Color(hex: "EDEBE0")
+        case .rose: Color(hex: "F6E2DE")
+        case .crema: Color(hex: "F2E7CB")
+        case .mint: Color(hex: "E4EBDD")
+        case .blueberry: Color(hex: "E6E8F3")
+        case .chai: Color(hex: "2E1412")
+        case .cocoa: Color(hex: "2A1C15")
         default: nil
         }
     }
@@ -72,9 +101,50 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .dark: Color(white: 0.21)
         case .black: Color(white: 0.09)
         case .sepia: Color(red: 0.984, green: 0.965, blue: 0.918)
+        case .butter: Color(hex: "FFF9E6")
+        case .linen: Color(hex: "F8F5EE")
+        case .olive: Color(hex: "F7F6F0")
+        case .rose: Color(hex: "FCF1EF")
+        case .crema: Color(hex: "FAF5E8")
+        case .mint: Color(hex: "F4F7F0")
+        case .blueberry: Color(hex: "F4F5FB")
+        case .chai: Color(hex: "441E1A")
+        case .cocoa: Color(hex: "3B2820")
         default: nil
         }
     }
+
+    /// The palette themes come with an accent; choosing one sets it, and it can still be changed after.
+    var accentHex: String? {
+        switch self {
+        case .butter: AccentPreset.rust
+        case .linen: AccentPreset.cherry
+        case .olive: AccentPreset.olive
+        case .rose: AccentPreset.burgundy
+        case .crema: AccentPreset.paprika
+        case .mint: AccentPreset.mint
+        case .blueberry: AccentPreset.blueberry
+        case .chai: AccentPreset.cinnamon
+        case .cocoa: AccentPreset.caramel
+        default: nil
+        }
+    }
+
+    var palette: ThemePalette { ThemePalette(colorScheme: colorScheme, canvas: canvas, surface: surface) }
+}
+
+/// The colors a screen paints with, so the Custom theme reads exactly like the built-in ones.
+struct ThemePalette {
+    var colorScheme: ColorScheme?
+    var canvas: Color?
+    var surface: Color?
+
+    static let system = ThemePalette()
+}
+
+enum CustomTheme {
+    static let defaultCanvasHex = "F4ECD8"
+    static let defaultSurfaceHex = "FBF6EA"
 }
 
 enum FontStyle: String, CaseIterable, Identifiable {
@@ -108,16 +178,34 @@ struct AccentPreset: Identifiable {
     var id: String { hex }
     var color: Color { Color(hex: hex) ?? .red }
 
+    static let blueberry = "3B6FD6"
+    static let rust = "BA3801"
+    static let cherry = "C8250C"
+    static let olive = "7D7F52"
+    static let burgundy = "80202E"
+    static let paprika = "C54F2D"
+    static let mint = "5F8A57"
+    static let cinnamon = "D0845A"
+    static let caramel = "CF954A"
+
     static let all = [
         AccentPreset(name: "Tomato", hex: Theme.defaultAccentHex),
         AccentPreset(name: "Orange", hex: "E8802A"),
         AccentPreset(name: "Saffron", hex: "D9A011"),
         AccentPreset(name: "Basil", hex: "3E8E5A"),
         AccentPreset(name: "Teal", hex: "1F9D9A"),
-        AccentPreset(name: "Blueberry", hex: "3B6FD6"),
+        AccentPreset(name: "Blueberry", hex: blueberry),
         AccentPreset(name: "Plum", hex: "8E4FC1"),
         AccentPreset(name: "Rose", hex: "D6457F"),
         AccentPreset(name: "Graphite", hex: "5C6670"),
+        AccentPreset(name: "Rust", hex: rust),
+        AccentPreset(name: "Cherry", hex: cherry),
+        AccentPreset(name: "Olive", hex: olive),
+        AccentPreset(name: "Burgundy", hex: burgundy),
+        AccentPreset(name: "Paprika", hex: paprika),
+        AccentPreset(name: "Mint", hex: mint),
+        AccentPreset(name: "Cinnamon", hex: cinnamon),
+        AccentPreset(name: "Caramel", hex: caramel),
     ]
 }
 
@@ -145,16 +233,25 @@ private struct AppThemeModifier: ViewModifier {
     @AppStorage(AppSettings.Key.appearance) private var appearanceRaw = Appearance.system.rawValue
     @AppStorage(AppSettings.Key.fontStyle) private var fontRaw = FontStyle.serif.rawValue
     @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
+    @AppStorage(AppSettings.Key.customThemeDark) private var customDark = false
+    @AppStorage(AppSettings.Key.customThemeCanvas) private var customCanvasHex = CustomTheme.defaultCanvasHex
+    @AppStorage(AppSettings.Key.customThemeSurface) private var customSurfaceHex = CustomTheme.defaultSurfaceHex
+
+    private var palette: ThemePalette {
+        let appearance = Appearance(rawValue: appearanceRaw) ?? .system
+        guard appearance == .custom else { return appearance.palette }
+        return ThemePalette(colorScheme: customDark ? .dark : .light, canvas: Color(hex: customCanvasHex), surface: Color(hex: customSurfaceHex))
+    }
 
     func body(content: Content) -> some View {
-        let appearance = Appearance(rawValue: appearanceRaw) ?? .system
+        let palette = palette
         let accent = Color(hex: accentHex) ?? Theme.defaultAccent
         content
-            .environment(\.appearance, appearance)
+            .environment(\.appearance, palette)
             .environment(\.appAccent, accent)
             .tint(accent)
             .fontDesign((FontStyle(rawValue: fontRaw) ?? .serif).design)
-            .preferredColorScheme(appearance.colorScheme)
+            .preferredColorScheme(palette.colorScheme)
             #if os(iOS) && !SHARE_EXTENSION
             .onChange(of: fontRaw, initial: true) { _, raw in ThemeFonts.apply(FontStyle(rawValue: raw) ?? .serif) }
             .onChange(of: accentHex, initial: true) { _, hex in ThemeTint.apply(Color(hex: hex) ?? Theme.defaultAccent) }
@@ -163,11 +260,11 @@ private struct AppThemeModifier: ViewModifier {
 }
 
 private struct AppearanceKey: EnvironmentKey {
-    static let defaultValue = Appearance.system
+    static let defaultValue = ThemePalette.system
 }
 
 extension EnvironmentValues {
-    var appearance: Appearance {
+    var appearance: ThemePalette {
         get { self[AppearanceKey.self] }
         set { self[AppearanceKey.self] = newValue }
     }
