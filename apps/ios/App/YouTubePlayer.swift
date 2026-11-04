@@ -1,19 +1,29 @@
 import RecipeKit
 import SwiftUI
 import WebKit
+#if os(iOS)
+import AVFoundation
+#endif
 
 @MainActor
 final class YouTubePlayerController: ObservableObject {
     @Published private(set) var isShown = false
     @Published private(set) var errorMessage: String?
     @Published fileprivate(set) var isPlaying = false
+    @Published fileprivate(set) var canPictureInPicture = false
+    @Published fileprivate(set) var isPictureInPicture = false
     private(set) var startSeconds = 0
     fileprivate weak var webView: WKWebView?
     fileprivate var isReady = false
+    fileprivate var videoFrame: WKFrameInfo?
 
     func play(from seconds: Int = 0) {
         startSeconds = seconds
         errorMessage = nil
+        #if os(iOS)
+        // Picture in Picture keeps playing in the background only under the playback category.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        #endif
         if isShown, isReady {
             webView?.evaluateJavaScript("seekTo(\(seconds))")
         }
@@ -22,6 +32,12 @@ final class YouTubePlayerController: ObservableObject {
 
     func pause() {
         webView?.evaluateJavaScript("if (player && player.pauseVideo) { player.pauseVideo(); }")
+    }
+
+    func togglePictureInPicture() {
+        guard let webView, let videoFrame else { return }
+        let mode = isPictureInPicture ? "inline" : "picture-in-picture"
+        webView.evaluateJavaScript("document.querySelector('video').webkitSetPresentationMode('\(mode)')", in: videoFrame, in: .page)
     }
 
     fileprivate func fail(_ message: String) { errorMessage = message }
@@ -40,6 +56,7 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #endif
         configuration.userContentController.add(context.coordinator, name: "player")
+        configuration.userContentController.addUserScript(WKUserScript(source: Self.videoFrameScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
         let webView = WKWebView(frame: .zero, configuration: configuration)
         #if os(iOS)
         webView.scrollView.isScrollEnabled = false
@@ -85,15 +102,42 @@ struct YouTubePlayerWebView: PlatformViewRepresentable {
         """
     }
 
+    /// The video lives in YouTube's cross-origin frame, so this runs inside it to report the frame and its presentation mode.
+    static let videoFrameScript = """
+    (function () {
+      if (window === window.top || !/(^|\\.)youtube(-nocookie)?\\.com$/.test(location.hostname)) return;
+      function attach(video) {
+        if (!video.webkitSupportsPresentationMode || !video.webkitSupportsPresentationMode('picture-in-picture')) return;
+        window.webkit.messageHandlers.player.postMessage('pip:ready');
+        video.addEventListener('webkitpresentationmodechanged', function () {
+          window.webkit.messageHandlers.player.postMessage('pip:' + video.webkitPresentationMode);
+        });
+      }
+      var video = document.querySelector('video');
+      if (video) { attach(video); return; }
+      var observer = new MutationObserver(function () {
+        var found = document.querySelector('video');
+        if (found) { observer.disconnect(); attach(found); }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    })();
+    """
+
     final class Coordinator: NSObject, WKScriptMessageHandler {
         let controller: YouTubePlayerController
         init(_ controller: YouTubePlayerController) { self.controller = controller }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? String else { return }
+            let frame = message.frameInfo
             Task { @MainActor in
                 if body == "ready" {
                     controller.isReady = true
+                } else if body == "pip:ready" {
+                    controller.videoFrame = frame
+                    controller.canPictureInPicture = true
+                } else if body.hasPrefix("pip:") {
+                    controller.isPictureInPicture = body == "pip:picture-in-picture"
                 } else if body.hasPrefix("state:") {
                     // 1 = playing, 3 = buffering
                     controller.isPlaying = ["1", "3"].contains(body.dropFirst("state:".count))
@@ -165,6 +209,9 @@ struct YouTubeEmbed: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .task(id: videoID) { aspect = await Self.ratio(for: videoID) }
             .overlay(alignment: .top) { if progress >= 1, !isCompact { dragHandle } }
+            .overlay(alignment: .topLeading) {
+                if controller.canPictureInPicture, !controller.isPictureInPicture { pictureInPictureButton }
+            }
             .scaleEffect(1 - (1 - miniScale) * progress, anchor: corner.isLeading ? .topLeading : .topTrailing)
             .offset(y: max(0, scrolled - Self.pinMargin + (corner.isBottom ? (bottomDock + Self.pinMargin) * progress : 0)))
             .offset(drag)
@@ -202,6 +249,19 @@ struct YouTubeEmbed: View {
                     }
             )
             .accessibilityLabel("Move video")
+    }
+
+    private var pictureInPictureButton: some View {
+        Button { controller.togglePictureInPicture() } label: {
+            Image(systemName: "pip.enter")
+                .font(isCompact ? .footnote : .body)
+                .foregroundStyle(.white)
+                .padding(isCompact ? 6 : 10)
+                .glassEffect(.regular, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(isCompact ? 4 : 8)
+        .accessibilityLabel("Picture in Picture")
     }
 
     @MainActor private static var known: [String: Double] = [:]
