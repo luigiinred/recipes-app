@@ -16,7 +16,7 @@ settings:
     RECIPES_APP_GROUP: group.${RECIPES_BUNDLE_ID}
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.3"
-    CURRENT_PROJECT_VERSION: "20"
+    CURRENT_PROJECT_VERSION: "21"
 targets:
   Recipes:
     type: application
@@ -52,6 +52,7 @@ targets:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Recipes connects to your Mealie server on your home network to sync recipes.
         UILaunchScreen: {}
+        UIBackgroundModes: [audio]
         UIRequiresFullScreen: true
         LSApplicationCategoryType: public.app-category.food-and-drink
         UISupportedInterfaceOrientations:
