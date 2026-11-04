@@ -244,6 +244,7 @@ extension FeedLoader {
     }
 }
 
+#if os(iOS)
 /// The newest followed posts as a swipeable row, for the Recipes home.
 struct DiscoverShelf: View {
     static let limit = 10
@@ -276,6 +277,7 @@ struct DiscoverShelf: View {
         .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
     }
 }
+#endif
 
 struct DiscoverCard: View {
     let entry: FeedEntry
