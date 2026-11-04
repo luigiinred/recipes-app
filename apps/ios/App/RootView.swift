@@ -55,7 +55,7 @@ struct RootView: View {
         TabView(selection: $tab) {
             if sizeClass == .regular {
                 TabSection("Recipes") {
-                    Tab("All Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
+                    Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
                     ForEach(sidebarCollections, id: \.self) { collection in
                         Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
                             .defaultVisibility(.hidden, for: .tabBar)
@@ -66,7 +66,7 @@ struct RootView: View {
                     }
                 }
             } else {
-                Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
+                Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
@@ -140,6 +140,8 @@ struct SearchTab: View {
                         RecipesHomeView(selection: $selection, tag: path).id(path)
                     case .allRecipes:
                         RecipesHomeView(selection: $selection, showsAllRecipes: true)
+                    case .homeSettings:
+                        HomeSettingsPage()
                     }
                 }
         }
@@ -226,6 +228,8 @@ struct RecipesTab: View {
             RecipesHomeView(selection: $selection, tag: path).id(path)
         case .allRecipes:
             RecipesHomeView(selection: $selection, showsAllRecipes: true)
+        case .homeSettings:
+            HomeSettingsPage()
         }
     }
 }
