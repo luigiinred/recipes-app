@@ -52,7 +52,9 @@ targets:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Recipes connects to your Mealie server on your home network to sync recipes.
         UILaunchScreen: {}
-        UIBackgroundModes: [audio]
+        BGTaskSchedulerPermittedIdentifiers:
+          - $(PRODUCT_BUNDLE_IDENTIFIER).feeds-refresh
+        UIBackgroundModes: [audio, fetch]
         UIRequiresFullScreen: true
         LSApplicationCategoryType: public.app-category.food-and-drink
         UISupportedInterfaceOrientations:

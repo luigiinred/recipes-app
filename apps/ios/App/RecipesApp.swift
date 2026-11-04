@@ -38,13 +38,27 @@ struct RecipesApp: App {
                 .onChange(of: library.recipes) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.mealPlan) { mealie.request(); rescheduleReminders() }
                 .onChange(of: library.groceries) { mealie.request() }
-                .onChange(of: scenePhase) { if scenePhase == .active { mealie.refresh(); mealie.request(); discover.refresh(); rescheduleReminders() } }
+                .onChange(of: scenePhase) {
+                    switch scenePhase {
+                    case .active:
+                        mealie.refresh(); mealie.request(); discover.refresh(); rescheduleReminders()
+                        Task { await feeds.refreshOffline(library.feeds) }
+                    #if os(iOS)
+                    case .background: FeedRefresh.schedule()
+                    #endif
+                    default: break
+                    }
+                }
+                .onChange(of: library.feeds) { Task { await feeds.refreshOffline(library.feeds) } }
                 .onOpenURL(perform: open)
                 .task {
                     // App Store captures on an unfolded iPhone Duo can't drive the app with UI tests, so they open a link at launch.
                     if let link = ProcessInfo.processInfo.environment["RECIPES_OPEN_URL"], let url = URL(string: link) { open(url) }
                 }
         }
+        #if os(iOS)
+        .backgroundTask(.appRefresh(FeedRefresh.taskID)) { await FeedRefresh.run() }
+        #endif
         #if os(macOS)
         Settings {
             SettingsView(inSheet: false)

@@ -381,6 +381,35 @@ extension FeedEntry {
     }
 }
 
+/// A post's photo, from the offline cache when it's saved there.
+struct FeedPhoto: View {
+    let url: URL?
+    @State private var saved: CGImage?
+
+    var body: some View {
+        Group {
+            if let saved {
+                Image(decorative: saved, scale: 1).resizable().scaledToFill()
+            } else {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    ZStack {
+                        Color.secondary.opacity(0.12)
+                        Image(systemName: "fork.knife").font(.largeTitle).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .task(id: url) {
+            guard let url else { return }
+            saved = await Task.detached {
+                FeedCache.standard.photo(for: url).flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: FeedCache.photoSize) }
+            }.value
+        }
+    }
+}
+
 struct FeedCard: View {
     let entry: FeedEntry
     let source: String
@@ -391,14 +420,7 @@ struct FeedCard: View {
                 .aspectRatio(16 / 10, contentMode: .fit)
                 .frame(maxWidth: .infinity)
                 .overlay {
-                    AsyncImage(url: entry.imageURL) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        ZStack {
-                            Color.secondary.opacity(0.12)
-                            Image(systemName: "fork.knife").font(.largeTitle).foregroundStyle(.tertiary)
-                        }
-                    }
+                    FeedPhoto(url: entry.imageURL)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
@@ -434,7 +456,10 @@ struct RecipeFeedsPage: View {
 
     var body: some View {
         List {
-            if showsTabToggle { TabVisibilitySection(tab: .feeds) }
+            if showsTabToggle {
+                TabVisibilitySection(tab: .feeds)
+                OfflineFeedsSection()
+            }
             Section {
                 ForEach(customFeeds) { feed in
                     NavigationLink { FeedPreviewPage(url: feed.url, title: feed.title) } label: {
@@ -483,6 +508,48 @@ struct RecipeFeedsPage: View {
                 FollowFeedButton(url: popular.url, title: popular.name)
             }
         }
+    }
+}
+
+/// Whether followed feeds are kept on the device, when they were last saved, and a way to free the space.
+private struct OfflineFeedsSection: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var loader: FeedLoader
+    @AppStorage(AppSettings.Key.feedsOffline) private var savesOffline = true
+    @State private var lastUpdated: Date?
+    @State private var byteCount = 0
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $savesOffline) { Label("Save for Offline Reading", systemImage: "arrow.down.circle") }
+            if savesOffline, let lastUpdated {
+                LabeledContent("Last Saved") { Text(lastUpdated, format: .relative(presentation: .named)) }
+            }
+            if byteCount > 0 {
+                Button("Remove Saved Posts (\(byteCount.formatted(.byteCount(style: .file))))", role: .destructive) {
+                    FeedCache.standard.clear()
+                    Task { await measure() }
+                }
+            }
+        } header: {
+            Text("Offline")
+        } footer: {
+            Text("Keeps the newest posts and photos from the feeds you follow on this device. They refresh when you open Recipes and now and then in the background.")
+        }
+        .task(id: savesOffline) {
+            if savesOffline { await loader.refreshOffline(library.feeds) }
+            #if os(iOS)
+            FeedRefresh.schedule()
+            #endif
+            await measure()
+        }
+    }
+
+    private func measure() async {
+        let cache = FeedCache.standard
+        let (date, bytes) = await Task.detached { (cache.lastUpdated, cache.byteCount) }.value
+        lastUpdated = date
+        byteCount = bytes
     }
 }
 
