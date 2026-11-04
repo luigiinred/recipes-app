@@ -136,9 +136,14 @@ struct SearchTab: View {
                         RecipeListView(collection: .constant(collection), selection: $selection)
                     case .recipe(let id):
                         if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+                    case .tag(let path):
+                        RecipesHomeView(selection: $selection, tag: path).id(path)
+                    case .tags(let parent):
+                        AllTagsView(parent: parent)
                     }
                 }
         }
+        .environment(\.openRecipesRoute) { path.append($0) }
         .searchable(text: $query, prompt: "Search My Recipes")
         .searchFocused($isTyping)
         .onChange(of: selection) { _, id in
@@ -193,6 +198,7 @@ struct RecipesTab: View {
             }
             .navigationDestination(for: RecipesRoute.self) { destination($0) }
         }
+        .environment(\.openRecipesRoute) { path.append($0) }
         .onChange(of: selection) { _, id in
             guard let id else { return }
             isTyping = false
@@ -216,6 +222,10 @@ struct RecipesTab: View {
             RecipeListView(collection: .constant(collection), selection: $selection)
         case .recipe(let id):
             if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+        case .tag(let path):
+            RecipesHomeView(selection: $selection, tag: path).id(path)
+        case .tags(let parent):
+            AllTagsView(parent: parent)
         }
     }
 }
