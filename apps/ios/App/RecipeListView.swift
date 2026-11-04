@@ -569,6 +569,8 @@ enum RecipesRoute: Hashable {
     case tag(String)
     /// Every recipe, from the home's View All.
     case allRecipes
+    case feeds
+    case feedPost(FeedEntry)
     case homeSettings
 }
 

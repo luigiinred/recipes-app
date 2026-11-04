@@ -47,6 +47,7 @@ public enum FeedParser {
 private final class FeedXMLDelegate: NSObject, XMLParserDelegate {
     struct Draft {
         var title = "", link = "", summary = "", date = "", image = ""
+        var imageWidth = 0
     }
 
     let baseURL: URL?
@@ -76,8 +77,12 @@ private final class FeedXMLDelegate: NSObject, XMLParserDelegate {
         case "enclosure":
             if let url = attributes["url"], attributes["type"]?.hasPrefix("image") == true, draft.image.isEmpty { draft.image = url }
         case "media:thumbnail", "media:content":
-            if let url = attributes["url"], draft.image.isEmpty, name == "media:thumbnail" || attributes["medium"] == "image" || attributes["type"]?.hasPrefix("image") == true {
+            let medium = attributes["medium"], type = attributes["type"]
+            let isImage = name == "media:thumbnail" || medium == "image" || type?.hasPrefix("image") == true || (medium == nil && type == nil)
+            let width = attributes["width"].flatMap(Int.init) ?? 0
+            if let url = attributes["url"], isImage, draft.image.isEmpty || width > draft.imageWidth {
                 draft.image = url
+                draft.imageWidth = width
             }
         default: break
         }

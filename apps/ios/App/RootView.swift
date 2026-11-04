@@ -5,6 +5,7 @@ enum AppSection: Hashable {
     case recipes(RecipeCollection)
     case discover(UUID)
     case feed(UUID)
+    case feeds
     case plan
     case groceries
 }
@@ -19,6 +20,7 @@ struct RootView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -74,6 +76,9 @@ struct RootView: View {
             } else {
                 Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
+            if showsFeeds {
+                Tab("Feeds", systemImage: "dot.radiowaves.up.forward", value: AppTab.feeds) { FeedStreamTab() }
+            }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: sizeClass == .regular) }
@@ -88,6 +93,9 @@ struct RootView: View {
         .reviewPrompt()
         .tabViewSearchActivation(.searchTabSelection)
         .cookModeCover(cook)
+        .onChange(of: showsFeeds) { _, shows in
+            if !shows, tab == .feeds { tab = .recipes }
+        }
         .onChange(of: sizeClass) { _, size in
             if size != .regular, case .collection(let collection) = tab {
                 recipesPath = [.collection(collection)]
@@ -146,6 +154,10 @@ struct SearchTab: View {
                         RecipesHomeView(selection: $selection, tag: path).id(path)
                     case .allRecipes:
                         RecipesHomeView(selection: $selection, showsAllRecipes: true)
+                    case .feeds:
+                        FeedStreamView()
+                    case .feedPost(let entry):
+                        FeedEntryPreview(entry: entry)
                     case .homeSettings:
                         HomeSettingsPage()
                     case .discoverSources:
@@ -246,6 +258,10 @@ struct RecipesTab: View {
             RecipesHomeView(selection: $selection, tag: path).id(path)
         case .allRecipes:
             RecipesHomeView(selection: $selection, showsAllRecipes: true)
+        case .feeds:
+            FeedStreamView()
+        case .feedPost(let entry):
+            FeedEntryPreview(entry: entry)
         case .homeSettings:
             HomeSettingsPage()
         }
@@ -422,6 +438,8 @@ struct RootView: View {
                 }
                 .id(feed.id)
             }
+        case .feeds:
+            FeedStreamView()
         case .plan:
             PlanView(mode: $planMode, open: { path.append($0) })
         case .groceries:
@@ -436,6 +454,7 @@ struct SidebarView: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.onboardingCompleted) private var onboarded = false
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @Binding var section: AppSection?
     @Binding var addingFeed: Bool
     @State private var recipesExpanded = true
@@ -455,6 +474,7 @@ struct SidebarView: View {
                         .onTapGesture { recipesExpanded.toggle() }
                         .categoryRootDrop()
                 }
+                if showsFeeds { Label("Feeds", systemImage: "dot.radiowaves.up.forward").tag(AppSection.feeds) }
                 Label("Plan", systemImage: "calendar").tag(AppSection.plan)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
             }

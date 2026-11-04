@@ -138,7 +138,7 @@ enum QuickChip: Hashable {
 
 /// A block on the Home page; Settings → Home orders them and hides any.
 enum HomeSection: String, CaseIterable, Identifiable {
-    case today, upNext, tags, discover, recipes
+    case today, upNext, tags, discover, feeds, recipes
 
     var id: Self { self }
 
@@ -148,6 +148,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .upNext: "Up Next"
         case .tags: "Tags"
         case .discover: "Discover"
+        case .feeds: "Feeds"
         case .recipes: "Recipes"
         }
     }
@@ -158,6 +159,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .upNext: "text.line.first.and.arrowtriangle.forward"
         case .tags: "tag"
         case .discover: "binoculars"
+        case .feeds: "dot.radiowaves.up.forward"
         case .recipes: "book.closed"
         }
     }
@@ -168,6 +170,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .upNext: "The recipes you've queued to cook."
         case .tags: "Your top-level tags as photo tiles."
         case .discover: "Mealie servers shared with you."
+        case .feeds: "The newest posts from recipe sites you follow."
         case .recipes: "Your first five recipes, with View All."
         }
     }
@@ -263,6 +266,7 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @AppStorage(AppSettings.Key.homeSections) private var homeSectionsRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
@@ -348,7 +352,7 @@ struct RecipesHomeView: View {
         switch section {
         case .today: todayPicks
         case .upNext: upNextPicks
-        case .tags, .discover, .recipes: []
+        case .tags, .discover, .feeds, .recipes: []
         }
     }
 
@@ -447,6 +451,13 @@ struct RecipesHomeView: View {
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
+        case .feeds:
+            if showsFeedShelf {
+                feedsRow
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 20, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            }
         case .recipes:
             if isHome {
                 recipesHeader(count: total)
@@ -504,6 +515,8 @@ struct RecipesHomeView: View {
             if showsTags { tagsRow }
         case .discover:
             if !discover.sources.isEmpty { discoverSection.padding(.horizontal, margin) }
+        case .feeds:
+            if showsFeedShelf { feedsRow }
         case .recipes:
             if isHome { recipesHeader(count: total).padding(.horizontal, margin) }
             GridSection(title: nil, minimum: 260, spacing: 24) {
@@ -689,6 +702,30 @@ struct RecipesHomeView: View {
         } else {
             tagPage = 0
             withAnimation(.smooth(duration: 0.4)) { tagsExpanded = true }
+        }
+    }
+
+    private var showsFeedShelf: Bool { showsFeeds && isHome && !library.feeds.isEmpty }
+
+    private var feedsRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                sectionTitle(HomeSection.feeds.title)
+                Spacer()
+                Button { openRoute(.feeds) } label: {
+                    HStack(spacing: 4) {
+                        Text("View All")
+                        Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
+                    }
+                    .appFont(.subheadline, weight: .medium)
+                    .foregroundStyle(.tint)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("View All Feeds")
+            }
+            .padding(.horizontal, margin)
+            FeedShelf(margin: margin, cardWidth: isRegular ? 300 : 260)
         }
     }
 

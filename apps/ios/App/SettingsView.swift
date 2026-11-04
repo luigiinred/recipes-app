@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case home, recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
+    case home, recipes, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -17,6 +17,7 @@ struct SettingsView: View {
     var listing = AppStoreLink.listing
     var writeReview = AppStoreLink.writeReview
 
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -84,6 +85,11 @@ struct SettingsView: View {
         Section {
             NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
         }
+        if showsFeeds {
+            Section {
+                NavigationLink(value: SettingsPage.feeds) { Label("Recipe Feeds", systemImage: "dot.radiowaves.up.forward") }
+            }
+        }
         Section {
             NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
         } header: {
@@ -139,6 +145,7 @@ struct SettingsView: View {
         case .groceries: GroceriesSettingsPage()
         case .reminders: RemindersSettingsPage()
         case .theme: ThemeSettingsPage()
+        case .feeds: RecipeFeedsPage()
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
@@ -239,12 +246,17 @@ private struct RecipesSettingsPage: View {
 struct HomeSettingsPage: View {
     @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
+
+    private var listed: [HomeSection] {
+        HomeSection.order(orderRaw).filter { showsFeeds || $0 != .feeds }
+    }
 
     var body: some View {
         let hidden = HomeSection.hidden(hiddenRaw, order: orderRaw)
         List {
             Section {
-                ForEach(HomeSection.order(orderRaw)) { section in
+                ForEach(listed) { section in
                     Toggle(isOn: Binding(
                         get: { !hidden.contains(section) },
                         set: { shown in
@@ -265,9 +277,9 @@ struct HomeSettingsPage: View {
                     }
                 }
                 .onMove { from, to in
-                    var order = HomeSection.order(orderRaw)
+                    var order = listed
                     order.move(fromOffsets: from, toOffset: to)
-                    orderRaw = HomeSection.raw(order)
+                    orderRaw = HomeSection.raw(order + HomeSection.order(orderRaw).filter { !order.contains($0) })
                 }
             } header: {
                 Text("Sections")
