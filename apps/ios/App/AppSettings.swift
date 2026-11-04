@@ -63,6 +63,7 @@ enum AppSettings {
         static let customThemeDarkAccent = "customThemeDarkAccentHex"
         static let hiddenTabs = "hiddenTabs"
         static let feedsOffline = "saveFeedsOffline"
+        static let feedsGrouped = "feedsGroupedByFeed"
         static let settingsInTabBar = "settingsInTabBar"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
