@@ -1,3 +1,4 @@
+import RecipeKit
 import SwiftUI
 
 extension View {
@@ -26,5 +27,41 @@ private struct Shimmer: ViewModifier {
                 guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { sweeping = true }
             }
+    }
+}
+
+extension Recipe {
+    /// Stand-in whose text gives a loading recipe page or row its shape.
+    static let placeholder = Recipe(
+        title: "A recipe title that's loading",
+        summary: "A short description of the dish while it loads.",
+        servings: 4, prepMinutes: 15, cookMinutes: 30,
+        ingredients: ["2 cups of an ingredient", "1 tablespoon of another", "A pinch of something", "3 of something else, chopped", "1 cup of a liquid"],
+        steps: ["The first step of the recipe, which takes a line or two to describe.", "The second step, a little shorter.", "A third step that finishes the dish and serves it."],
+        tags: ["Loading"]
+    )
+}
+
+/// A recipe page that's still loading, laid out like the real one.
+struct RecipeDetailSkeleton: View {
+    var body: some View {
+        RecipeDetailView(recipe: .placeholder, previewSave: {}, previewImage: nil)
+            .loadingPlaceholder()
+            .allowsHitTesting(false)
+    }
+}
+
+/// Recipe rows that are still loading.
+struct RecipeRowsSkeleton: View {
+    var count = 6
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(0..<count, id: \.self) { _ in RecipeRow(recipe: .placeholder) }
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .loadingPlaceholder()
+        .allowsHitTesting(false)
     }
 }

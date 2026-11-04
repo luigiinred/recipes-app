@@ -296,8 +296,9 @@ struct FeedRow: View {
             if entries.isEmpty {
                 Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
             } else if !loader.exhausted.contains(url) {
-                ProgressView()
-                    .frame(width: 60, height: Self.cardWidth * 10 / 16)
+                FeedCard(entry: .placeholder(0), source: "")
+                    .frame(width: Self.cardWidth)
+                    .loadingPlaceholder()
                     .onAppear { Task { await loader.loadMore(url: url) } }
                     .id(entries.count)
             }
@@ -557,10 +558,12 @@ struct FeedPreviewPage: View {
                     }
                     .padding()
                     if seed == nil, !entries.isEmpty, !loader.exhausted.contains(url) {
-                        ProgressView()
-                            .padding()
-                            .onAppear { Task { await loader.loadMore(url: url) } }
-                            .id(entries.count)
+                        GridSection(title: nil, minimum: 300, spacing: 20) {
+                            ForEach(0..<2, id: \.self) { FeedCard(entry: .placeholder($0), source: "").loadingPlaceholder() }
+                        }
+                        .padding(.horizontal)
+                        .onAppear { Task { await loader.loadMore(url: url) } }
+                        .id(entries.count)
                     }
                 }
             }

@@ -219,20 +219,25 @@ struct EmptyLibraryView: View {
         } else if let message = library.errorMessage {
             ContentUnavailableView("Couldn't load recipes", systemImage: "exclamationmark.triangle", description: Text(message))
         } else {
-            VStack(spacing: 4) {
-                MascotLoader(height: 120)
-                Text("Syncing recipes…").appFont(.headline)
-                if let detail = progressDetail {
-                    Text(detail)
-                        .appFont(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .animation(.snappy, value: library.loadProgress)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Syncing recipes…").appFont(.subheadline, weight: .semibold)
+                    if let detail = progressDetail {
+                        Text(detail)
+                            .appFont(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: library.loadProgress)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .accessibilityElement(children: .combine)
+                RecipeRowsSkeleton().accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityElement(children: .combine)
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 

@@ -101,7 +101,7 @@ private struct DiscoverRecipePage: View {
             } else if let failure {
                 ContentUnavailableView("Couldn't Load Recipe", systemImage: "exclamationmark.triangle", description: Text(failure))
             } else {
-                ProgressView("Loading recipe…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                RecipeDetailSkeleton()
             }
         }
         .task(id: id) {
@@ -118,7 +118,7 @@ struct DiscoverStatusView: View {
     var body: some View {
         switch catalog.state {
         case .loading:
-            ProgressView("Loading recipes…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            RecipeRowsSkeleton().padding(.top, 16)
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't Reach \(catalog.source.name)", systemImage: "exclamationmark.triangle")
