@@ -138,7 +138,7 @@ enum QuickChip: Hashable {
 
 /// A block on the Home page; Settings → Home orders them and hides any.
 enum HomeSection: String, CaseIterable, Identifiable {
-    case today, upNext, tags, discover, feeds, recipes
+    case today, upNext, favorites, tags, discover, feeds, recipes
 
     var id: Self { self }
 
@@ -146,6 +146,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         switch self {
         case .today: "Today"
         case .upNext: "Up Next"
+        case .favorites: "Favorites"
         case .tags: "Tags"
         case .discover: "Discover"
         case .feeds: "Feeds"
@@ -157,6 +158,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         switch self {
         case .today: "sun.max"
         case .upNext: "text.line.first.and.arrowtriangle.forward"
+        case .favorites: "heart"
         case .tags: "tag"
         case .discover: "binoculars"
         case .feeds: "dot.radiowaves.up.forward"
@@ -168,6 +170,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         switch self {
         case .today: "What's planned for today."
         case .upNext: "The recipes you've queued to cook."
+        case .favorites: "The recipes you've hearted."
         case .tags: "Your top-level tags as photo tiles."
         case .discover: "Mealie servers shared with you."
         case .feeds: "The newest posts from recipe sites you follow."
@@ -181,10 +184,14 @@ enum HomeSection: String, CaseIterable, Identifiable {
         raw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) }
     }
 
-    /// Every section in its saved order; ones the saved order doesn't list go last.
+    /// Every section in its saved order; ones the saved order doesn't list go after the section they follow by default.
     static func order(_ raw: String) -> [HomeSection] {
-        let saved = parse(raw)
-        return saved + allCases.filter { !saved.contains($0) }
+        var order = parse(raw)
+        for section in allCases where !order.contains(section) {
+            let previous = allCases.prefix { $0 != section }.last { order.contains($0) }
+            order.insert(section, at: previous.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
+        return order
     }
 
     /// Sections the saved order doesn't list yet keep their default visibility.
@@ -352,6 +359,10 @@ struct RecipesHomeView: View {
             }
     }
 
+    private var favoritePicks: [HeroPick] {
+        RecipeCollection.favorites.filter(library.recipes).prefix(5).map { HeroPick(recipe: $0, kicker: "Favorite") }
+    }
+
     private var upNextPicks: [HeroPick] {
         RecipeCollection.wantToCook.filter(library.recipes).prefix(5).map { HeroPick(recipe: $0, kicker: "Up Next") }
     }
@@ -360,6 +371,7 @@ struct RecipesHomeView: View {
         switch section {
         case .today: todayPicks
         case .upNext: upNextPicks
+        case .favorites: favoritePicks
         case .tags, .discover, .feeds, .recipes: []
         }
     }
@@ -447,7 +459,7 @@ struct RecipesHomeView: View {
     @ViewBuilder
     private func listSection(_ section: HomeSection, items: [Recipe], total: Int) -> some View {
         switch section {
-        case .today, .upNext:
+        case .today, .upNext, .favorites:
             let picks = picks(for: section)
             if !picks.isEmpty {
                 heroSection(section, picks: picks)
@@ -543,7 +555,7 @@ struct RecipesHomeView: View {
     @ViewBuilder
     private func gridSection(_ section: HomeSection, items: [Recipe], total: Int) -> some View {
         switch section {
-        case .today, .upNext:
+        case .today, .upNext, .favorites:
             let picks = picks(for: section)
             if !picks.isEmpty { heroSection(section, picks: picks) }
             else if let empty = emptyCard(section) { empty.padding(.horizontal, margin) }
@@ -629,6 +641,11 @@ struct RecipesHomeView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Opens Up Next to reorder it")
+                } else if section == .favorites {
+                    sectionTitle(section.title)
+                    Spacer()
+                    sectionLink("View All") { openRoute(.collection(.favorites)) }
+                        .accessibilityLabel("View All Favorites")
                 } else {
                     sectionTitle(section.title)
                     Spacer()
@@ -665,6 +682,9 @@ struct RecipesHomeView: View {
         case .upNext where shows(.upNext):
             return AnyView(emptyCard(section, symbol: "text.line.first.and.arrowtriangle.forward", heading: "Line up what to cook",
                                      message: "Swipe a recipe left, or use its ⋯ menu, to add it to Up Next. Planning it takes it off.") { openRoute(.upNext) })
+        case .favorites where !library.recipes.isEmpty:
+            return AnyView(emptyCard(section, symbol: "heart", heading: "Keep your favorites close",
+                                     message: "Long-press a recipe, or use its ⋯ menu, and choose Favorite.", action: nil))
         case .feeds where library.feeds.isEmpty:
             return AnyView(emptyCard(section, symbol: "dot.radiowaves.up.forward", heading: "Follow recipe sites",
                                      message: "Discover blogs, magazines and YouTube channels and see their newest recipes here.") { openRoute(.feeds) })
