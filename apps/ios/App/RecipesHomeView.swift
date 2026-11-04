@@ -206,25 +206,30 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(HomeBrowsing.self) private var browsing
+    @Environment(\.openRecipesRoute) private var openRoute
     @Environment(\.appAccent) private var accent
     @Binding var selection: Recipe.ID?
     var query = ""
     var showsQuickFilters = false
     var isSearching = false
+    /// Shows one tag's page with its own filters instead of the shared home.
+    var tag: String?
     var onScroll: (() -> Void)?
 
     private var filter: HomeFilter {
         get {
-            var filter = browsing.filter
+            var filter = tag == nil ? browsing.filter : tagFilter
             filter.query = query
+            if let tag { filter.scope = .category(tag) }
             return filter
         }
         nonmutating set {
             var filter = newValue
             filter.query = ""
-            browsing.filter = filter
+            if tag == nil { browsing.filter = filter } else { tagFilter = filter }
         }
     }
+    @State private var tagFilter = HomeFilter()
     private var chosenSort: RecipeSort? {
         get { browsing.chosenSort }
         nonmutating set { browsing.chosenSort = newValue }
@@ -237,7 +242,6 @@ struct RecipesHomeView: View {
     @State private var pinnedWidth: CGFloat = 0
     /// A line of chip text, so icon-only chips are as tall as the labeled ones.
     @ScaledMetric(relativeTo: .body) private var chipLine: CGFloat = 22
-    @State private var browsingAllTags = false
     @State private var titleInBar = false
     @State private var tagShelfWidth: CGFloat = 0
     @State private var editing: Recipe?
@@ -282,9 +286,6 @@ struct RecipesHomeView: View {
         }
         .sheet(isPresented: $choosingFilter) {
             HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
-        }
-        .navigationDestination(isPresented: $browsingAllTags) {
-            AllTagsView(filter: Binding(get: { filter }, set: { filter = $0 }), count: count(in:))
         }
         .sheet(item: $editing) { recipe in
             RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
@@ -358,9 +359,14 @@ struct RecipesHomeView: View {
         .reviewPromptInset()
     }
 
+    private var tagNodes: [CategoryNode] {
+        guard let tag else { return library.categoryTree }
+        return CategoryTree.node(at: tag, in: library.categoryTree)?.children ?? []
+    }
+
     /// Searching hides the tags unless one is already narrowing the results.
     private var showsTags: Bool {
-        !library.categoryTree.isEmpty && (!showsQuickFilters || filter.scope != .all)
+        !tagNodes.isEmpty && (!showsQuickFilters || filter.scope != .all)
     }
 
     private var tagsPerPage: Int {
@@ -374,14 +380,14 @@ struct RecipesHomeView: View {
     }
 
     private var tagPages: [[CategoryNode]] {
-        let tree = library.categoryTree, perPage = tagsPerPage
+        let tree = tagNodes, perPage = tagsPerPage
         return stride(from: 0, to: tree.count, by: perPage).map { Array(tree[$0..<min($0 + perPage, tree.count)]) }
     }
 
     private var tagsRow: some View {
         let pages = tagPages
         return VStack(alignment: .leading, spacing: 14) {
-            Button { browsingAllTags = true } label: {
+            Button { openRoute(.tags(under: tag)) } label: {
                 HStack {
                     Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary)
                     Spacer()
@@ -422,9 +428,7 @@ struct RecipesHomeView: View {
     private func tagTile(_ node: CategoryNode) -> some View {
         let collection = RecipeCollection.category(node.path)
         return TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
-                       count: count(in: collection), isOn: isWithin(node)) {
-            filter.scope = isWithin(node) ? .all : collection
-        }
+                       count: count(in: collection), isOn: isWithin(node), route: .tag(node.path))
     }
 
     private func isWithin(_ node: CategoryNode) -> Bool {
@@ -599,14 +603,15 @@ private extension View {
     }
 }
 
-/// Every tag as tiles: the top-level ones, then each folder's subtags. Choosing one narrows the home and goes back to it.
-private struct AllTagsView: View {
+/// Every tag under `parent` as tiles, then each folder's subtags; each opens that tag's page.
+struct AllTagsView: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
-    @Binding var filter: HomeFilter
-    let count: (RecipeCollection) -> Int
+    let parent: String?
 
-    private var folders: [CategoryNode] { Self.folders(in: library.categoryTree) }
+    private var nodes: [CategoryNode] {
+        guard let parent else { return library.categoryTree }
+        return CategoryTree.node(at: parent, in: library.categoryTree)?.children ?? []
+    }
 
     private static func folders(in nodes: [CategoryNode]) -> [CategoryNode] {
         nodes.flatMap { $0.children.isEmpty ? [] : [$0] + folders(in: $0.children) }
@@ -615,8 +620,8 @@ private struct AllTagsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                grid(library.categoryTree)
-                ForEach(folders) { folder in
+                grid(nodes)
+                ForEach(Self.folders(in: nodes)) { folder in
                     VStack(alignment: .leading, spacing: 14) {
                         Text(CategoryTree.displayName(folder.path)).font(.title3.weight(.semibold))
                         grid(folder.children)
@@ -626,26 +631,17 @@ private struct AllTagsView: View {
             .padding(20)
         }
         .themedCanvas()
-        .navigationTitle("Tags")
+        .navigationTitle(parent.map { RecipeCollection.category($0).title } ?? "Tags")
     }
 
     private func grid(_ nodes: [CategoryNode]) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: TagTile.width + TagTile.minSpacing), spacing: 0)], spacing: 20) {
             ForEach(nodes) { node in
                 let collection = RecipeCollection.category(node.path)
-                let isOn = isWithin(node)
                 TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
-                        count: count(collection), isOn: isOn) {
-                    filter.scope = isOn ? .all : collection
-                    dismiss()
-                }
+                        count: collection.filter(library.recipes).count, route: .tag(node.path))
             }
         }
-    }
-
-    private func isWithin(_ node: CategoryNode) -> Bool {
-        guard case .category(let path) = filter.scope else { return false }
-        return CategoryTree.tag(path, isIn: node.path)
     }
 }
 
@@ -653,12 +649,14 @@ private struct AllTagsView: View {
 private struct TagTile: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.appAccent) private var accent
+    @Environment(\.openRecipesRoute) private var openRoute
     let title: String
     let collection: RecipeCollection
     let symbol: String
     let count: Int
-    let isOn: Bool
-    let action: () -> Void
+    var isOn = false
+    var route: RecipesRoute?
+    var action: () -> Void = {}
 
     static let width: CGFloat = 76
     static let minSpacing: CGFloat = 12
@@ -670,43 +668,45 @@ private struct TagTile: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Group {
-                    if let cover {
-                        RecipeImageView(recipe: cover)
-                    } else {
-                        Image(systemName: symbol)
-                            .font(.title2)
-                            .foregroundStyle(accent)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }
-                }
-                .frame(width: 68, height: 68)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(isOn ? accent : .clear, lineWidth: 3)
-                }
-                .padding(.bottom, 2)
-                Text(title)
-                    .font(.footnote.weight(isOn ? .semibold : .regular))
-                    .foregroundStyle(isOn ? .primary : .secondary)
-                    .lineLimit(1)
-                Text(count == 1 ? "1 recipe" : "\(count) recipes")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-            .frame(width: Self.width)
-            .opacity(count == 0 && !isOn ? 0.45 : 1)
-        }
+        Button { if let route { openRoute(route) } else { action() } } label: { label }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(count == 1 ? "1 recipe" : "\(count) recipes")")
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private var label: some View {
+        VStack(spacing: 4) {
+            Group {
+                if let cover {
+                    RecipeImageView(recipe: cover)
+                } else {
+                    Image(systemName: symbol)
+                        .font(.title2)
+                        .foregroundStyle(accent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+            }
+            .frame(width: 68, height: 68)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(isOn ? accent : .clear, lineWidth: 3)
+            }
+            .padding(.bottom, 2)
+            Text(title)
+                .font(.footnote.weight(isOn ? .semibold : .regular))
+                .foregroundStyle(isOn ? .primary : .secondary)
+                .lineLimit(1)
+            Text(count == 1 ? "1 recipe" : "\(count) recipes")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+        .frame(width: Self.width)
+        .opacity(count == 0 && !isOn ? 0.45 : 1)
     }
 }
 
