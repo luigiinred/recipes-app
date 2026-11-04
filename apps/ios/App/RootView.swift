@@ -138,8 +138,8 @@ struct SearchTab: View {
                         if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
                     case .tag(let path):
                         RecipesHomeView(selection: $selection, tag: path).id(path)
-                    case .tags(let parent):
-                        AllTagsView(parent: parent)
+                    case .allRecipes:
+                        RecipesHomeView(selection: $selection, showsAllRecipes: true)
                     }
                 }
         }
@@ -224,8 +224,8 @@ struct RecipesTab: View {
             if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
         case .tag(let path):
             RecipesHomeView(selection: $selection, tag: path).id(path)
-        case .tags(let parent):
-            AllTagsView(parent: parent)
+        case .allRecipes:
+            RecipesHomeView(selection: $selection, showsAllRecipes: true)
         }
     }
 }
