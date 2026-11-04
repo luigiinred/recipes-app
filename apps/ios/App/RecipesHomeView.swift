@@ -138,7 +138,7 @@ enum QuickChip: Hashable {
 
 /// A block on the Home page; Settings → Home orders them and hides any.
 enum HomeSection: String, CaseIterable, Identifiable {
-    case today, upNext, tags, recipes
+    case today, upNext, tags, discover, recipes
 
     var id: Self { self }
 
@@ -147,6 +147,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .today: "Today"
         case .upNext: "Up Next"
         case .tags: "Tags"
+        case .discover: "Discover"
         case .recipes: "Recipes"
         }
     }
@@ -156,6 +157,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .today: "sun.max"
         case .upNext: "text.line.first.and.arrowtriangle.forward"
         case .tags: "tag"
+        case .discover: "binoculars"
         case .recipes: "book.closed"
         }
     }
@@ -165,11 +167,12 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .today: "What's planned for today."
         case .upNext: "The recipes you've queued to cook."
         case .tags: "Your top-level tags as photo tiles."
+        case .discover: "Mealie servers shared with you."
         case .recipes: "Your first five recipes, with View All."
         }
     }
 
-    var isOnByDefault: Bool { true }
+    var isOnByDefault: Bool { self != .discover }
 
     private static func parse(_ raw: String) -> [HomeSection] {
         raw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) }
@@ -253,6 +256,7 @@ final class HomeBrowsing {
 struct RecipesHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.listStyle) private var style = RecipeListStyle.list
     @AppStorage(AppSettings.Key.homeSort) private var savedSort = RecipeSort.recent
@@ -344,7 +348,7 @@ struct RecipesHomeView: View {
         switch section {
         case .today: todayPicks
         case .upNext: upNextPicks
-        case .tags, .recipes: []
+        case .tags, .discover, .recipes: []
         }
     }
 
@@ -436,6 +440,13 @@ struct RecipesHomeView: View {
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
+        case .discover:
+            if !discover.sources.isEmpty {
+                discoverSection
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: 20, trailing: margin))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            }
         case .recipes:
             if isHome {
                 recipesHeader(count: total)
@@ -491,6 +502,8 @@ struct RecipesHomeView: View {
             if !picks.isEmpty { heroSection(section, picks: picks) }
         case .tags:
             if showsTags { tagsRow }
+        case .discover:
+            if !discover.sources.isEmpty { discoverSection.padding(.horizontal, margin) }
         case .recipes:
             if isHome { recipesHeader(count: total).padding(.horizontal, margin) }
             GridSection(title: nil, minimum: 260, spacing: 24) {
@@ -560,6 +573,13 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             HeroCarousel(picks: picks, margin: margin) { selection = $0 }
+        }
+    }
+
+    private var discoverSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle(HomeSection.discover.title)
+            DiscoverEntryTile(sources: discover.sources)
         }
     }
 

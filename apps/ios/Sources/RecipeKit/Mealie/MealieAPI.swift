@@ -137,6 +137,9 @@ public struct MealieClient: MealieAPI {
         }
     }
 
+    /// Every recipe as Mealie lists them: names, descriptions, times and labels, without ingredients or steps.
+    public func recipeSummaries() async throws -> [MealieObject] { try await paged("recipes") }
+
     public func recipe(slug: String) async throws -> MealieObject {
         try await object("GET", "recipes/\(slug)")
     }
@@ -156,7 +159,12 @@ public struct MealieClient: MealieAPI {
     }
 
     public func recipeImage(id: String) async throws -> Data? {
-        let (data, response) = try await send("GET", "media/recipes/\(id)/images/original.webp", allowing: [404])
+        try await recipeImage(id: id, file: "original.webp")
+    }
+
+    /// `file` is one of Mealie's sizes: `original.webp`, `min-original.webp` or `tiny-original.webp`.
+    public func recipeImage(id: String, file: String) async throws -> Data? {
+        let (data, response) = try await send("GET", "media/recipes/\(id)/images/\(file)", allowing: [404])
         return response.statusCode == 404 ? nil : data
     }
 

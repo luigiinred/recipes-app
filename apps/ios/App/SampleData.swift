@@ -209,6 +209,14 @@ enum SampleData {
                       remindersStatus: .synced(now))
     }
 
+    static let discoverSource = DiscoverSource(
+        id: UUID(uuidString: "D15C0000-0000-4000-8000-000000000001")!, server: "https://mealie.example.com", token: "sample", username: "sam"
+    )
+
+    static func discover() -> DiscoverController {
+        DiscoverController(previewing: [DiscoverCatalog(previewing: discoverSource, recipes: recipes, images: images)])
+    }
+
     static func feedLoader() -> FeedLoader {
         FeedLoader(
             seed: Dictionary(uniqueKeysWithValues: feeds.map { ($0.id, FeedLoader.State.loaded(feedEntries)) }),
@@ -239,6 +247,7 @@ extension View {
             .environmentObject(SampleData.timers())
             .environmentObject(AppRouter())
             .environmentObject(MealieSyncController(previewing: .disconnected))
+            .environmentObject(DiscoverController(previewing: []))
             .environment(\.referenceDate, SampleData.now)
             .appTheme()
             .defaultAppStorage(SampleData.defaults)
