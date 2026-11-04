@@ -60,22 +60,32 @@ The system SHALL offer "Sync with Reminders" on the Groceries page, which keeps 
 - **THEN** Turn All Off is disabled
 
 ### Requirement: Theme page
-The system SHALL offer on the Theme page a live preview, an Appearance choice (System, Light, Dark, Pitch Black, Sepia; default System; key `appearance`), a Font choice (Serif, Sans Serif, Rounded, Monospaced; default Serif; key `fontStyle`), and an Accent color (key `accentColorHex`, a six-digit hex) chosen from presets Tomato (DB4738, the default), Orange, Saffron, Basil, Teal, Blueberry, Plum, Rose and Graphite, or a custom color, with "Reset to Tomato" disabled while Tomato is selected.
+The system SHALL offer on the Theme page, below a live preview: an Appearance choice of Light, Dark or Auto (key `appearance`, values `light`, `dark`, `system`; default Auto), shown as thumbnails of the app in the current color; a Color choice (key `colorTheme`, default Classic) of Classic, Paper, Tomato, Pear, Blueberry, Plum and Custom, shown as thumbnails drawn in the current light or dark appearance, with a Theme Creator link; an Accent color, shown only while Classic is chosen (key `accentColorHex`, a six-digit hex), picked from presets Tomato (DB4738, the default), Rust, Orange, Saffron, Pear, Basil, Teal, Blueberry, Plum, Rose and Graphite or a custom color, with "Reset to Tomato" disabled while Tomato is selected; and a Font row that opens the Font page. Settings saved before appearance and color were separate are mapped to the closest color and appearance on launch.
 
 #### Scenario: Pick an accent preset
-- **WHEN** the user taps the Basil swatch
+- **WHEN** Classic is chosen and the user taps the Basil swatch
 - **THEN** `accentColorHex` becomes 3E8E5A and the swatch shows a checkmark
 
+#### Scenario: Colored themes bring their own accent
+- **WHEN** the user picks Blueberry
+- **THEN** the Accent color section is hidden and the app uses Blueberry's accent, lighter in dark
+
+### Requirement: Font page
+The system SHALL show the live preview at the top of the Font page and list fonts (key `fontStyle`, default New York) in sections: System (New York, San Francisco, Rounded, Monospaced), Serif (Georgia, Charter, Iowan Old Style, Palatino, Baskerville), Sans Serif (Avenir Next, Gill Sans, Futura, Optima) and Typewriter (American Typewriter), each drawn in its own font, with a checkmark on the chosen one.
+
+### Requirement: Theme Creator
+The system SHALL let the user build the Custom color on the Theme Creator page: Light and Dark thumbnails choose which version is edited, and Page, Cards and Accent color pickers edit it. Start From a Theme copies a theme's light and dark colors. Any edit selects Custom.
+
 ### Requirement: Theme applies across the app
-The system SHALL apply the chosen appearance, font design and accent color to every screen, sheet and full-screen cover. Light and Sepia use a light color scheme, Dark and Pitch Black a dark one, and System follows the device. Dark, Pitch Black and Sepia paint their own page and card colors. The font applies throughout, including navigation titles and tab labels on iPhone and iPad, while text size follows the device. The accent colors buttons, links, highlights and ratings.
+The system SHALL apply the chosen appearance, color, font and accent color to every screen, sheet and full-screen cover. Light and Dark force a color scheme and Auto follows the device. Every color has a light and a dark version: Classic uses the system's white and black pages with the chosen accent, and the others tint the page and cards and use their own accent. The font applies throughout, including navigation titles and tab labels on iPhone and iPad, while text size follows the device. The accent colors buttons, links, highlights and ratings.
 
-#### Scenario: Dark is lighter than Pitch Black
-- **WHEN** the user picks Dark
-- **THEN** pages are a dark gray rather than the pure black of Pitch Black
+#### Scenario: Classic dark is black
+- **WHEN** the user picks Classic and Dark
+- **THEN** pages are pure black
 
-#### Scenario: Sepia
-- **WHEN** the user picks Sepia
-- **THEN** screens show a light color scheme on a warm paper-colored page
+#### Scenario: Blueberry follows light and dark
+- **WHEN** the user picks Blueberry and switches Appearance between Light and Dark
+- **THEN** pages and cards are a pale blue in Light and a dark blue in Dark
 
 ### Requirement: Apple Intelligence page
 The system SHALL show on the Apple Intelligence page whether each of "Smart Plan for My Week", "Recipes from video captions", "Recipes from meal photos" and "Photos with Image Playground" is "Ready" or "Not available" on this device, and when the model is unavailable, why, and what falls back (see apple-intelligence).

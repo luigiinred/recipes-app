@@ -208,10 +208,10 @@ struct EmptyLibraryView: View {
         } else {
             VStack(spacing: 4) {
                 MascotLoader(height: 120)
-                Text("Syncing recipes…").font(.headline)
+                Text("Syncing recipes…").appFont(.headline)
                 if let detail = progressDetail {
                     Text(detail)
-                        .font(.subheadline)
+                        .appFont(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -297,8 +297,8 @@ struct GridSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let title {
-                if takesCategories { Text(title).font(.title3.weight(.semibold)).categoryRootDrop() }
-                else { Text(title).font(.title3.weight(.semibold)) }
+                if takesCategories { Text(title).appFont(.title3, weight: .semibold).categoryRootDrop() }
+                else { Text(title).appFont(.title3, weight: .semibold) }
             }
             LazyVGrid(columns: columns, spacing: spacing) { content }
                 .onGeometryChange(for: GridSpace.self) { GridSpace(width: $0.size.width, fold: $0.verticalFold) } action: { space = $0 }
@@ -356,7 +356,7 @@ private struct RecipeActionsModifier: ViewModifier {
             if let progressMessage {
                 VStack(spacing: 4) {
                     MascotLoader(height: 120)
-                    Text(progressMessage).font(.headline)
+                    Text(progressMessage).appFont(.headline)
                 }
                 .padding(20)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -563,15 +563,15 @@ private struct FolderTile: View {
         NavigationLink(value: RecipesRoute.collection(collection)) {
             HStack(spacing: 14) {
                 Image(systemName: symbol ?? collection.symbol)
-                    .font(.title2)
+                    .appFont(.title2)
                     .foregroundStyle(accent)
                     .frame(width: 32)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(collection.title).font(.headline).lineLimit(1)
-                    Text(count == 1 ? "1 recipe" : "\(count) recipes").font(.subheadline).foregroundStyle(.secondary)
+                    Text(collection.title).appFont(.headline).lineLimit(1)
+                    Text(count == 1 ? "1 recipe" : "\(count) recipes").appFont(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -653,7 +653,7 @@ struct RecipeFacts: View {
 
     var body: some View {
         line
-            .font(.subheadline)
+            .appFont(.subheadline)
             .foregroundStyle(.secondary)
             .lineLimit(1)
     }
@@ -705,7 +705,7 @@ struct RecipeCard: View {
                 .overlay { RecipeImageView(recipe: recipe) }
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title).font(.title3.weight(.semibold)).lineLimit(2)
+                Text(recipe.title).appFont(.title3, weight: .semibold).lineLimit(2)
                 RecipeFacts(recipe: recipe)
             }
             .padding(.horizontal, 4)
@@ -724,7 +724,7 @@ struct RecipeRow: View {
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(recipe.title).font(.headline).lineLimit(2)
+                Text(recipe.title).appFont(.headline).lineLimit(2)
                 RecipeFacts(recipe: recipe)
             }
             Spacer(minLength: 0)

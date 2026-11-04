@@ -34,7 +34,7 @@ struct RecipeTimelineSheet: View {
                                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
                                 }
                                 if !event.note.isEmpty {
-                                    Text(event.note).font(.callout).foregroundStyle(.secondary)
+                                    Text(event.note).appFont(.callout).foregroundStyle(.secondary)
                                 }
                             }
                             .swipeActions {

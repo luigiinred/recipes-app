@@ -76,12 +76,12 @@ struct GroceriesView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .appFont(.title3)
                     .foregroundStyle(item.isChecked ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.system(.body, weight: .medium))
+                    Text(item.name).appFont(.body, weight: .medium)
                     if !item.quantity.isEmpty {
-                        Text(item.quantity).font(.caption.weight(.bold)).foregroundStyle(Theme.accent)
+                        Text(item.quantity).appFont(.caption, weight: .bold).foregroundStyle(Theme.accent)
                     }
                 }
                 .foregroundStyle(item.isChecked ? .secondary : .primary)
@@ -116,12 +116,12 @@ struct AddToGroceriesSheet: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: skipped.contains(index) ? "circle" : "checkmark.circle.fill")
-                            .font(.title3)
+                            .appFont(.title3)
                             .foregroundStyle(skipped.contains(index) ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(Theme.accent))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(parts.name).font(.system(.body, weight: .medium))
+                            Text(parts.name).appFont(.body, weight: .medium)
                             if !parts.quantity.isEmpty {
-                                Text(parts.quantity).font(.caption.weight(.bold)).foregroundStyle(Theme.accent)
+                                Text(parts.quantity).appFont(.caption, weight: .bold).foregroundStyle(Theme.accent)
                             }
                         }
                         Spacer()

@@ -365,16 +365,16 @@ struct RecipesHomeView: View {
         VStack(alignment: .leading, spacing: 14) {
             Button(action: toggleAllTags) {
                 HStack {
-                    Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary)
+                    Text("Tags").appFont(.title3, weight: .semibold).foregroundStyle(.primary)
                     Spacer()
                     if tagsOverflow || showsAllTags {
                         HStack(spacing: 4) {
                             Text(showsAllTags ? "Show Less" : "Show All").contentTransition(.interpolate)
                             Image(systemName: "chevron.down")
-                                .font(.caption.weight(.semibold))
+                                .appFont(.caption, weight: .semibold)
                                 .rotationEffect(.degrees(showsAllTags ? 180 : 0))
                         }
-                        .font(.subheadline.weight(.medium))
+                        .appFont(.subheadline, weight: .medium)
                         .foregroundStyle(.tint)
                         .transition(.opacity)
                     }
@@ -518,12 +518,12 @@ struct RecipesHomeView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(filter.scope == .all ? "My Recipes" : filter.scope.title)
-                    .font(.largeTitle.bold())
+                    .appFont(.largeTitle, weight: .bold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .accessibilityAddTraits(.isHeader)
                 Text(Self.countText(count))
-                    .font(.subheadline)
+                    .appFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -649,7 +649,7 @@ private struct TagTile: View {
                         RecipeImageView(recipe: cover)
                     } else {
                         Image(systemName: symbol)
-                            .font(.title2)
+                            .appFont(.title2)
                             .foregroundStyle(accent)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -663,11 +663,11 @@ private struct TagTile: View {
                 }
                 .padding(.bottom, 2)
                 Text(title)
-                    .font(.footnote.weight(isOn ? .semibold : .regular))
+                    .appFont(.footnote, weight: isOn ? .semibold : .regular)
                     .foregroundStyle(isOn ? .primary : .secondary)
                     .lineLimit(1)
                 Text(count == 1 ? "1 recipe" : "\(count) recipes")
-                    .font(.caption2)
+                    .appFont(.caption2)
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -709,9 +709,9 @@ private struct HomeFilterSheet: View {
                     Slider(value: maxMinutes, in: Double(HomeFilter.timeStep)...Double(HomeFilter.timeLimit), step: Double(HomeFilter.timeStep)) {
                         Text("Maximum time")
                     } minimumValueLabel: {
-                        Text(HomeFilter.minutes(HomeFilter.timeStep)).font(.caption).foregroundStyle(.secondary)
+                        Text(HomeFilter.minutes(HomeFilter.timeStep)).appFont(.caption).foregroundStyle(.secondary)
                     } maximumValueLabel: {
-                        Text("Any").font(.caption).foregroundStyle(.secondary)
+                        Text("Any").appFont(.caption).foregroundStyle(.secondary)
                     }
                     .accessibilityValue(filter.timeTitle)
                 } header: {

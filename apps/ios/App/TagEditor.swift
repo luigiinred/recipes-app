@@ -16,9 +16,9 @@ struct TagEditor: View {
                         Button { remove(tag) } label: {
                             HStack(spacing: 6) {
                                 Text(CategoryTree.displayName(tag))
-                                Image(systemName: "xmark").font(.caption2.weight(.bold))
+                                Image(systemName: "xmark").appFont(.caption2, weight: .bold)
                             }
-                            .font(.callout.weight(.medium))
+                            .appFont(.callout, weight: .medium)
                             .tagChip()
                         }
                         .buttonStyle(.plain)
@@ -40,7 +40,7 @@ struct TagEditor: View {
                     #endif
                 if !CategoryTree.normalized(draft).isEmpty {
                     Button("Add") { commit() }
-                        .font(.callout.weight(.semibold))
+                        .appFont(.callout, weight: .semibold)
                         .foregroundStyle(Theme.accent)
                         .buttonStyle(.plain)
                 }
@@ -51,16 +51,16 @@ struct TagEditor: View {
             .onTapGesture { focused = true }
             if !suggestions.isEmpty {
                 Text(libraryTags.isEmpty ? "Suggestions" : "Your tags")
-                    .font(.caption.weight(.medium))
+                    .appFont(.caption, weight: .medium)
                     .foregroundStyle(.secondary)
                 ChipFlow {
                     ForEach(suggestions, id: \.self) { tag in
                         Button { add(tag) } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "plus").font(.caption2.weight(.bold))
+                                Image(systemName: "plus").appFont(.caption2, weight: .bold)
                                 Text(CategoryTree.displayName(tag))
                             }
-                            .font(.callout)
+                            .appFont(.callout)
                             .lineLimit(1)
                             .fixedSize()
                             .padding(.horizontal, 12).padding(.vertical, 6)

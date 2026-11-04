@@ -41,13 +41,13 @@ struct FeedEntryRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.title).font(.system(.headline)).lineLimit(3)
+                Text(entry.title).appFont(.headline).lineLimit(3)
                 if !entry.summary.isEmpty {
-                    Text(entry.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    Text(entry.summary).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 if let date = entry.published {
                     Text(date, format: .dateTime.month(.abbreviated).day().year())
-                        .font(.caption).foregroundStyle(.secondary)
+                        .appFont(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)

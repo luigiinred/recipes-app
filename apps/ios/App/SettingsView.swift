@@ -39,6 +39,7 @@ struct SettingsView: View {
         NavigationStack {
             Form { rows }
                 .formStyle(.grouped)
+                .settingsSpacing()
                 .themedCanvas()
                 .navigationTitle("Settings")
                 #if os(iOS)
@@ -54,6 +55,7 @@ struct SettingsView: View {
     private var split: some View {
         NavigationSplitView {
             List(selection: $page) { rows }
+                .settingsSpacing()
                 .themedCanvas()
                 .navigationTitle("Settings")
                 .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
@@ -473,24 +475,20 @@ struct RemindersSettingsPage: View {
 
 struct ThemeSettingsPage: View {
     @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
     @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
     @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
     @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var scheme
+    private var custom = StoredCustomTheme()
+
+    private var theme: ColorTheme { ColorTheme(rawValue: themeRaw) ?? .classic }
+    private var font: FontStyle { FontStyle(rawValue: fontStyle) ?? .serif }
 
     private var customAccent: Binding<Color> {
         Binding(
             get: { Color(hex: accentHex) ?? Theme.defaultAccent },
             set: { accentHex = $0.hex(in: environment) }
-        )
-    }
-
-    private var palette: Binding<String> {
-        Binding(
-            get: { appearance },
-            set: { raw in
-                appearance = raw
-                if let hex = Appearance(rawValue: raw)?.accentHex { accentHex = hex }
-            }
         )
     }
 
@@ -500,77 +498,260 @@ struct ThemeSettingsPage: View {
                 ThemePreview().themedRow(raised: true)
             }
             Section {
-                Picker("Appearance", selection: palette) {
-                    ForEach(Appearance.allCases) { Label($0.title, systemImage: $0.symbol).tag($0.rawValue) }
+                ThemeTileRow {
+                    ForEach(Appearance.allCases) { mode in
+                        ThemeTile(title: mode.title, isSelected: appearance == mode.rawValue) {
+                            appearance = mode.rawValue
+                        } thumbnail: {
+                            appearanceThumbnail(mode)
+                        }
+                    }
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
-                NavigationLink { CustomThemePage() } label: { Label("Build Your Own", systemImage: "slider.horizontal.3") }
+                .themedRow(raised: true)
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page. The cookbook palettes, from Butter on, follow your device between light and dark and come with a matching accent color. Build Your Own picks every color yourself.")
+                Text("Auto follows your device between light and dark.")
             }
             Section {
-                Picker("Font", selection: $fontStyle) {
-                    ForEach(FontStyle.allCases) { style in
-                        Text(style.title).fontDesign(style.design).tag(style.rawValue)
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } header: {
-                Text("Font")
-            } footer: {
-                Text("Used for recipes, lists and settings throughout the app. Text size still follows your device's settings.")
-            }
-            Section {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
-                    ForEach(AccentPreset.all) { preset in
-                        Button { accentHex = preset.hex } label: {
-                            Circle()
-                                .fill(preset.color)
-                                .frame(width: 36, height: 36)
-                                .overlay {
-                                    if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
-                                        Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.white)
-                                    }
-                                }
+                ThemeTileRow {
+                    ForEach(ColorTheme.colors + [.custom]) { option in
+                        ThemeTile(title: option.title, isSelected: theme == option) {
+                            themeRaw = option.rawValue
+                        } thumbnail: {
+                            ThemeThumbnail(swatch: preview(option, scheme), scheme: scheme)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(preset.name)
-                        .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
                     }
                 }
-                .padding(.vertical, 4)
-                ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
-                Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
-                    .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
+                .themedRow(raised: true)
+                NavigationLink { CustomThemePage() } label: { Label("Theme Creator", systemImage: "slider.horizontal.3") }
+                    .themedRow(raised: true)
             } header: {
-                Text("Accent color")
+                Text("Color")
             } footer: {
-                Text("Buttons, links, highlights and ratings.")
+                Text("Classic is plain white or black with an accent you pick. The other colors tint the page and cards and bring their own accent. Theme Creator makes a Custom one.")
+            }
+            if theme == .classic {
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
+                        ForEach(AccentPreset.all) { preset in
+                            Button { accentHex = preset.hex } label: {
+                                Circle()
+                                    .fill(preset.color)
+                                    .frame(width: 36, height: 36)
+                                    .overlay {
+                                        if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
+                                            Image(systemName: "checkmark").appFont(.footnote, weight: .bold).foregroundStyle(.white)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(preset.name)
+                            .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
+                    Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
+                        .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
+                } header: {
+                    Text("Accent color")
+                } footer: {
+                    Text("Buttons, links, highlights and ratings.")
+                }
+            }
+            Section {
+                NavigationLink { FontSettingsPage() } label: {
+                    LabeledContent {
+                        Text(font.title)
+                    } label: {
+                        Label("Font", systemImage: "textformat")
+                    }
+                }
+                .themedRow(raised: true)
+            } footer: {
+                Text("Used for recipes, lists and settings throughout the app.")
             }
         }
         .formStyle(.grouped)
         .settingsPage("Theme")
+    }
+
+    private func preview(_ theme: ColorTheme, _ scheme: ColorScheme) -> Swatch {
+        theme.previewSwatch(for: scheme, classicAccent: accentHex, custom: custom.colors)
+    }
+
+    @ViewBuilder
+    private func appearanceThumbnail(_ mode: Appearance) -> some View {
+        switch mode {
+        case .light: ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
+        case .dark: ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark)
+        case .system:
+            ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
+                .overlay { ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark).mask(DiagonalHalf()) }
+        }
+    }
+}
+
+struct FontSettingsPage: View {
+    @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
+
+    var body: some View {
+        Form {
+            Section {
+                ThemePreview().themedRow(raised: true)
+            }
+            fonts("System", FontStyle.system)
+            fonts("Serif", FontStyle.serifs)
+            fonts("Sans Serif", FontStyle.sansSerifs)
+            Section {
+                rows(FontStyle.typewriters)
+            } header: {
+                Text("Typewriter")
+            } footer: {
+                Text("Text size still follows your device's settings.")
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Font")
+    }
+
+    private func fonts(_ title: String, _ styles: [FontStyle]) -> some View {
+        Section(title) { rows(styles) }
+    }
+
+    private func rows(_ styles: [FontStyle]) -> some View {
+        ForEach(styles) { style in
+            Button { fontStyle = style.rawValue } label: {
+                HStack {
+                    VStack {
+                        Text(style.title)
+                            .font(style.family.map { .custom($0, size: 17, relativeTo: .body) } ?? .system(.body, design: style.design))
+                            .foregroundStyle(.primary)
+                    }
+                    .fontDesign(nil)
+                    Spacer()
+                    if fontStyle == style.rawValue {
+                        Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(Theme.accent)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(fontStyle == style.rawValue ? .isSelected : [])
+            .themedRow(raised: true)
+        }
+    }
+}
+
+/// Picture tiles three to a row, like the system's own appearance picker.
+private struct ThemeTileRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3), spacing: 14) {
+            content
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+/// A tiny recipe screen: a title, two cards of text and an accent button.
+struct ThemeThumbnail: View {
+    let swatch: Swatch
+    let scheme: ColorScheme
+
+    private var ink: Color { scheme == .dark ? .white : .black }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            swatch.canvas
+            VStack(alignment: .leading, spacing: 6) {
+                Capsule().fill(ink.opacity(0.85)).frame(width: 38, height: 6)
+                card(lines: [0.8, 0.55])
+                card(lines: [0.65])
+                Capsule().fill(swatch.accent).frame(width: 30, height: 10)
+            }
+            .padding(9)
+        }
+        .aspectRatio(0.75, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.separator))
+        .accessibilityHidden(true)
+    }
+
+    private func card(lines: [CGFloat]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(lines.indices, id: \.self) { index in
+                GeometryReader { proxy in
+                    Capsule().fill(ink.opacity(index == 0 ? 0.6 : 0.3)).frame(width: proxy.size.width * lines[index])
+                }
+                .frame(height: 4)
+            }
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(swatch.surface, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+}
+
+private struct ThemeTile<Thumbnail: View>: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    @ViewBuilder let thumbnail: Thumbnail
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                thumbnail
+                    .frame(maxWidth: 110)
+                    .padding(3)
+                    .overlay {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(accent, lineWidth: 3)
+                        }
+                    }
+                Text(title)
+                    .appFont(.footnote, weight: isSelected ? .semibold : .regular)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+private struct DiagonalHalf: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.maxX * 0.6, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.maxX * 0.4, y: rect.maxY))
+            path.closeSubpath()
+        }
     }
 }
 
 private struct ThemePreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Sunday Sauce").font(.system(.title2, weight: .bold))
+            Text("Sunday Sauce").appFont(.title2, weight: .bold)
             IngredientLine(text: "2 tbsp olive oil, plus more for serving")
             Text("Simmer for 20 minutes, stirring now and then.").foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 Label("Cook", systemImage: "frying.pan")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline, weight: .semibold)
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(Theme.accent, in: Capsule())
                     .foregroundStyle(.white)
                 Label("4.5", systemImage: "star.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline, weight: .semibold)
                     .foregroundStyle(Theme.accent)
             }
         }
@@ -580,32 +761,30 @@ private struct ThemePreview: View {
     }
 }
 
+/// Builds the Custom theme: a page, card and accent color for light and for dark.
 struct CustomThemePage: View {
-    @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
-    @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
-    @AppStorage(AppSettings.Key.customThemeDark) private var dark = false
-    @AppStorage(AppSettings.Key.customThemeCanvas) private var canvasHex = CustomTheme.defaultCanvasHex
-    @AppStorage(AppSettings.Key.customThemeSurface) private var surfaceHex = CustomTheme.defaultSurfaceHex
+    @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
+    @AppStorage(AppSettings.Key.accentColor) private var classicAccent = Theme.defaultAccentHex
     @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var scheme
+    private var custom = StoredCustomTheme()
+    @State private var editing: ColorScheme?
 
-    private var isOn: Bool { appearance == Appearance.custom.rawValue }
+    private var isOn: Bool { themeRaw == ColorTheme.custom.rawValue }
+    private var edited: ColorScheme { editing ?? scheme }
 
     /// Any edit switches to the Custom theme, so the change shows straight away.
-    private func color(_ hex: Binding<String>, fallback: String) -> Binding<Color> {
+    private func color(_ part: WritableKeyPath<Swatch, String>) -> Binding<Color> {
         Binding(
-            get: { Color(hex: hex.wrappedValue) ?? Color(hex: fallback) ?? .white },
+            get: { Color(hex: custom.colors.swatch(for: edited)[keyPath: part]) ?? .white },
             set: {
-                hex.wrappedValue = $0.hex(in: environment)
-                appearance = Appearance.custom.rawValue
+                var swatch = custom.colors.swatch(for: edited)
+                swatch[keyPath: part] = $0.hex(in: environment)
+                custom.set(swatch, for: edited)
+                themeRaw = ColorTheme.custom.rawValue
             }
         )
     }
-
-    private var text: Binding<Bool> {
-        Binding(get: { dark }, set: { dark = $0; appearance = Appearance.custom.rawValue })
-    }
-
-    private var starters: [Appearance] { Appearance.allCases.filter { $0.swatch(for: .light) != nil } }
 
     var body: some View {
         Form {
@@ -613,48 +792,61 @@ struct CustomThemePage: View {
                 ThemePreview().themedRow(raised: true)
             }
             Section {
-                Picker("Text", selection: text) {
-                    Text("Dark on Light").tag(false)
-                    Text("Light on Dark").tag(true)
+                ThemeTileRow {
+                    ForEach([ColorScheme.light, .dark], id: \.self) { variant in
+                        ThemeTile(title: variant == .dark ? "Dark" : "Light", isSelected: edited == variant) {
+                            editing = variant
+                        } thumbnail: {
+                            ThemeThumbnail(swatch: custom.colors.swatch(for: variant), scheme: variant)
+                        }
+                    }
                 }
-                ColorPicker("Page", selection: color($canvasHex, fallback: CustomTheme.defaultCanvasHex), supportsOpacity: false)
-                ColorPicker("Cards", selection: color($surfaceHex, fallback: CustomTheme.defaultSurfaceHex), supportsOpacity: false)
-                ColorPicker("Accent", selection: color($accentHex, fallback: Theme.defaultAccentHex), supportsOpacity: false)
+                .themedRow(raised: true)
             } header: {
-                Text("Colors")
+                Text("Editing")
             } footer: {
-                Text("The page sits behind every screen, cards and rows sit on it, and the accent colors buttons, links and ratings. Pick a text style that reads well on your page color.")
+                Text("Custom has its own colors for light and for dark, and follows the Appearance you pick in Theme.")
+            }
+            Section {
+                ColorPicker("Page", selection: color(\.canvasHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+                ColorPicker("Cards", selection: color(\.surfaceHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+                ColorPicker("Accent", selection: color(\.accentHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+            } header: {
+                Text(edited == .dark ? "Dark colors" : "Light colors")
+            } footer: {
+                Text("The page sits behind every screen, cards and rows sit on it, and the accent colors buttons, links and ratings.")
             }
             Section {
                 Menu {
-                    ForEach(starters) { starter in
-                        Button(starter.title, systemImage: starter.symbol) { start(from: starter) }
+                    ForEach(ColorTheme.colors) { starter in
+                        Button(starter.title) { start(from: starter) }
                     }
                 } label: {
                     Label("Start From a Theme", systemImage: "square.on.square")
                 }
+                .themedRow(raised: true)
             } footer: {
-                Text("Copies a theme's colors here to tweak.")
+                Text("Copies a theme's light and dark colors here to tweak.")
             }
             if !isOn {
                 Section {
-                    Button("Use Custom Theme") { appearance = Appearance.custom.rawValue }
+                    Button("Use Custom Theme") { themeRaw = ColorTheme.custom.rawValue }
+                        .themedRow(raised: true)
                 }
             }
         }
         .formStyle(.grouped)
-        .settingsPage("Build Your Own")
+        .settingsPage("Theme Creator")
     }
 
-    private func start(from starter: Appearance) {
-        let scheme = starter.colorScheme ?? environment.colorScheme
-        if let swatch = starter.swatch(for: scheme) {
-            canvasHex = swatch.canvas.hex(in: environment)
-            surfaceHex = swatch.surface.hex(in: environment)
+    private func start(from starter: ColorTheme) {
+        for variant in [ColorScheme.light, .dark] {
+            custom.set(starter.previewSwatch(for: variant, classicAccent: classicAccent), for: variant)
         }
-        dark = scheme == .dark
-        if let hex = starter.accentHex { accentHex = starter.accentHex(chosen: hex, for: scheme) }
-        appearance = Appearance.custom.rawValue
+        themeRaw = ColorTheme.custom.rawValue
     }
 }
 
@@ -743,7 +935,7 @@ private struct PromptSettingsPage: View {
             Section {
                 if customized {
                     TextEditor(text: $text)
-                        .font(.callout)
+                        .appFont(.callout)
                         .frame(minHeight: 280)
                         .autocorrectionDisabled()
                         #if os(iOS)
@@ -751,7 +943,7 @@ private struct PromptSettingsPage: View {
                         #endif
                 } else {
                     Text(action.defaultInstructions)
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
@@ -858,9 +1050,17 @@ private struct DataSettingsPage: View {
     }
 }
 
+extension View {
+    /// Room between a Settings page's title and its first section.
+    func settingsSpacing() -> some View {
+        contentMargins(.top, 16, for: .scrollContent)
+    }
+}
+
 private extension View {
     func settingsPage(_ title: String) -> some View {
-        themedCanvas()
+        settingsSpacing()
+            .themedCanvas()
             .navigationTitle(title)
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

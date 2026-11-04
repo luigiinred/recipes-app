@@ -15,7 +15,7 @@ struct RecipeImageView: View {
                 colors: [accent.opacity(0.22), accent.opacity(0.08)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
-            Image(systemName: "fork.knife").font(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))
+            Image(systemName: "fork.knife").appFont(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))
             if let image {
                 Image(decorative: image, scale: 1)
                     .resizable()

@@ -6,6 +6,7 @@ import UIKit
 
 struct CookModeView: View {
     @Environment(\.appAccent) private var accent
+    @Environment(\.appFontFamily) private var fontFamily
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var session: CookSession
     @EnvironmentObject private var timers: TimerCenter
@@ -91,7 +92,7 @@ struct CookModeView: View {
 
     private var titleView: some View {
         VStack(spacing: 2) {
-            Text(recipe?.title ?? "Cook Mode").font(.headline).lineLimit(1)
+            Text(recipe?.title ?? "Cook Mode").appFont(.headline).lineLimit(1)
             if let recipe, recipe.steps.count > 1 {
                 StepDots(count: recipe.steps.count, index: stepIndex(recipe)) { move(recipe, to: $0, count: recipe.steps.count) }
             }
@@ -137,11 +138,11 @@ struct CookModeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Step \(index + 1) of \(recipe.steps.count)")
-                    .font(.subheadline.weight(.semibold).smallCaps())
+                    .font(.app(.subheadline, weight: .semibold, family: fontFamily).smallCaps())
                     .tracking(1.2)
                     .foregroundStyle(accent)
                 timerHighlighted(recipe.steps[index], ingredients: recipe.ingredients)
-                    .font(.system(size: fontSize))
+                    .font(fontFamily.map { .custom($0, fixedSize: fontSize) } ?? .system(size: fontSize))
                     .lineSpacing(fontSize * 0.25)
                     .fixedSize(horizontal: false, vertical: true)
                     .textRenderer(TimerPillRenderer())
@@ -166,7 +167,7 @@ struct CookModeView: View {
 
     private func pageNumber(_ number: Int) -> some View {
         Text("\(number)")
-            .font(.footnote.monospacedDigit())
+            .appFont(.footnote).monospacedDigit()
             .foregroundStyle(.secondary)
             .padding(.bottom, 12)
             .accessibilityHidden(true)
@@ -216,7 +217,7 @@ struct CookModeView: View {
                 }
                 if !wide {
                     Button { showingIngredients = true } label: {
-                        Image(systemName: "checklist.checked").font(.title3.weight(.semibold)).frame(width: 28, height: 28)
+                        Image(systemName: "checklist.checked").appFont(.title3, weight: .semibold).frame(width: 28, height: 28)
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.circle)
@@ -353,9 +354,9 @@ private struct TimerChip: View {
         let done = remaining == 0
         HStack(spacing: 8) {
             Text(done ? "Done" : formatTimer(remaining))
-                .font(.system(.headline, weight: .semibold)).monospacedDigit()
+                .appFont(.headline, weight: .semibold).monospacedDigit()
             Text(timer.label)
-                .font(.caption).lineLimit(1)
+                .appFont(.caption).lineLimit(1)
                 .foregroundStyle(done ? .white.opacity(0.85) : .secondary)
                 .frame(maxWidth: 120, alignment: .leading)
             Button(action: dismiss) { Image(systemName: "xmark.circle.fill") }
@@ -384,7 +385,7 @@ struct IngredientChecklist: View {
                             HStack(spacing: 12) {
                                 Image(systemName: checked.contains(index) ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(checked.contains(index) ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
-                                IngredientLine(text: text).font(.system(.title3)).strikethrough(checked.contains(index))
+                                IngredientLine(text: text).appFont(.title3).strikethrough(checked.contains(index))
                                 Spacer()
                             }
                             .contentShape(Rectangle())
@@ -414,9 +415,9 @@ struct CookStepIngredients: View {
         let used = IngredientMatcher.indices(in: recipe.steps[step], ingredients: recipe.ingredients)
         if !used.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("FOR THIS STEP").font(.caption.weight(.semibold)).tracking(1.5).foregroundStyle(.secondary)
+                Text("FOR THIS STEP").appFont(.caption, weight: .semibold).tracking(1.5).foregroundStyle(.secondary)
                 ForEach(used, id: \.self) { index in
-                    IngredientLine(text: recipe.ingredients[index]).font(.system(.title3))
+                    IngredientLine(text: recipe.ingredients[index]).appFont(.title3)
                         .conversionMenu(for: recipe.ingredients[index])
                 }
             }

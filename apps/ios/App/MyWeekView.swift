@@ -67,7 +67,7 @@ struct MyWeekView: View {
         HStack(spacing: 12) {
             Button { shift(-1) } label: { Image(systemName: "chevron.left") }
                 .accessibilityLabel("Previous week")
-            Text(rangeTitle).font(.headline).frame(maxWidth: .infinity)
+            Text(rangeTitle).appFont(.headline).frame(maxWidth: .infinity)
                 .contentTransition(.numericText())
             Button { shift(1) } label: { Image(systemName: "chevron.right") }
                 .accessibilityLabel("Next week")
@@ -78,7 +78,7 @@ struct MyWeekView: View {
         .overlay(alignment: .trailing) {
             if !isThisWeek {
                 Button("Today") { withAnimation(.snappy) { jumpToToday() } }
-                    .font(.footnote.weight(.semibold)).foregroundStyle(Theme.accent)
+                    .appFont(.footnote, weight: .semibold).foregroundStyle(Theme.accent)
                     .padding(.trailing, 48)
             }
         }
@@ -93,10 +93,10 @@ struct MyWeekView: View {
     private func header(for day: Date) -> some View {
         let isToday = calendar.isDate(day, inSameDayAs: today)
         return HStack(spacing: 6) {
-            Text(day, format: .dateTime.weekday(.wide)).font(.subheadline.weight(.semibold))
-            Text(day, format: .dateTime.month(.abbreviated).day()).font(.subheadline).foregroundStyle(.secondary)
+            Text(day, format: .dateTime.weekday(.wide)).appFont(.subheadline, weight: .semibold)
+            Text(day, format: .dateTime.month(.abbreviated).day()).appFont(.subheadline).foregroundStyle(.secondary)
             if isToday {
-                Text("Today").font(.caption2.weight(.bold)).textCase(.uppercase)
+                Text("Today").appFont(.caption2, weight: .bold).textCase(.uppercase)
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
             }
@@ -113,8 +113,8 @@ struct MyWeekView: View {
             HStack(spacing: 12) {
                 Image(systemName: entry.meal.symbol).foregroundStyle(Theme.accent).frame(width: 24)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(entry.title).font(.system(.body))
-                    Text(entry.meal.title).font(.caption).foregroundStyle(.secondary)
+                    Text(entry.title).appFont(.body)
+                    Text(entry.meal.title).appFont(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -152,7 +152,7 @@ struct MyWeekView: View {
     private func addRow(for day: Date) -> some View {
         Button { addingOn = day } label: {
             Label("Add meal", systemImage: "plus")
-                .font(.subheadline)
+                .appFont(.subheadline)
                 .foregroundStyle(Theme.accent)
         }
         .buttonStyle(.plain)

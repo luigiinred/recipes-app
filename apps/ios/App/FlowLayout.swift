@@ -78,7 +78,7 @@ struct StepIngredientChips: View {
             FlowLayout(spacing: 6) {
                 ForEach(used, id: \.self) { index in
                     Text(IngredientLine.chipText(recipe.ingredients[index]))
-                        .font(.caption.weight(.medium))
+                        .appFont(.caption, weight: .medium)
                         .lineLimit(1)
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .background(Theme.accent.opacity(0.12), in: Capsule())
