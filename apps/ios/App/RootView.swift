@@ -4,8 +4,8 @@ import SwiftUI
 enum AppSection: Hashable {
     case recipes(RecipeCollection)
     case discover(UUID)
-    case feed(UUID)
     case feeds
+    case upNext
     case plan
     case groceries
 }
@@ -13,28 +13,28 @@ enum AppSection: Hashable {
 #if os(iOS)
 struct RootView: View {
     enum AppTab: Hashable {
-        case recipes, feeds, plan, groceries, settings, search, discover
+        case recipes, feeds, upNext, plan, groceries, settings, search, discover
         case collection(RecipeCollection)
     }
 
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var tab: AppTab
     @State private var query: String
     @State private var browsing = HomeBrowsing()
-    private let planMode: PlanMode
     private let showsSmartPlan: Bool
     /// Kept here so folding or unfolding a Duo, which swaps the tab items, keeps the open recipe.
     @State private var recipesPath: [RecipesRoute]
     @State private var searchPath: [RecipesRoute] = []
 
     init(
-        tab: AppTab = .recipes, searchQuery: String = "", planMode: PlanMode = .queue, showsSmartPlan: Bool = false,
+        tab: AppTab = .recipes, searchQuery: String = "", showsSmartPlan: Bool = false,
         recipesPath: [RecipesRoute] = [], recipeSelection: Recipe.ID? = nil, recipesCollection: RecipeCollection = .all
     ) {
         var path = recipesPath
@@ -45,7 +45,6 @@ struct RootView: View {
         _recipesPath = State(initialValue: path)
         _tab = State(initialValue: tab)
         _query = State(initialValue: searchQuery)
-        self.planMode = planMode
         self.showsSmartPlan = showsSmartPlan
     }
 
@@ -53,6 +52,8 @@ struct RootView: View {
         RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
             .filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
     }
+
+    private func shows(_ tab: MainTab) -> Bool { !AppSettings.hiddenTabs(hiddenTabsRaw).contains(tab) }
 
     /// The tab bar and the sidebar are one component on iPad. Collections and categories filter the Recipes tab.
     var body: some View {
@@ -76,12 +77,22 @@ struct RootView: View {
             } else {
                 Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
-            if showsFeeds {
+            if shows(.feeds) {
                 Tab("Feeds", systemImage: "dot.radiowaves.up.forward", value: AppTab.feeds) { FeedStreamTab() }
             }
-            Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
-            Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
-            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: sizeClass == .regular) }
+            if shows(.upNext) {
+                Tab("Up Next", systemImage: MainTab.upNext.symbol, value: AppTab.upNext) { UpNextTab() }
+            }
+            if shows(.plan) {
+                Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(showsSmartPlan: showsSmartPlan) }
+            }
+            if shows(.groceries) {
+                Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
+            }
+            // iPhone opens Settings from the gear on Home unless it's set to sit in the tab bar.
+            if sizeClass == .regular || settingsInTabBar {
+                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: sizeClass == .regular) }
+            }
             // Wide screens search from the My Recipes page itself.
             if sizeClass != .regular {
                 Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { SearchTab(query: $query, path: $searchPath) }
@@ -92,11 +103,16 @@ struct RootView: View {
         .sidebarFirst()
         .reviewPrompt()
         .tabViewSearchActivation(.searchTabSelection)
+        .toastHost()
         .cookModeCover(cook)
-        .onChange(of: showsFeeds) { _, shows in
-            if !shows, tab == .feeds { tab = .recipes }
+        .onChange(of: settingsInTabBar) { _, shown in
+            if !shown, sizeClass != .regular, tab == .settings { tab = .recipes }
+        }
+        .onChange(of: hiddenTabsRaw) {
+            if let hidden = mainTab(tab), !shows(hidden) { tab = .recipes }
         }
         .onChange(of: sizeClass) { _, size in
+            if size != .regular, tab == .settings, !settingsInTabBar { tab = .recipes }
             if size != .regular, case .collection(let collection) = tab {
                 recipesPath = [.collection(collection)]
                 tab = .recipes
@@ -109,7 +125,8 @@ struct RootView: View {
         }
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            tab = destination == .plan ? .plan : .groceries
+            let target: AppTab = destination == .plan ? .plan : .groceries
+            if let main = mainTab(target), shows(main) { tab = target }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
@@ -117,10 +134,20 @@ struct RootView: View {
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
-            case .logDinner, .planWeek: tab = .plan
+            case .logDinner, .planWeek: if shows(.plan) { tab = .plan }
             case .addRecipe: tab = .recipes
             case nil: break
             }
+        }
+    }
+
+    private func mainTab(_ tab: AppTab) -> MainTab? {
+        switch tab {
+        case .feeds: .feeds
+        case .upNext: .upNext
+        case .plan: .plan
+        case .groceries: .groceries
+        default: nil
         }
     }
 }
@@ -158,6 +185,8 @@ struct SearchTab: View {
                         FeedStreamView()
                     case .feedPost(let entry):
                         FeedEntryPreview(entry: entry)
+                    case .upNext:
+                        QueueView { path.append(.recipe($0)) }.navigationTitle("Up Next")
                     case .homeSettings:
                         HomeSettingsPage()
                     case .discoverSources:
@@ -262,8 +291,26 @@ struct RecipesTab: View {
             FeedStreamView()
         case .feedPost(let entry):
             FeedEntryPreview(entry: entry)
+        case .upNext:
+            QueueView { path.append(.recipe($0)) }.navigationTitle("Up Next")
         case .homeSettings:
             HomeSettingsPage()
+        }
+    }
+}
+
+struct UpNextTab: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @State private var path: [UUID] = []
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            QueueView { path.append($0) }
+                .navigationTitle("Up Next")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: UUID.self) { id in
+                    if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe) }
+                }
         }
     }
 }
@@ -272,17 +319,13 @@ struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
     @State private var path: [UUID] = []
-    @State private var mode: PlanMode
-    private let showsSmartPlan: Bool
-
-    init(mode: PlanMode = .queue, showsSmartPlan: Bool = false) {
-        _mode = State(initialValue: mode)
-        self.showsSmartPlan = showsSmartPlan
-    }
+    var showsSmartPlan = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+            MyWeekView(open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+                .navigationTitle("Plan")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { router.add = .plan } label: { Label("Add", systemImage: "plus") }
@@ -295,9 +338,7 @@ struct PlanTab: View {
                 }
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
-            guard kind == .logDinner || kind == .planWeek else { return }
-            mode = .week
-            router.reminder = nil
+            if kind == .logDinner || kind == .planWeek { router.reminder = nil }
         }
     }
 }
@@ -349,20 +390,15 @@ struct RootView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
 
     @State private var section: AppSection?
     @State private var path: [Recipe.ID]
     @State private var selection: Recipe.ID?
-    @State private var entrySelection: FeedEntry.ID?
     @State private var collection: RecipeCollection
-    @State private var addingFeed = false
-    @State private var planMode: PlanMode
-
-    init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil, entrySelection: FeedEntry.ID? = nil, planMode: PlanMode = .queue) {
-        _planMode = State(initialValue: planMode)
+    init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil) {
         _section = State(initialValue: section)
         _path = State(initialValue: selection.map { [$0] } ?? [])
-        _entrySelection = State(initialValue: entrySelection)
         if case .recipes(let collection) = section {
             _collection = State(initialValue: collection)
         } else {
@@ -373,7 +409,7 @@ struct RootView: View {
     /// The sidebar picks a section; a recipe opened from it fills the rest of the window.
     var body: some View {
         NavigationSplitView {
-            SidebarView(section: $section, addingFeed: $addingFeed)
+            SidebarView(section: $section)
         } detail: {
             NavigationStack(path: $path) {
                 sectionRoot
@@ -386,9 +422,13 @@ struct RootView: View {
                     }
             }
         }
+        .onChange(of: hiddenTabsRaw) {
+            if let section, MainTab.allCases.contains(where: { $0.section == section && AppSettings.hiddenTabs(hiddenTabsRaw).contains($0) }) {
+                self.section = .recipes(.all)
+            }
+        }
         .onChange(of: section) { _, new in
             if case .recipes(let newCollection) = new { collection = newCollection }
-            entrySelection = nil
             path = []
         }
         .onChange(of: selection) { _, id in
@@ -396,11 +436,12 @@ struct RootView: View {
             path.append(id)
             selection = nil
         }
-        .sheet(isPresented: $addingFeed) { AddFeedSheet() }
+        .toastHost()
         .cookModeCover(cook)
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            section = destination == .plan ? .plan : .groceries
+            let target: MainTab = destination == .plan ? .plan : .groceries
+            if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(target) { section = target.section }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
@@ -412,8 +453,7 @@ struct RootView: View {
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
             case .logDinner, .planWeek:
-                section = .plan
-                planMode = .week
+                if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(.plan) { section = .plan }
                 router.reminder = nil
             case .addRecipe:
                 section = .recipes(.all)
@@ -429,19 +469,12 @@ struct RootView: View {
             RecipeListView(collection: $collection, selection: $selection)
         case .discover(let source):
             DiscoverPage(sourceID: source, route: .home) { path.append($0) }.id(source)
-        case .feed(let id):
-            if let feed = library.feeds.first(where: { $0.id == id }) {
-                HStack(spacing: 0) {
-                    FeedEntriesList(feed: feed, selection: $entrySelection).frame(width: 320)
-                    Divider()
-                    FeedDetail(feedID: id, entryID: entrySelection)
-                }
-                .id(feed.id)
-            }
         case .feeds:
             FeedStreamView()
         case .plan:
-            PlanView(mode: $planMode, open: { path.append($0) })
+            MyWeekView(open: { path.append($0) }).navigationTitle("Plan")
+        case .upNext:
+            QueueView { path.append($0) }.navigationTitle("Up Next")
         case .groceries:
             GroceriesBoard()
         }
@@ -454,9 +487,8 @@ struct SidebarView: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.onboardingCompleted) private var onboarded = false
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
     @Binding var section: AppSection?
-    @Binding var addingFeed: Bool
     @State private var recipesExpanded = true
     @State private var collapsed: Set<String> = []
 
@@ -474,9 +506,10 @@ struct SidebarView: View {
                         .onTapGesture { recipesExpanded.toggle() }
                         .categoryRootDrop()
                 }
-                if showsFeeds { Label("Feeds", systemImage: "dot.radiowaves.up.forward").tag(AppSection.feeds) }
-                Label("Plan", systemImage: "calendar").tag(AppSection.plan)
-                Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
+                let hidden = AppSettings.hiddenTabs(hiddenTabsRaw)
+                ForEach(MainTab.allCases.filter { !hidden.contains($0) }, id: \.self) { tab in
+                    Label(tab.title, systemImage: tab.symbol).tag(tab.section)
+                }
             }
             if !discover.sources.isEmpty {
                 Section("Discover") {
@@ -484,20 +517,6 @@ struct SidebarView: View {
                         Label(source.name, systemImage: "binoculars").lineLimit(1).tag(AppSection.discover(source.id))
                     }
                 }
-            }
-            if AppFeatures.feeds {
-            Section("Feeds") {
-                ForEach(library.feeds) { feed in
-                    Label(feed.title, systemImage: "dot.radiowaves.up.forward").lineLimit(1)
-                        .tag(AppSection.feed(feed.id))
-                        .contextMenu {
-                            Button("Unsubscribe", role: .destructive) { Task { await library.remove(feed) } }
-                        }
-                }
-                Button { addingFeed = true } label: { Label("Add Feed…", systemImage: "plus") }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-            }
             }
         }
         .listStyle(.sidebar)
@@ -551,16 +570,13 @@ struct SidebarView: View {
     }
 }
 
-struct FeedDetail: View {
-    @EnvironmentObject private var loader: FeedLoader
-    let feedID: UUID
-    let entryID: FeedEntry.ID?
-
-    var body: some View {
-        if let entryID, case .loaded(let entries)? = loader.states[feedID], let entry = entries.first(where: { $0.id == entryID }) {
-            FeedEntryPreview(entry: entry)
-        } else {
-            ContentUnavailableView("Select a post", systemImage: "dot.radiowaves.up.forward")
+extension MainTab {
+    var section: AppSection {
+        switch self {
+        case .feeds: .feeds
+        case .upNext: .upNext
+        case .plan: .plan
+        case .groceries: .groceries
         }
     }
 }

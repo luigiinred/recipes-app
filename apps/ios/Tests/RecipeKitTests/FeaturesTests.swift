@@ -94,6 +94,33 @@ final class FeaturesTests: XCTestCase {
         XCTAssertEqual(try FeedParser.parse(Data(media.utf8)).entries.first?.imageURL?.absoluteString, "https://example.com/large.jpg")
     }
 
+    func testFeedPicksFullSizeImages() throws {
+        let rss = """
+        <rss><channel><title>Blog</title>
+        <item><title>Muffins</title><link>https://example.com/muffins</link><description><![CDATA[<img src="https://example.com/m-300x200.jpg" srcset="https://example.com/m-300x200.jpg 300w, https://example.com/m-1200x800.jpg 1200w, https://example.com/m-768x512.jpg 768w">]]></description></item>
+        <item><title>Pierogi</title><link>https://example.com/pierogi</link><description><![CDATA[<img src="https://i0.wp.com/example.com/wp-content/uploads/p.jpg?fit=640%2C427&amp;quality=89&amp;ssl=1">]]></description></item>
+        </channel></rss>
+        """
+        let entries = try FeedParser.parse(Data(rss.utf8)).entries
+        XCTAssertEqual(entries.map { $0.imageURL?.absoluteString }, [
+            "https://example.com/m-1200x800.jpg",
+            "https://i0.wp.com/example.com/wp-content/uploads/p.jpg?quality=89&ssl=1",
+        ])
+    }
+
+    func testSinglePostsAreNotFollowable() async {
+        let video = await FeedService.followable(URL(string: "https://www.youtube.com/watch?v=abc")!)
+        let post = await FeedService.followable(URL(string: "https://example.com/2026/10/soup/")!)
+        XCTAssertNil(video)
+        XCTAssertNil(post)
+    }
+
+    func testFeedPageURL() {
+        let feed = URL(string: "https://example.com/feed/")!
+        XCTAssertEqual(FeedService.pageURL(feed, page: 1), feed)
+        XCTAssertEqual(FeedService.pageURL(feed, page: 3).absoluteString, "https://example.com/feed/?paged=3")
+    }
+
     func testCollections() {
         let a = Recipe(title: "A", tags: ["soup"], isFavorite: true)
         let b = Recipe(title: "B", wantToCook: true)

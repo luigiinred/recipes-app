@@ -11,6 +11,7 @@ struct MyWeekView: View {
     @State private var weekStart: Date
     @State private var addingOn: Date?
     @State private var smartPlanning: Bool
+    @State private var creatingPlan = false
     @AppStorage(AppSettings.Key.weekStart) private var weekStartSetting = AppSettings.WeekStart.system.rawValue
 
     init(open: @escaping (UUID) -> Void, showsSmartPlan: Bool = false) {
@@ -24,6 +25,8 @@ struct MyWeekView: View {
     private var today: Date { calendar.startOfDay(for: referenceDate ?? Date()) }
     private var days: [Date] { (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) } }
     private var isThisWeek: Bool { days.contains { calendar.isDate($0, inSameDayAs: today) } }
+    private var isPast: Bool { (days.last ?? today) < today }
+    private var isEmptyWeek: Bool { days.allSatisfy { entries(on: $0).isEmpty } }
 
     private func entries(on day: Date) -> [MealPlanEntry] {
         let key = DayKey.string(from: day, calendar: calendar)
@@ -33,6 +36,9 @@ struct MyWeekView: View {
     var body: some View {
         VStack(spacing: 0) {
             weekBar
+            if isEmptyWeek, !isPast, !library.recipes.isEmpty {
+                emptyWeek
+            } else {
             List {
                 ForEach(days, id: \.self) { day in
                     Section {
@@ -46,6 +52,7 @@ struct MyWeekView: View {
             .listStyle(.plain)
             .themedCanvas()
             .animation(.snappy, value: library.mealPlan.map(\.id))
+            }
         }
         .onAppear { jumpToToday() }
         .onChange(of: router.add) { _, target in
@@ -61,6 +68,30 @@ struct MyWeekView: View {
         }
         .sheet(item: $addingOn) { AddMealSheet(day: $0) }
         .sheet(isPresented: $smartPlanning) { SmartPlanSheet(weekStart: weekStart) }
+        .sheet(isPresented: $creatingPlan) {
+            PlanCreatorSheet(weekStart: weekStart) {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    smartPlanning = true
+                }
+            }
+        }
+    }
+
+    private var emptyWeek: some View {
+        MascotEmptyState(
+            scene: .bookWrite, title: isThisWeek ? "Nothing planned this week" : "Nothing planned yet",
+            message: "Pick a few recommended recipes and they'll fill the week, or let Smart Plan choose for you."
+        ) {
+            VStack(spacing: 10) {
+                Button("Create a Plan") { creatingPlan = true }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)
+                Button { smartPlanning = true } label: { Label("Smart Plan", systemImage: "sparkles") }
+                    .appFont(.subheadline, weight: .semibold)
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .themedCanvas()
     }
 
     private var weekBar: some View {

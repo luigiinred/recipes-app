@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 final class ShareModel: ObservableObject {
-    enum State { case loading, review, saving, saved(Recipe, note: String?), failed(String) }
+    enum State { case loading, follow(url: URL, title: String, following: Bool), followed(String), review, saving, saved(Recipe, note: String?), failed(String) }
 
     @Published var state = State.loading
     @Published private(set) var host: String?
@@ -19,6 +19,27 @@ final class ShareModel: ObservableObject {
             return
         }
         host = url.host?.replacingOccurrences(of: "www.", with: "")
+        if let feed = await FeedService.followable(url) {
+            let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
+            let feeds = await Task.detached { (try? library.feeds.list()) ?? [] }.value
+            self.library = library
+            state = .follow(url: feed.url, title: feed.title, following: feeds.contains { $0.url == feed.url.absoluteString })
+            return
+        }
+        await importRecipe(from: url)
+    }
+
+    func follow(_ url: URL, title: String) async {
+        guard let library else { return }
+        let feed = Feed(url: url.absoluteString, title: title)
+        let outcome = await Task.detached { Result { try library.feeds.save(feed) } }.value
+        switch outcome {
+        case .success: state = .followed(title)
+        case .failure(let error): state = .failed(error.localizedDescription)
+        }
+    }
+
+    private func importRecipe(from url: URL) async {
         do {
             let result = try await RecipeImporter.importResult(from: url, progress: progress.report)
             let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
@@ -77,6 +98,40 @@ struct ShareView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .follow(let url, let title, let following):
+                VStack(spacing: 14) {
+                    MascotView(character: .tomato, scene: .wave, height: 130)
+                    Text(following ? "Already following" : "Follow \(title)?").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
+                    Text(following ? "\(title) is already in your Feeds." : "Its newest recipes and videos will show up in your Feeds tab.")
+                        .appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    VStack(spacing: 10) {
+                        if !following {
+                            Button { Task { await model.follow(url, title: title) } } label: { Label("Follow", systemImage: "dot.radiowaves.up.forward") }
+                                .buttonStyle(PaperButtonStyle())
+                                .keyboardShortcut(.defaultAction)
+                        }
+                        Button(following ? "Done" : "Cancel", action: following ? finish : cancel)
+                            .buttonStyle(PaperButtonStyle(prominent: false))
+                    }
+                    .frame(maxWidth: 320)
+                    .padding(.top, 6)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .followed(let title):
+                VStack(spacing: 14) {
+                    MascotCluster(height: 150)
+                    Text("Following \(title)").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
+                    Text("New posts will show up in your Feeds tab.").appFont(.subheadline).foregroundStyle(.secondary)
+                    Button("Done", action: finish)
+                        .buttonStyle(PaperButtonStyle())
+                        .keyboardShortcut(.defaultAction)
+                        .frame(maxWidth: 320)
+                        .padding(.top, 6)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .sensoryFeedback(.success, trigger: title)
             case .review:
                 if let result = model.result {
                     NavigationStack {
@@ -147,6 +202,8 @@ extension ShareModel.State {
         case .saving: 2
         case .saved: 3
         case .failed: 4
+        case .follow: 5
+        case .followed: 6
         }
     }
 }

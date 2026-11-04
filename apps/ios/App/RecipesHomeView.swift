@@ -266,10 +266,11 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @AppStorage(AppSettings.Key.homeSections) private var homeSectionsRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
@@ -316,6 +317,7 @@ struct RecipesHomeView: View {
     @State private var tagsExpanded = false
     @State private var tagPage: Int?
     @State private var editing: Recipe?
+    @State private var showingSettings = false
 
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
     private var isRegular: Bool { sizeClass == .regular }
@@ -328,6 +330,7 @@ struct RecipesHomeView: View {
     private var items: [Recipe] { sort.sorted(filter.apply(library.recipes, style: ratingStyle), seed: shuffleSeed) }
 
     static let homeRecipeLimit = 5
+    static let sectionGap: CGFloat = 36
 
     /// The home shows its first few recipes under a Recipes heading; searching, tag pages and View All show them all.
     private var isHome: Bool { tag == nil && !showsAllRecipes && !showsQuickFilters && query.isEmpty }
@@ -341,7 +344,11 @@ struct RecipesHomeView: View {
     private var todayPicks: [HeroPick] {
         let key = DayKey.string(from: referenceDate ?? Date())
         return library.mealPlan.filter { $0.day == key }.sorted { ($0.meal.order, $0.title) < ($1.meal.order, $1.title) }
-            .compactMap { entry in entry.recipeID.flatMap(library.recipe(id:)).map { HeroPick(recipe: $0, kicker: entry.meal.title) } }
+            .map { entry in
+                // A meal synced from Mealie or typed in may have no recipe here; show it by title.
+                let recipe = entry.recipeID.flatMap(library.recipe(id:)) ?? Recipe(id: entry.recipeID ?? entry.id, title: entry.title)
+                return HeroPick(recipe: recipe, kicker: entry.meal.title)
+            }
     }
 
     private var upNextPicks: [HeroPick] {
@@ -364,7 +371,7 @@ struct RecipesHomeView: View {
 
     var body: some View {
         Group {
-            if library.recipes.isEmpty {
+            if library.recipes.isEmpty, !(isHome && library.isLoaded) {
                 EmptyLibraryView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if isRegular {
                 grid
@@ -374,12 +381,19 @@ struct RecipesHomeView: View {
         }
         .themedCanvas()
         .navigationTitle(titleInBar ? title : "")
-        .navigationSubtitle(titleInBar ? Self.countText(items.count) : "")
+        .navigationSubtitle(titleInBar && !isHome ? Self.countText(items.count) : "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
         .toolbar {
+            #if os(iOS)
+            if isHome, !isRegular, !settingsInTabBar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                }
+            }
+            #endif
             if !library.recipes.isEmpty, !isHome {
                 ToolbarItem(placement: .primaryAction) { sortMenu }
                 if !isRegular {
@@ -393,6 +407,7 @@ struct RecipesHomeView: View {
         .sheet(isPresented: $choosingFilter) {
             HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
         }
+        .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(item: $editing) { recipe in
             RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
@@ -409,7 +424,7 @@ struct RecipesHomeView: View {
                     .themedRow()
                 if isHome, !homeTipDismissed {
                     customizeTip
-                        .listRowInsets(EdgeInsets(top: 0, leading: margin, bottom: 16, trailing: margin))
+                        .listRowInsets(EdgeInsets(top: 0, leading: margin, bottom: Self.sectionGap, trailing: margin))
                         .listRowSeparator(.hidden)
                         .themedRow()
                 }
@@ -419,6 +434,8 @@ struct RecipesHomeView: View {
             }
             .listSectionSeparator(.hidden)
         }
+        // List keeps rows in their old places when whole sections reorder, so rebuild it.
+        .id(sections)
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
         .onScrollPhaseChange { _, phase in if phase == .interacting { onScroll?() } }
@@ -433,32 +450,48 @@ struct RecipesHomeView: View {
             let picks = picks(for: section)
             if !picks.isEmpty {
                 heroSection(section, picks: picks)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 20, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: Self.sectionGap, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            } else if let empty = emptyCard(section) {
+                empty
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: Self.sectionGap, trailing: margin))
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
         case .tags:
             if showsTags {
                 tagsRow
-                    .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 20, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: Self.sectionGap, trailing: 0))
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
         case .discover:
             if !discover.sources.isEmpty {
                 discoverSection
-                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: 20, trailing: margin))
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: Self.sectionGap, trailing: margin))
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
         case .feeds:
             if showsFeedShelf {
                 feedsRow
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 20, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: Self.sectionGap, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            } else if let empty = emptyCard(section) {
+                empty
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: Self.sectionGap, trailing: margin))
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
         case .recipes:
+            if let empty = emptyCard(section) {
+                empty
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: Self.sectionGap, trailing: margin))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            } else {
             if isHome {
                 recipesHeader(count: total)
                     .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: 8, trailing: margin))
@@ -482,6 +515,7 @@ struct RecipesHomeView: View {
                     .contextMenu { recipeMenu(recipe) }
                 }
                 if items.isEmpty { noMatches.listRowSeparator(.hidden).themedRow() }
+            }
         }
     }
 
@@ -489,7 +523,7 @@ struct RecipesHomeView: View {
         let all = items
         let items = isHome ? Array(all.prefix(Self.homeRecipeLimit)) : all
         return ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Self.sectionGap) {
                 header(count: all.count).padding(.horizontal, margin)
                 if isHome, !homeTipDismissed { customizeTip.padding(.horizontal, margin) }
                 ForEach(sections) { section in
@@ -511,13 +545,15 @@ struct RecipesHomeView: View {
         case .today, .upNext:
             let picks = picks(for: section)
             if !picks.isEmpty { heroSection(section, picks: picks) }
+            else if let empty = emptyCard(section) { empty.padding(.horizontal, margin) }
         case .tags:
             if showsTags { tagsRow }
         case .discover:
             if !discover.sources.isEmpty { discoverSection.padding(.horizontal, margin) }
         case .feeds:
-            if showsFeedShelf { feedsRow }
+            if showsFeedShelf { feedsRow } else if let empty = emptyCard(section) { empty.padding(.horizontal, margin) }
         case .recipes:
+            if let empty = emptyCard(section) { empty.padding(.horizontal, margin) } else {
             if isHome { recipesHeader(count: total).padding(.horizontal, margin) }
             GridSection(title: nil, minimum: 260, spacing: 24) {
                 ForEach(items) { recipe in
@@ -529,6 +565,7 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             if items.isEmpty { noMatches }
+            }
         }
     }
 
@@ -580,12 +617,75 @@ struct RecipesHomeView: View {
     private func heroSection(_ section: HomeSection, picks: [HeroPick]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                sectionTitle(section.title)
+                if section == .upNext {
+                    Button { openRoute(.upNext) } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            sectionTitle(section.title)
+                            Image(systemName: "chevron.right").appFont(.subheadline, weight: .semibold).foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens Up Next to reorder it")
+                } else {
+                    sectionTitle(section.title)
+                }
                 Spacer()
                 if section == .today { sectionLink("View Plan") { router.destination = .plan } }
             }
             .padding(.horizontal, margin)
-            HeroCarousel(picks: picks, margin: margin) { selection = $0 }
+            HeroCarousel(picks: picks, margin: margin) { id in
+                if library.recipe(id: id) != nil { selection = id } else { router.destination = .plan }
+            }
+        }
+    }
+
+
+    private func shows(_ tab: MainTab) -> Bool { !AppSettings.hiddenTabs(hiddenTabsRaw).contains(tab) }
+
+    /// What a Home section says when it has nothing to show yet, and where its tap leads.
+    private func emptyCard(_ section: HomeSection) -> AnyView? {
+        guard isHome else { return nil }
+        switch section {
+        case .today where shows(.plan):
+            return AnyView(emptyCard(section, symbol: "calendar.badge.plus", heading: "Nothing planned for today",
+                                     message: "Plan a meal, or create a plan for the whole week.") { router.destination = .plan })
+        case .upNext where shows(.upNext):
+            return AnyView(emptyCard(section, symbol: "text.line.first.and.arrowtriangle.forward", heading: "Line up what to cook",
+                                     message: "Swipe a recipe left, or use its ⋯ menu, to add it to Up Next. Planning it takes it off.") { openRoute(.upNext) })
+        case .feeds where library.feeds.isEmpty:
+            return AnyView(emptyCard(section, symbol: "dot.radiowaves.up.forward", heading: "Follow recipe sites",
+                                     message: "Discover blogs, magazines and YouTube channels and see their newest recipes here.") { openRoute(.feeds) })
+        case .recipes where library.recipes.isEmpty:
+            return AnyView(emptyCard(section, symbol: "plus.circle", heading: "Add your first recipe",
+                                     message: "Tap + to paste a link or scan a page, or share one from Safari or YouTube.", action: nil))
+        default:
+            return nil
+        }
+    }
+
+    private func emptyCard(_ section: HomeSection, symbol: String, heading: String, message: String, action: (() -> Void)?) -> some View {
+        let card = HStack(spacing: 12) {
+            Image(systemName: symbol).appFont(.title2).foregroundStyle(accent).frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(heading).appFont(.headline)
+                Text(message).appFont(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if action != nil {
+                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(16)
+        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        return VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(section.title)
+            if let action {
+                Button(action: action) { card }.buttonStyle(.plain)
+            } else {
+                card
+            }
         }
     }
 
@@ -705,7 +805,7 @@ struct RecipesHomeView: View {
         }
     }
 
-    private var showsFeedShelf: Bool { showsFeeds && isHome && !library.feeds.isEmpty }
+    private var showsFeedShelf: Bool { isHome && !library.feeds.isEmpty }
 
     private var feedsRow: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -739,10 +839,7 @@ struct RecipesHomeView: View {
 
     private func recipesHeader(count: Int) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                sectionTitle("Recipes")
-                countLabel(count)
-            }
+            sectionTitle("Recipes")
             Spacer()
             if count > Self.homeRecipeLimit {
                 sectionLink("View All") { openRoute(.allRecipes) }

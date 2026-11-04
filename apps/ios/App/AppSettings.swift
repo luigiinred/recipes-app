@@ -2,6 +2,29 @@ import Foundation
 import RecipeKit
 
 /// User preferences, stored in UserDefaults so views can bind to them with @AppStorage.
+/// A tab that Settings can hide. Home and Settings always show.
+enum MainTab: String, CaseIterable {
+    case feeds, upNext, plan, groceries
+
+    var title: String {
+        switch self {
+        case .feeds: "Feeds"
+        case .upNext: "Up Next"
+        case .plan: "Plan"
+        case .groceries: "Groceries"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .feeds: "dot.radiowaves.up.forward"
+        case .upNext: "text.line.first.and.arrowtriangle.forward"
+        case .plan: "calendar"
+        case .groceries: "checklist"
+        }
+    }
+}
+
 enum AppSettings {
     enum Key {
         static let defaultMeal = "defaultMeal"
@@ -38,7 +61,8 @@ enum AppSettings {
         static let customThemeDarkCanvas = "customThemeDarkCanvasHex"
         static let customThemeDarkSurface = "customThemeDarkSurfaceHex"
         static let customThemeDarkAccent = "customThemeDarkAccentHex"
-        static let feedsTab = "experimentFeedsTab"
+        static let hiddenTabs = "hiddenTabs"
+        static let settingsInTabBar = "settingsInTabBar"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }
@@ -92,6 +116,14 @@ enum AppSettings {
 
     static func encode(_ meals: Set<Meal>) -> String {
         meals.map(\.rawValue).sorted().joined(separator: ",")
+    }
+
+    static func hiddenTabs(_ raw: String) -> Set<MainTab> {
+        Set(raw.split(separator: ",").compactMap { MainTab(rawValue: String($0)) })
+    }
+
+    static func encode(_ tabs: Set<MainTab>) -> String {
+        tabs.map(\.rawValue).sorted().joined(separator: ",")
     }
 
     static var keepsScreenAwake: Bool {

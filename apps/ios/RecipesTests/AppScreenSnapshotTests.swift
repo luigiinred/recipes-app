@@ -47,7 +47,7 @@ struct AppScreenSnapshotTests {
 
     @Test("iPad: Plan, My Week")
     func iPadPlan() {
-        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week), inNavigationStack: false, coverage: .iPad)
+        assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false, coverage: .iPad)
     }
 
     @Test("Search tab, with results")
@@ -57,17 +57,27 @@ struct AppScreenSnapshotTests {
 
     @Test("Plan tab: Up Next queue")
     func planQueue() {
-        assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false)
+        assertPageSnapshots(of: RootView(tab: .upNext), inNavigationStack: false)
     }
 
     @Test("Plan tab: My Week")
     func planWeek() {
-        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week), inNavigationStack: false, coverage: .adaptive)
+        assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false, coverage: .adaptive)
+    }
+
+    @Test("Plan tab: an empty week offers to create a plan")
+    func planEmptyWeek() {
+        assertPageSnapshots(of: RootView(tab: .plan).environmentObject(RecipeLibrary(recipes: SampleData.recipes)), inNavigationStack: false)
+    }
+
+    @Test("Plan creator: recommended recipes")
+    func planCreator() {
+        assertPageSnapshots(of: PlanCreatorSheet(weekStart: SampleData.now), inNavigationStack: false, coverage: .sheet)
     }
 
     @Test("Plan tab: smart plan sheet over My Week")
     func planSmart() {
-        assertPageSnapshots(of: RootView(tab: .plan, planMode: .week, showsSmartPlan: true), inNavigationStack: false)
+        assertPageSnapshots(of: RootView(tab: .plan, showsSmartPlan: true), inNavigationStack: false)
     }
 
     @Test("Groceries tab")
@@ -87,7 +97,7 @@ struct AppScreenSnapshotTests {
 
     @Test("Plan: My Week")
     func planWeek() {
-        assertPageSnapshots(of: RootView(section: .plan, planMode: .week), inNavigationStack: false)
+        assertPageSnapshots(of: RootView(section: .plan), inNavigationStack: false)
     }
 
     @Test("Groceries")
