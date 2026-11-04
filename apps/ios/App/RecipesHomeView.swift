@@ -201,6 +201,13 @@ enum HomeSection: String, CaseIterable, Identifiable {
     }
 
     static func raw(_ sections: some Sequence<HomeSection>) -> String { sections.map(\.rawValue).joined(separator: ",") }
+
+    /// The saved order and hidden lists after showing or hiding `section`.
+    static func showing(_ section: HomeSection, _ shown: Bool, order: String, hidden: String) -> (order: String, hidden: String) {
+        var sections = Self.hidden(hidden, order: order)
+        if shown { sections.remove(section) } else { sections.insert(section) }
+        return (raw(Self.order(order)), raw(allCases.filter(sections.contains)))
+    }
 }
 
 /// Everything narrowing the Recipes home: a category, quick filters and a total time range.

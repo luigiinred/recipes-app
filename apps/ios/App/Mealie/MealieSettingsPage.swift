@@ -241,7 +241,7 @@ extension MealieLink: Identifiable {
     public var id: String { token }
 }
 
-private struct AddDiscoverSheet: View {
+struct AddDiscoverSheet: View {
     @EnvironmentObject private var discover: DiscoverController
     @Environment(\.dismiss) private var dismiss
     @State private var address = ""

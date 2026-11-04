@@ -45,3 +45,8 @@ enum OnboardingSources {
         ),
     ]
 }
+
+enum OnboardingFeeds {
+    /// A couple of popular feeds of each kind; the rest are in Settings.
+    static let picks = PopularFeed.Kind.allCases.flatMap { kind in PopularFeed.all.filter { $0.kind == kind }.prefix(2) }
+}
