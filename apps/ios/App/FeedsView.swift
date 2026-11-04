@@ -31,7 +31,7 @@ struct FeedEntryPreview: View {
                     #endif
                 }
             } else {
-                ProgressView("Loading recipe…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                RecipeDetailSkeleton()
             }
         }
         #if os(iOS)

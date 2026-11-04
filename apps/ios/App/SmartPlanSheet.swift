@@ -25,12 +25,7 @@ struct SmartPlanSheet: View {
             Group {
                 switch phase {
                 case .options: options
-                case .working:
-                    VStack(spacing: 6) {
-                        MascotLoader(height: 170)
-                        Text("Planning your week…").appFont(.title3, weight: .bold)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .working: working
                 case .review: review
                 }
             }
@@ -86,6 +81,31 @@ struct SmartPlanSheet: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The review list's shape while the plan is being worked out.
+    private var working: some View {
+        List {
+            Section {
+                Label("Planning your week…", systemImage: "sparkles").appFont(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(0..<4, id: \.self) { _ in
+                Section(header: Text("Wednesday, November 4")) {
+                    ForEach(Meal.allCases.filter(meals.contains), id: \.self) { meal in
+                        HStack(spacing: 12) {
+                            Image(systemName: meal.symbol).frame(width: 24)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("A recipe for this meal").appFont(.body)
+                                Text(meal.title).appFont(.caption)
+                            }
+                        }
+                        .loadingPlaceholder()
+                    }
+                }
+                .redacted(reason: .placeholder)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     private var review: some View {
