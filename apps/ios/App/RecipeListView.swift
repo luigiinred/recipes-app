@@ -531,8 +531,8 @@ enum RecipesRoute: Hashable {
     case recipe(UUID)
     /// A tag's own home page.
     case tag(String)
-    /// Every tag under a parent, or every top-level tag.
-    case tags(under: String?)
+    /// Every recipe, from the home's View All.
+    case allRecipes
 }
 
 private struct OpenRecipesRouteKey: EnvironmentKey {
