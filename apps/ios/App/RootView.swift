@@ -57,7 +57,7 @@ struct RootView: View {
         TabView(selection: $tab) {
             if sizeClass == .regular {
                 TabSection("Recipes") {
-                    Tab("All Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
+                    Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
                     ForEach(sidebarCollections, id: \.self) { collection in
                         Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
                             .defaultVisibility(.hidden, for: .tabBar)
@@ -68,7 +68,7 @@ struct RootView: View {
                     }
                 }
             } else {
-                Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
+                Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
             if showsDiscover {
                 Tab("Discover", systemImage: "safari", value: AppTab.discover) { DiscoverTab() }
@@ -152,6 +152,8 @@ struct SearchTab: View {
                         DiscoverView()
                     case .discoverPost(let entry):
                         FeedEntryPreview(entry: entry)
+                    case .homeSettings:
+                        HomeSettingsPage()
                     }
                 }
         }
@@ -242,6 +244,8 @@ struct RecipesTab: View {
             DiscoverView()
         case .discoverPost(let entry):
             FeedEntryPreview(entry: entry)
+        case .homeSettings:
+            HomeSettingsPage()
         }
     }
 }

@@ -14,6 +14,13 @@ struct SettingsSnapshotTests {
         ), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
+    #if os(iOS)
+    @Test("home sections")
+    func home() {
+        assertPageSnapshots(of: HomeSettingsPage(), coverage: .sheet)
+    }
+    #endif
+
     @Test("reminders")
     func reminders() {
         assertPageSnapshots(of: RemindersSettingsPage(), macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)

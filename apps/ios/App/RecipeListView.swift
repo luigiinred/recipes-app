@@ -337,6 +337,7 @@ private struct RecipeActionsModifier: ViewModifier {
     @Binding var selection: Recipe.ID?
     var listStyle: Binding<RecipeListStyle>?
     var findRecipes: FindRecipesAction?
+    var addsAtTrailing = false
 
     @State private var showingNew = false
     @State private var ideaDraft: IdeaDraft?
@@ -462,7 +463,7 @@ private struct RecipeActionsModifier: ViewModifier {
 
     private var addPlacement: ToolbarItemPlacement {
         #if os(iOS)
-        .topBarLeading
+        addsAtTrailing ? .primaryAction : .topBarLeading
         #else
         .primaryAction
         #endif
@@ -520,8 +521,8 @@ private struct RecipeActionsModifier: ViewModifier {
 }
 
 extension View {
-    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, findRecipes: FindRecipesAction? = nil) -> some View {
-        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, findRecipes: findRecipes))
+    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, findRecipes: FindRecipesAction? = nil, addsAtTrailing: Bool = false) -> some View {
+        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, findRecipes: findRecipes, addsAtTrailing: addsAtTrailing))
     }
 }
 
@@ -535,6 +536,7 @@ enum RecipesRoute: Hashable {
     case allRecipes
     case discover
     case discoverPost(FeedEntry)
+    case homeSettings
 }
 
 private struct OpenRecipesRouteKey: EnvironmentKey {
