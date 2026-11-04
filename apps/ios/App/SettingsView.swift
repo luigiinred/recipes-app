@@ -1053,7 +1053,7 @@ private struct DataSettingsPage: View {
 extension View {
     /// Room between a Settings page's title and its first section.
     func settingsSpacing() -> some View {
-        contentMargins(.top, 16, for: .scrollContent)
+        safeAreaPadding(.top, 16)
     }
 }
 

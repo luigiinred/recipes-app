@@ -266,9 +266,9 @@ extension Font.TextStyle {
 
 extension Font {
     static func app(_ style: TextStyle, weight: Weight? = nil, family: String?) -> Font {
-        let weight = weight ?? (style == .headline ? .semibold : nil)
-        let font: Font = if let family { .custom(family, size: style.defaultSize, relativeTo: style) } else { .system(style) }
-        return weight.map { font.weight($0) } ?? font
+        guard let family else { return weight.map { .system(style, weight: $0) } ?? .system(style) }
+        let font = Font.custom(family, size: style.defaultSize, relativeTo: style)
+        return (weight ?? (style == .headline ? .semibold : nil)).map { font.weight($0) } ?? font
     }
 }
 
