@@ -30,6 +30,10 @@ final class FeedStreamSnapshotTests: XCTestCase {
         assertPageSnapshots(of: FeedDiscoverPage())
     }
 
+    func testRecipeLoading() {
+        assertPageSnapshots(of: RecipeDetailSkeleton(), coverage: .sheet)
+    }
+
     func testFeedsPage() {
         assertPageSnapshots(of: RecipeFeedsPage(), coverage: .sheet)
     }
