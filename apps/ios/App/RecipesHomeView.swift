@@ -237,11 +237,9 @@ struct RecipesHomeView: View {
     @State private var pinnedWidth: CGFloat = 0
     /// A line of chip text, so icon-only chips are as tall as the labeled ones.
     @ScaledMetric(relativeTo: .body) private var chipLine: CGFloat = 22
-    @State private var showsAllTags = false
+    @State private var browsingAllTags = false
     @State private var titleInBar = false
     @State private var tagShelfWidth: CGFloat = 0
-    @State private var tagRowWidth: CGFloat = 0
-    @State private var tagScroll = ScrollPosition(edge: .leading)
     @State private var editing: Recipe?
 
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
@@ -274,6 +272,9 @@ struct RecipesHomeView: View {
         .toolbar {
             if !library.recipes.isEmpty {
                 ToolbarItem(placement: .primaryAction) { sortMenu }
+                if !isRegular {
+                    ToolbarItem(placement: .primaryAction) { styleButton }
+                }
             }
         }
         .safeAreaBar(edge: .bottom) {
@@ -281,6 +282,9 @@ struct RecipesHomeView: View {
         }
         .sheet(isPresented: $choosingFilter) {
             HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
+        }
+        .navigationDestination(isPresented: $browsingAllTags) {
+            AllTagsView(filter: Binding(get: { filter }, set: { filter = $0 }), count: count(in:))
         }
         .sheet(item: $editing) { recipe in
             RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
@@ -359,61 +363,67 @@ struct RecipesHomeView: View {
         !library.categoryTree.isEmpty && (!showsQuickFilters || filter.scope != .all)
     }
 
-    private var tagsOverflow: Bool { tagRowWidth > tagShelfWidth - 2 * margin }
+    private var tagsPerPage: Int {
+        max(1, Int((tagShelfWidth - 2 * margin + TagTile.minSpacing) / (TagTile.width + TagTile.minSpacing)))
+    }
+
+    /// Spreads each page's tiles across the full width.
+    private var tagSpacing: CGFloat {
+        let perPage = CGFloat(tagsPerPage)
+        return perPage > 1 ? max(TagTile.minSpacing, (tagShelfWidth - 2 * margin - perPage * TagTile.width) / (perPage - 1)) : 0
+    }
+
+    private var tagPages: [[CategoryNode]] {
+        let tree = library.categoryTree, perPage = tagsPerPage
+        return stride(from: 0, to: tree.count, by: perPage).map { Array(tree[$0..<min($0 + perPage, tree.count)]) }
+    }
 
     private var tagsRow: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button(action: toggleAllTags) {
+        let pages = tagPages
+        return VStack(alignment: .leading, spacing: 14) {
+            Button { browsingAllTags = true } label: {
                 HStack {
                     Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary)
                     Spacer()
-                    if tagsOverflow || showsAllTags {
+                    if pages.count > 1 {
                         HStack(spacing: 4) {
-                            Text(showsAllTags ? "Show Less" : "Show All").contentTransition(.interpolate)
-                            Image(systemName: "chevron.down")
-                                .font(.caption.weight(.semibold))
-                                .rotationEffect(.degrees(showsAllTags ? 180 : 0))
+                            Text("View All")
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                         }
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.tint)
-                        .transition(.opacity)
                     }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(!tagsOverflow && !showsAllTags)
-            .accessibilityLabel("Tags")
-            .accessibilityValue(tagsOverflow || showsAllTags ? (showsAllTags ? "Showing all" : "Showing one row") : "")
+            .disabled(pages.count < 2)
+            .accessibilityLabel(pages.count > 1 ? "View All Tags" : "Tags")
             .padding(.horizontal, margin)
             ScrollView(.horizontal, showsIndicators: false) {
-                TagShelf(wraps: showsAllTags, width: tagShelfWidth - 2 * margin, spacing: 16) { tagTiles }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-                        if !showsAllTags { tagRowWidth = width }
+                HStack(alignment: .top, spacing: tagSpacing) {
+                    ForEach(pages, id: \.first?.id) { page in
+                        HStack(alignment: .top, spacing: tagSpacing) {
+                            ForEach(page) { tagTile($0) }
+                        }
+                        .frame(width: max(tagShelfWidth - 2 * margin, 0), alignment: .leading)
                     }
+                }
+                .scrollTargetLayout()
             }
             .contentMargins(.horizontal, margin, for: .scrollContent)
-            .scrollPosition($tagScroll)
-            .scrollDisabled(showsAllTags || !tagsOverflow)
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+            .scrollDisabled(pages.count < 2)
             .scrollClipDisabled()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagShelfWidth = $0 }
         }
     }
 
-    private func toggleAllTags() {
-        withAnimation(.spring(duration: 0.5, bounce: 0.2)) {
-            tagScroll.scrollTo(edge: .leading)
-            showsAllTags.toggle()
-        }
-    }
-
-    private var tagTiles: some View {
-        ForEach(library.categoryTree) { node in
-            let collection = RecipeCollection.category(node.path)
-            TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
-                    count: count(in: collection), isOn: isWithin(node)) {
-                filter.scope = isWithin(node) ? .all : collection
-            }
+    private func tagTile(_ node: CategoryNode) -> some View {
+        let collection = RecipeCollection.category(node.path)
+        return TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                       count: count(in: collection), isOn: isWithin(node)) {
+            filter.scope = isWithin(node) ? .all : collection
         }
     }
 
@@ -511,7 +521,16 @@ struct RecipesHomeView: View {
         .accessibilityValue(sort.title)
     }
 
-    static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
+    private var styleButton: some View {
+        let other: RecipeListStyle = style == .cards ? .list : .cards
+        return Button { withAnimation(.snappy) { style = other } } label: {
+            Label("Show \(other.title)", systemImage: other.symbol)
+                .labelStyle(.iconOnly)
+                .contentTransition(.symbolEffect(.replace))
+        }
+    }
+
+        static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
 
     /// The page title sits here; once it scrolls under the bar, the bar shows it instead.
     private func header(count: Int) -> some View {
@@ -529,15 +548,6 @@ struct RecipesHomeView: View {
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
-            if !isRegular {
-                Picker("View as", selection: $style) {
-                    ForEach(RecipeListStyle.allCases, id: \.self) { option in
-                        Image(systemName: option.symbol).accessibilityLabel(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
         }
         .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).midY < 0 } action: { hidden in
             withAnimation(.easeInOut(duration: 0.2)) { titleInBar = hidden }
@@ -589,38 +599,53 @@ private extension View {
     }
 }
 
-/// Tag tiles in one row, or wrapped to `width` so every tag shows; the same tiles move between the two.
-private struct TagShelf: Layout {
-    var wraps: Bool
-    var width: CGFloat
-    var spacing: CGFloat = 14
+/// Every tag as tiles: the top-level ones, then each folder's subtags. Choosing one narrows the home and goes back to it.
+private struct AllTagsView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.dismiss) private var dismiss
+    @Binding var filter: HomeFilter
+    let count: (RecipeCollection) -> Int
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let frames = frames(subviews)
-        return CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+    private var folders: [CategoryNode] { Self.folders(in: library.categoryTree) }
+
+    private static func folders(in nodes: [CategoryNode]) -> [CategoryNode] {
+        nodes.flatMap { $0.children.isEmpty ? [] : [$0] + folders(in: $0.children) }
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, frames(subviews)) {
-            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                grid(library.categoryTree)
+                ForEach(folders) { folder in
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(CategoryTree.displayName(folder.path)).font(.title3.weight(.semibold))
+                        grid(folder.children)
+                    }
+                }
+            }
+            .padding(20)
+        }
+        .themedCanvas()
+        .navigationTitle("Tags")
+    }
+
+    private func grid(_ nodes: [CategoryNode]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: TagTile.width + TagTile.minSpacing), spacing: 0)], spacing: 20) {
+            ForEach(nodes) { node in
+                let collection = RecipeCollection.category(node.path)
+                let isOn = isWithin(node)
+                TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                        count: count(collection), isOn: isOn) {
+                    filter.scope = isOn ? .all : collection
+                    dismiss()
+                }
+            }
         }
     }
 
-    private func frames(_ subviews: Subviews) -> [CGRect] {
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
-        return subviews.map { subview in
-            let size = subview.sizeThatFits(.unspecified)
-            if wraps, x > 0, x + size.width > width {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            defer {
-                x += size.width + spacing
-                rowHeight = max(rowHeight, size.height)
-            }
-            return CGRect(origin: CGPoint(x: x, y: y), size: size)
-        }
+    private func isWithin(_ node: CategoryNode) -> Bool {
+        guard case .category(let path) = filter.scope else { return false }
+        return CategoryTree.tag(path, isIn: node.path)
     }
 }
 
@@ -634,6 +659,9 @@ private struct TagTile: View {
     let count: Int
     let isOn: Bool
     let action: () -> Void
+
+    static let width: CGFloat = 76
+    static let minSpacing: CGFloat = 12
 
     private var cover: Recipe? {
         collection.filter(library.recipes)
@@ -672,7 +700,7 @@ private struct TagTile: View {
                     .monospacedDigit()
                     .contentTransition(.numericText())
             }
-            .frame(width: 76)
+            .frame(width: Self.width)
             .opacity(count == 0 && !isOn ? 0.45 : 1)
         }
         .buttonStyle(.plain)
