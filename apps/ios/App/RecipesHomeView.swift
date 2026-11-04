@@ -369,50 +369,59 @@ struct RecipesHomeView: View {
         !tagNodes.isEmpty && (!showsQuickFilters || filter.scope != .all)
     }
 
-    private var tagsPerPage: Int {
+    private var tagColumns: Int {
         max(1, Int((tagShelfWidth - 2 * margin + TagTile.minSpacing) / (TagTile.width + TagTile.minSpacing)))
     }
 
-    /// Spreads each page's tiles across the full width.
+    /// Spreads each page's columns across the full width.
     private var tagSpacing: CGFloat {
-        let perPage = CGFloat(tagsPerPage)
-        return perPage > 1 ? max(TagTile.minSpacing, (tagShelfWidth - 2 * margin - perPage * TagTile.width) / (perPage - 1)) : 0
+        let columns = CGFloat(tagColumns)
+        return columns > 1 ? max(TagTile.minSpacing, (tagShelfWidth - 2 * margin - columns * TagTile.width) / (columns - 1)) : 0
     }
 
-    private var tagPages: [[CategoryNode]] {
-        let tree = tagNodes, perPage = tagsPerPage
-        return stride(from: 0, to: tree.count, by: perPage).map { Array(tree[$0..<min($0 + perPage, tree.count)]) }
+    /// Pages of rows: two rows a page once the tags overflow one row.
+    private var tagPages: [[[CategoryNode]]] {
+        let tree = tagNodes, columns = tagColumns
+        let rows = stride(from: 0, to: tree.count, by: columns).map { Array(tree[$0..<min($0 + columns, tree.count)]) }
+        return stride(from: 0, to: rows.count, by: 2).map { Array(rows[$0..<min($0 + 2, rows.count)]) }
     }
 
     private var tagsRow: some View {
         let pages = tagPages
-        return VStack(alignment: .leading, spacing: 14) {
-            Button { openRoute(.tags(under: tag)) } label: {
-                HStack {
-                    Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary)
-                    Spacer()
-                    if pages.count > 1 {
-                        HStack(spacing: 4) {
-                            Text("View All")
-                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+        return VStack(alignment: .leading, spacing: 20) {
+            Group {
+                if pages.count > 1 {
+                    Button { openRoute(.tags(under: tag)) } label: {
+                        HStack {
+                            tagsTitle
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Text("View All")
+                                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.tint)
                         }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.tint)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("View All Tags")
+                } else {
+                    tagsTitle
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(pages.count < 2)
-            .accessibilityLabel(pages.count > 1 ? "View All Tags" : "Tags")
             .padding(.horizontal, margin)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: tagSpacing) {
-                    ForEach(pages, id: \.first?.id) { page in
-                        HStack(alignment: .top, spacing: tagSpacing) {
-                            ForEach(page) { tagTile($0) }
+                    ForEach(pages, id: \.first?.first?.id) { page in
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(page, id: \.first?.id) { row in
+                                HStack(alignment: .top, spacing: tagSpacing) {
+                                    ForEach(row) { tagTile($0) }
+                                }
+                            }
                         }
-                        .frame(width: max(tagShelfWidth - 2 * margin, 0), alignment: .leading)
+                        .frame(width: max(tagShelfWidth - 2 * margin, 0), alignment: .topLeading)
                     }
                 }
                 .scrollTargetLayout()
@@ -423,6 +432,10 @@ struct RecipesHomeView: View {
             .scrollClipDisabled()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagShelfWidth = $0 }
         }
+    }
+
+    private var tagsTitle: some View {
+        Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
     }
 
     private func tagTile(_ node: CategoryNode) -> some View {
