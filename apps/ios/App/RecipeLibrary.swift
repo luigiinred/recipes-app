@@ -9,6 +9,11 @@ enum ImageChange {
     case remove
 }
 
+struct LoadProgress: Equatable {
+    var done: Int
+    var total: Int
+}
+
 struct StepImageChanges {
     var added: [UUID: Data] = [:]
     var removed: [UUID] = []
@@ -25,6 +30,7 @@ final class RecipeLibrary: ObservableObject {
     @Published private(set) var stepImageStamps: [UUID: Date] = [:]
     @Published private(set) var isICloud = false
     @Published private(set) var isLoaded = false
+    @Published private(set) var loadProgress: LoadProgress?
     @Published private(set) var remindersStatus = RemindersStatus.unavailable
     @Published private(set) var errorMessage: String?
 
@@ -199,8 +205,13 @@ final class RecipeLibrary: ObservableObject {
 
     func reload() async {
         guard let library else { return }
+        let isFirstLoad = !isLoaded
+        let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
+            guard isFirstLoad, let self else { return }
+            Task { await self.updateLoadProgress(LoadProgress(done: done, total: total)) }
+        }
         let result = await Task.detached {
-            Result { try (library.recipes.list(), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
+            Result { try (library.recipes.list(progress: report), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
         }.value
         switch result {
         case .success(let (recipes, plan, groceries, feeds, stamps, stepStamps, order)):
@@ -216,10 +227,16 @@ final class RecipeLibrary: ObservableObject {
             if stamps != imageStamps { imageStamps = stamps }
             if stepStamps != stepImageStamps { stepImageStamps = stepStamps }
             if !isLoaded { isLoaded = true }
+            loadProgress = nil
             errorMessage = nil
         case .failure(let error):
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func updateLoadProgress(_ progress: LoadProgress) {
+        guard !isLoaded, progress.done >= loadProgress?.done ?? 0 else { return }
+        loadProgress = progress
     }
 
     private static func index(_ recipes: [Recipe]) {
@@ -379,9 +396,9 @@ final class RecipeLibrary: ObservableObject {
         }
     }
 
-    func addIdea(title: String, notes: String) async -> Recipe {
+    func addIdea(title: String, notes: String, image: Data? = nil) async -> Recipe {
         let idea = Recipe(title: title, notes: notes)
-        await save(idea)
+        await save(idea, image: image.map(ImageChange.set) ?? .unchanged)
         return idea
     }
 

@@ -5,6 +5,13 @@ import SwiftUI
 enum ReviewPrompt {
     static let recipeThreshold = 5
 
+    static var isTestFlight: Bool {
+        get async {
+            guard case .verified(let transaction) = try? await AppTransaction.shared else { return false }
+            return transaction.environment == .sandbox
+        }
+    }
+
     static func isDue(recipes: [Recipe], onboarded: Bool, dismissed: Bool) -> Bool {
         onboarded && !dismissed && recipes.filter { !$0.isIdea }.count >= recipeThreshold
     }
@@ -12,19 +19,23 @@ enum ReviewPrompt {
 
 struct ReviewPromptBanner: View {
     @Environment(\.requestReview) private var requestReview
+    @Environment(\.openURL) private var openURL
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var dismissed = false
 
     var body: some View {
         HStack(spacing: 8) {
             Button {
                 dismissed = true
-                requestReview()
+                Task {
+                    // StoreKit never shows its rating sheet on TestFlight, so there the App Store composer opens instead.
+                    if await ReviewPrompt.isTestFlight, let url = AppStoreLink.writeReview { openURL(url) } else { requestReview() }
+                }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "star.bubble.fill").foregroundStyle(Theme.accent)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Rate us").font(.subheadline.weight(.semibold))
-                        Text("Help other cooks find Recipes").font(.caption).foregroundStyle(.secondary)
+                        Text("Rate us").appFont(.subheadline, weight: .semibold)
+                        Text("Help other cooks find Recipes").appFont(.caption).foregroundStyle(.secondary)
                     }
                     .lineLimit(1)
                     Spacer(minLength: 0)
@@ -33,7 +44,7 @@ struct ReviewPromptBanner: View {
             }
             .buttonStyle(.plain)
             Button { dismissed = true } label: {
-                Image(systemName: "xmark").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(6)
+                Image(systemName: "xmark").appFont(.footnote, weight: .semibold).foregroundStyle(.secondary).padding(6)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dismiss")

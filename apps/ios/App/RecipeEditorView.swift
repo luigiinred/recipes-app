@@ -90,14 +90,14 @@ struct RecipeEditorView: View {
                 if let scannedText {
                     Section {
                         DisclosureGroup(scannedTextTitle) {
-                            Text(scannedText).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                            Text(scannedText).appFont(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         }
                     } footer: {
                         if notice == nil { Text("Check the recipe below against the scan before saving.") }
                     }
                 }
                 Section {
-                    PlainField("Title", text: $title).font(.title3.weight(.semibold))
+                    PlainField("Title", text: $title).appFont(.title3, weight: .semibold)
                     PlainField("Summary", text: $summary, axis: .vertical)
                 }
                 Section {
@@ -209,7 +209,7 @@ struct RecipeEditorView: View {
     @ViewBuilder
     private func container<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         #if os(iOS)
-        Form { content() }
+        Form { content() }.scrollDismissesKeyboard(.immediately)
         #else
         Form { content() }.formStyle(.grouped)
         #endif
@@ -310,7 +310,7 @@ struct RecipeEditorView: View {
         HStack(spacing: 10) {
             Image(systemName: "text.alignleft").foregroundStyle(Theme.accent).accessibilityHidden(true)
             PlainField("Section name", text: line.item)
-                .font(.headline)
+                .appFont(.headline)
                 .focused($focused, equals: line.wrappedValue.id)
             #if os(macOS)
             Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
@@ -349,7 +349,7 @@ struct RecipeEditorView: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if let number {
                 Text("\(number)")
-                    .font(.footnote.weight(.bold))
+                    .appFont(.footnote, weight: .bold)
                     .foregroundStyle(.white)
                     .frame(width: 22, height: 22)
                     .background(Theme.accent, in: Circle())
@@ -360,7 +360,7 @@ struct RecipeEditorView: View {
             if showsTime {
                 PlainField("m:ss", text: line.time)
                     .multilineTextAlignment(.trailing)
-                    .font(.footnote.monospacedDigit())
+                    .appFont(.footnote).monospacedDigit()
                     .foregroundStyle(Theme.accent)
                     .frame(width: 52)
                     .accessibilityLabel("Video timestamp")

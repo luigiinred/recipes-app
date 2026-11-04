@@ -21,6 +21,17 @@ final class RecipeStoreTests: XCTestCase {
         XCTAssertTrue(try store.list().isEmpty)
     }
 
+    func testListReportsProgressPerFileIncludingPlaceholders() throws {
+        let store = RecipeStore(directory: directory)
+        try store.save(Recipe(title: "Pancakes"))
+        try store.save(Recipe(title: "Waffles"))
+        try Data().write(to: directory.appendingPathComponent(".\(UUID().uuidString.lowercased()).json.icloud"))
+        try Data().write(to: directory.appendingPathComponent("notes.txt"))
+        var reports: [[Int]] = []
+        XCTAssertEqual(try store.list { reports.append([$0, $1]) }.count, 2)
+        XCTAssertEqual(reports, [[0, 3], [1, 3], [2, 3], [3, 3]])
+    }
+
     func testRejectsEmptyTitle() {
         XCTAssertThrowsError(try RecipeStore(directory: directory).save(Recipe(title: "  ")))
     }

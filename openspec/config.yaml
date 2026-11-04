@@ -1,0 +1,46 @@
+schema: spec-driven
+
+context: |
+  Monorepo: SwiftUI app for iOS and macOS (apps/ios, with the RecipeKit package and CLI),
+  a self-hostable Node server (apps/server) and a React web UI (apps/web), sharing
+  packages/schema.
+  The app and the server read and write the same library format (one JSON file per recipe,
+  meal, grocery item and feed, plus JPEG photos). Any data-model change must stay
+  compatible across both and with docs/sync-protocol.md.
+  For each change, state which platforms it touches (iOS, macOS, server, web); app-only
+  features that need on-device frameworks are not expected in the web UI.
+
+rules:
+  tasks:
+    - Include the test commands to run (npm test, swift test in apps/ios)
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

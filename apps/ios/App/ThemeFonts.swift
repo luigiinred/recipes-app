@@ -51,12 +51,16 @@ enum ThemeFonts {
     private static func font(_ style: FontStyle, _ textStyle: UIFont.TextStyle, _ weight: UIFont.Weight) -> UIFont {
         let size = UIFont.preferredFont(forTextStyle: textStyle).pointSize
         let base = UIFont.systemFont(ofSize: size, weight: weight)
+        if let family = style.family {
+            let descriptor = UIFontDescriptor(fontAttributes: [.family: family, .traits: [UIFontDescriptor.TraitKey.weight: weight]])
+            return UIFont(descriptor: descriptor, size: size)
+        }
         let design: UIFontDescriptor.SystemDesign
         switch style {
         case .serif: design = .serif
-        case .sans: return base
         case .rounded: design = .rounded
         case .monospaced: design = .monospaced
+        default: return base
         }
         guard let descriptor = base.fontDescriptor.withDesign(design) else { return base }
         return UIFont(descriptor: descriptor, size: size)

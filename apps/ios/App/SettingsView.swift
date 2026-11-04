@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
+    case home, recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -39,10 +39,11 @@ struct SettingsView: View {
         NavigationStack {
             Form { rows }
                 .formStyle(.grouped)
+                .settingsSpacing()
                 .themedCanvas()
                 .navigationTitle("Settings")
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(inSheet ? .inline : .large)
                 #endif
                 .toolbar {
                     if inSheet { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
@@ -54,6 +55,7 @@ struct SettingsView: View {
     private var split: some View {
         NavigationSplitView {
             List(selection: $page) { rows }
+                .settingsSpacing()
                 .themedCanvas()
                 .navigationTitle("Settings")
                 .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
@@ -70,6 +72,9 @@ struct SettingsView: View {
     @ViewBuilder
     private var rows: some View {
         Section {
+            #if os(iOS)
+            NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
+            #endif
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
             NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
@@ -122,6 +127,12 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
+        case .home:
+            #if os(iOS)
+            HomeSettingsPage()
+            #else
+            EmptyView()
+            #endif
         case .recipes: RecipesSettingsPage()
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
@@ -140,6 +151,11 @@ private struct RecipesSettingsPage: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
+    @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
+    #if os(iOS)
+    @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
+    @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
+    #endif
 
     var body: some View {
         Form {
@@ -155,6 +171,49 @@ private struct RecipesSettingsPage: View {
             } footer: {
                 Text("Favorites are a heart on the recipes you love. Star ratings give each recipe one to five stars, and Top Rated lists the 4 and 5 star ones. Both are always in a recipe’s ⋯ menu, and switching never deletes either.")
             }
+            Section {
+                ForEach(RecipeDetail.allCases, id: \.self) { detail in
+                    Toggle(isOn: Binding(
+                        get: { RecipeDetail.parse(recipeDetailsRaw).contains(detail) },
+                        set: { on in
+                            var details = RecipeDetail.parse(recipeDetailsRaw)
+                            if on { details.insert(detail) } else { details.remove(detail) }
+                            recipeDetailsRaw = RecipeDetail.raw(details)
+                        }
+                    )) {
+                        Label(detail.title, systemImage: detail.symbol)
+                    }
+                }
+            } header: {
+                Text("Recipe details")
+            } footer: {
+                Text("What shows under each recipe's title in cards and lists.")
+            }
+            #if os(iOS)
+            Section {
+                NavigationLink { QuickFiltersSettingsPage() } label: {
+                    Label("Quick Filters", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            } header: {
+                Text("Search")
+            } footer: {
+                Text("The buttons above the search bar. Choose which filters and tags they show and in what order.")
+            }
+            Section {
+                Toggle("Remember last sort", isOn: $remembersSort)
+                if !remembersSort {
+                    Picker("Default sort", selection: $defaultSort) {
+                        ForEach(RecipeSort.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                    }
+                }
+            } header: {
+                Text("Sorting")
+            } footer: {
+                Text(remembersSort
+                     ? "The Recipes home keeps the last sort you chose."
+                     : "The Recipes home opens sorted this way each time, and a sort you choose lasts until you leave the app.")
+            }
+            #endif
             Section {
                 Toggle("Show Delete", isOn: $showDeleteSwipe)
             } header: {
@@ -174,6 +233,125 @@ private struct RecipesSettingsPage: View {
         .settingsPage("Recipes")
     }
 }
+
+#if os(iOS)
+/// Which sections the Home page shows, in order.
+struct HomeSettingsPage: View {
+    @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
+    @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
+
+    var body: some View {
+        let hidden = HomeSection.hidden(hiddenRaw, order: orderRaw)
+        List {
+            Section {
+                ForEach(HomeSection.order(orderRaw)) { section in
+                    Toggle(isOn: Binding(
+                        get: { !hidden.contains(section) },
+                        set: { shown in
+                            var hidden = hidden
+                            if shown { hidden.remove(section) } else { hidden.insert(section) }
+                            hiddenRaw = HomeSection.raw(HomeSection.allCases.filter(hidden.contains))
+                            orderRaw = HomeSection.raw(HomeSection.order(orderRaw))
+                        }
+                    )) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(section.title)
+                                Text(section.detail).appFont(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: section.symbol)
+                        }
+                    }
+                }
+                .onMove { from, to in
+                    var order = HomeSection.order(orderRaw)
+                    order.move(fromOffsets: from, toOffset: to)
+                    orderRaw = HomeSection.raw(order)
+                }
+            } header: {
+                Text("Sections")
+            } footer: {
+                Text("Drag to reorder. Turned-off sections don't show on Home.")
+            }
+            Section {
+                Button("Reset to Default") {
+                    withAnimation { orderRaw = ""; hiddenRaw = "" }
+                }
+                .disabled(orderRaw.isEmpty && hiddenRaw.isEmpty)
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .settingsPage("Home")
+    }
+}
+
+/// Which quick filter chips the Search tab shows, in order: the built-in filters and any tags.
+private struct QuickFiltersSettingsPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.quickChips) private var raw = QuickChip.raw(QuickChip.defaults)
+    @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+
+    private var style: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
+    private var chips: [QuickChip] { QuickChip.parse(raw) }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(chips, id: \.self) { chip in
+                    Label(chip.title(style), systemImage: chip.symbol(style))
+                }
+                .onMove { from, to in
+                    var chips = chips
+                    chips.move(fromOffsets: from, toOffset: to)
+                    raw = QuickChip.raw(chips)
+                }
+                .onDelete { offsets in
+                    var chips = chips
+                    chips.remove(atOffsets: offsets)
+                    raw = QuickChip.raw(chips)
+                }
+            } header: {
+                Text("Shown")
+            } footer: {
+                Text(chips.isEmpty ? "No quick filters show above the search bar." : "Drag to reorder. Filters that are on move to the front as icons.")
+            }
+            let filters = QuickFilter.allCases.map(QuickChip.filter).filter { !chips.contains($0) }
+            if !filters.isEmpty {
+                Section("Filters") {
+                    ForEach(filters, id: \.self) { add($0) }
+                }
+            }
+            let tags = flattened(library.categoryTree).map { QuickChip.tag($0.path) }.filter { !chips.contains($0) }
+            if !tags.isEmpty {
+                Section("Tags") {
+                    ForEach(tags, id: \.self) { chip in
+                        if case .tag(let path) = chip { add(chip, title: CategoryTree.displayName(path)) }
+                    }
+                }
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .settingsPage("Quick Filters")
+    }
+
+    private func add(_ chip: QuickChip, title: String? = nil) -> some View {
+        Button {
+            withAnimation { raw = QuickChip.raw(chips + [chip]) }
+        } label: {
+            Label {
+                Text(title ?? chip.title(style)).foregroundStyle(.primary)
+            } icon: {
+                Image(systemName: "plus.circle.fill").foregroundStyle(.green)
+            }
+        }
+    }
+
+    private func flattened(_ nodes: [CategoryNode]) -> [CategoryNode] {
+        nodes.flatMap { [$0] + flattened($0.children) }
+    }
+}
+#endif
 
 private struct PlannerSettingsPage: View {
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue
@@ -357,9 +535,15 @@ struct RemindersSettingsPage: View {
 
 struct ThemeSettingsPage: View {
     @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
     @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
     @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
     @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var scheme
+    private var custom = StoredCustomTheme()
+
+    private var theme: ColorTheme { ColorTheme(rawValue: themeRaw) ?? .classic }
+    private var font: FontStyle { FontStyle(rawValue: fontStyle) ?? .serif }
 
     private var customAccent: Binding<Color> {
         Binding(
@@ -371,83 +555,358 @@ struct ThemeSettingsPage: View {
     var body: some View {
         Form {
             Section {
-                preview
+                ThemePreview().themedRow(raised: true)
             }
             Section {
-                Picker("Appearance", selection: $appearance) {
-                    ForEach(Appearance.allCases) { Label($0.title, systemImage: $0.symbol).tag($0.rawValue) }
+                ThemeTileRow {
+                    ForEach(Appearance.allCases) { mode in
+                        ThemeTile(title: mode.title, isSelected: appearance == mode.rawValue) {
+                            appearance = mode.rawValue
+                        } thumbnail: {
+                            appearanceThumbnail(mode)
+                        }
+                    }
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                .themedRow(raised: true)
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("System follows your device. Pitch Black suits OLED screens, and Sepia is a warm, low-glare page.")
+                Text("Auto follows your device between light and dark.")
             }
             Section {
-                Picker("Font", selection: $fontStyle) {
-                    ForEach(FontStyle.allCases) { style in
-                        Text(style.title).fontDesign(style.design).tag(style.rawValue)
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } header: {
-                Text("Font")
-            } footer: {
-                Text("Used for recipes, lists and settings throughout the app. Text size still follows your device's settings.")
-            }
-            Section {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
-                    ForEach(AccentPreset.all) { preset in
-                        Button { accentHex = preset.hex } label: {
-                            Circle()
-                                .fill(preset.color)
-                                .frame(width: 36, height: 36)
-                                .overlay {
-                                    if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
-                                        Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.white)
-                                    }
-                                }
+                ThemeTileRow {
+                    ForEach(ColorTheme.colors + [.custom]) { option in
+                        ThemeTile(title: option.title, isSelected: theme == option) {
+                            themeRaw = option.rawValue
+                        } thumbnail: {
+                            ThemeThumbnail(swatch: preview(option, scheme), scheme: scheme)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(preset.name)
-                        .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
                     }
                 }
-                .padding(.vertical, 4)
-                ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
-                Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
-                    .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
+                .themedRow(raised: true)
+                NavigationLink { CustomThemePage() } label: { Label("Theme Creator", systemImage: "slider.horizontal.3") }
+                    .themedRow(raised: true)
             } header: {
-                Text("Accent color")
+                Text("Color")
             } footer: {
-                Text("Buttons, links, highlights and ratings.")
+                Text("Classic is plain white or black with an accent you pick. The other colors tint the page and cards and bring their own accent. Theme Creator makes a Custom one.")
+            }
+            if theme == .classic {
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
+                        ForEach(AccentPreset.all) { preset in
+                            Button { accentHex = preset.hex } label: {
+                                Circle()
+                                    .fill(preset.color)
+                                    .frame(width: 36, height: 36)
+                                    .overlay {
+                                        if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
+                                            Image(systemName: "checkmark").appFont(.footnote, weight: .bold).foregroundStyle(.white)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(preset.name)
+                            .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
+                    Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
+                        .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
+                } header: {
+                    Text("Accent color")
+                } footer: {
+                    Text("Buttons, links, highlights and ratings.")
+                }
+            }
+            Section {
+                NavigationLink { FontSettingsPage() } label: {
+                    LabeledContent {
+                        Text(font.title)
+                    } label: {
+                        Label("Font", systemImage: "textformat")
+                    }
+                }
+                .themedRow(raised: true)
+            } footer: {
+                Text("Used for recipes, lists and settings throughout the app.")
             }
         }
         .formStyle(.grouped)
         .settingsPage("Theme")
     }
 
-    private var preview: some View {
+    private func preview(_ theme: ColorTheme, _ scheme: ColorScheme) -> Swatch {
+        theme.previewSwatch(for: scheme, classicAccent: accentHex, custom: custom.colors)
+    }
+
+    @ViewBuilder
+    private func appearanceThumbnail(_ mode: Appearance) -> some View {
+        switch mode {
+        case .light: ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
+        case .dark: ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark)
+        case .system:
+            ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
+                .overlay { ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark).mask(DiagonalHalf()) }
+        }
+    }
+}
+
+struct FontSettingsPage: View {
+    @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
+
+    var body: some View {
+        Form {
+            Section {
+                ThemePreview().themedRow(raised: true)
+            }
+            fonts("System", FontStyle.system)
+            fonts("Serif", FontStyle.serifs)
+            fonts("Sans Serif", FontStyle.sansSerifs)
+            Section {
+                rows(FontStyle.typewriters)
+            } header: {
+                Text("Typewriter")
+            } footer: {
+                Text("Text size still follows your device's settings.")
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Font")
+    }
+
+    private func fonts(_ title: String, _ styles: [FontStyle]) -> some View {
+        Section(title) { rows(styles) }
+    }
+
+    private func rows(_ styles: [FontStyle]) -> some View {
+        ForEach(styles) { style in
+            Button { fontStyle = style.rawValue } label: {
+                HStack {
+                    VStack {
+                        Text(style.title)
+                            .font(style.family.map { .custom($0, size: 17, relativeTo: .body) } ?? .system(.body, design: style.design))
+                            .foregroundStyle(.primary)
+                    }
+                    .fontDesign(nil)
+                    Spacer()
+                    if fontStyle == style.rawValue {
+                        Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(Theme.accent)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(fontStyle == style.rawValue ? .isSelected : [])
+            .themedRow(raised: true)
+        }
+    }
+}
+
+/// Picture tiles three to a row, like the system's own appearance picker.
+private struct ThemeTileRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3), spacing: 14) {
+            content
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+/// A tiny recipe screen: a title, two cards of text and an accent button.
+struct ThemeThumbnail: View {
+    let swatch: Swatch
+    let scheme: ColorScheme
+
+    private var ink: Color { scheme == .dark ? .white : .black }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            swatch.canvas
+            VStack(alignment: .leading, spacing: 6) {
+                Capsule().fill(ink.opacity(0.85)).frame(width: 38, height: 6)
+                card(lines: [0.8, 0.55])
+                card(lines: [0.65])
+                Capsule().fill(swatch.accent).frame(width: 30, height: 10)
+            }
+            .padding(9)
+        }
+        .aspectRatio(0.75, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.separator))
+        .accessibilityHidden(true)
+    }
+
+    private func card(lines: [CGFloat]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(lines.indices, id: \.self) { index in
+                GeometryReader { proxy in
+                    Capsule().fill(ink.opacity(index == 0 ? 0.6 : 0.3)).frame(width: proxy.size.width * lines[index])
+                }
+                .frame(height: 4)
+            }
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(swatch.surface, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+}
+
+private struct ThemeTile<Thumbnail: View>: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    @ViewBuilder let thumbnail: Thumbnail
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                thumbnail
+                    .frame(maxWidth: 110)
+                    .padding(3)
+                    .overlay {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(accent, lineWidth: 3)
+                        }
+                    }
+                Text(title)
+                    .appFont(.footnote, weight: isSelected ? .semibold : .regular)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+private struct DiagonalHalf: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.maxX * 0.6, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.maxX * 0.4, y: rect.maxY))
+            path.closeSubpath()
+        }
+    }
+}
+
+private struct ThemePreview: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Sunday Sauce").font(.system(.title2, weight: .bold))
+            Text("Sunday Sauce").appFont(.title2, weight: .bold)
             IngredientLine(text: "2 tbsp olive oil, plus more for serving")
             Text("Simmer for 20 minutes, stirring now and then.").foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 Label("Cook", systemImage: "frying.pan")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline, weight: .semibold)
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(Theme.accent, in: Capsule())
                     .foregroundStyle(.white)
                 Label("4.5", systemImage: "star.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .appFont(.subheadline, weight: .semibold)
                     .foregroundStyle(Theme.accent)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Builds the Custom theme: a page, card and accent color for light and for dark.
+struct CustomThemePage: View {
+    @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
+    @AppStorage(AppSettings.Key.accentColor) private var classicAccent = Theme.defaultAccentHex
+    @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var scheme
+    private var custom = StoredCustomTheme()
+    @State private var editing: ColorScheme?
+
+    private var isOn: Bool { themeRaw == ColorTheme.custom.rawValue }
+    private var edited: ColorScheme { editing ?? scheme }
+
+    /// Any edit switches to the Custom theme, so the change shows straight away.
+    private func color(_ part: WritableKeyPath<Swatch, String>) -> Binding<Color> {
+        Binding(
+            get: { Color(hex: custom.colors.swatch(for: edited)[keyPath: part]) ?? .white },
+            set: {
+                var swatch = custom.colors.swatch(for: edited)
+                swatch[keyPath: part] = $0.hex(in: environment)
+                custom.set(swatch, for: edited)
+                themeRaw = ColorTheme.custom.rawValue
+            }
+        )
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                ThemePreview().themedRow(raised: true)
+            }
+            Section {
+                ThemeTileRow {
+                    ForEach([ColorScheme.light, .dark], id: \.self) { variant in
+                        ThemeTile(title: variant == .dark ? "Dark" : "Light", isSelected: edited == variant) {
+                            editing = variant
+                        } thumbnail: {
+                            ThemeThumbnail(swatch: custom.colors.swatch(for: variant), scheme: variant)
+                        }
+                    }
+                }
+                .themedRow(raised: true)
+            } header: {
+                Text("Editing")
+            } footer: {
+                Text("Custom has its own colors for light and for dark, and follows the Appearance you pick in Theme.")
+            }
+            Section {
+                ColorPicker("Page", selection: color(\.canvasHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+                ColorPicker("Cards", selection: color(\.surfaceHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+                ColorPicker("Accent", selection: color(\.accentHex), supportsOpacity: false)
+                    .themedRow(raised: true)
+            } header: {
+                Text(edited == .dark ? "Dark colors" : "Light colors")
+            } footer: {
+                Text("The page sits behind every screen, cards and rows sit on it, and the accent colors buttons, links and ratings.")
+            }
+            Section {
+                Menu {
+                    ForEach(ColorTheme.colors) { starter in
+                        Button(starter.title) { start(from: starter) }
+                    }
+                } label: {
+                    Label("Start From a Theme", systemImage: "square.on.square")
+                }
+                .themedRow(raised: true)
+            } footer: {
+                Text("Copies a theme's light and dark colors here to tweak.")
+            }
+            if !isOn {
+                Section {
+                    Button("Use Custom Theme") { themeRaw = ColorTheme.custom.rawValue }
+                        .themedRow(raised: true)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Theme Creator")
+    }
+
+    private func start(from starter: ColorTheme) {
+        for variant in [ColorScheme.light, .dark] {
+            custom.set(starter.previewSwatch(for: variant, classicAccent: classicAccent), for: variant)
+        }
+        themeRaw = ColorTheme.custom.rawValue
     }
 }
 
@@ -461,6 +920,7 @@ private struct IntelligenceSettingsPage: View {
             Section {
                 statusRow("Smart Plan for My Week", ready: status.isAvailable)
                 statusRow("Recipes from video captions", ready: status.isAvailable)
+                statusRow("Ideas from meal photos", ready: status.isAvailable)
                 statusRow("Photos with Image Playground", ready: override?.imagePlayground ?? supportsImagePlayground)
             } footer: {
                 if status.isAvailable {
@@ -535,7 +995,7 @@ private struct PromptSettingsPage: View {
             Section {
                 if customized {
                     TextEditor(text: $text)
-                        .font(.callout)
+                        .appFont(.callout)
                         .frame(minHeight: 280)
                         .autocorrectionDisabled()
                         #if os(iOS)
@@ -543,7 +1003,7 @@ private struct PromptSettingsPage: View {
                         #endif
                 } else {
                     Text(action.defaultInstructions)
-                        .font(.callout)
+                        .appFont(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
@@ -650,9 +1110,17 @@ private struct DataSettingsPage: View {
     }
 }
 
+extension View {
+    /// Room between a Settings page's title and its first section.
+    func settingsSpacing() -> some View {
+        safeAreaPadding(.top, 16)
+    }
+}
+
 private extension View {
     func settingsPage(_ title: String) -> some View {
-        themedCanvas()
+        settingsSpacing()
+            .themedCanvas()
             .navigationTitle(title)
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

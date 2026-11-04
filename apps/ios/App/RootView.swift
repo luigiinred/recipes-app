@@ -23,30 +23,29 @@ struct RootView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var tab: AppTab
-    @State private var previousTab: AppTab
     @State private var query: String
+    @State private var browsing = HomeBrowsing()
     private let planMode: PlanMode
     private let showsSmartPlan: Bool
-    private let recipesPath: [RecipesRoute]
-    private let recipeSelection: Recipe.ID?
-    private let recipesCollection: RecipeCollection
+    /// Kept here so folding or unfolding a Duo, which swaps the tab items, keeps the open recipe.
+    @State private var recipesPath: [RecipesRoute]
+    @State private var searchPath: [RecipesRoute] = []
 
     init(
         tab: AppTab = .recipes, searchQuery: String = "", planMode: PlanMode = .queue, showsSmartPlan: Bool = false,
         recipesPath: [RecipesRoute] = [], recipeSelection: Recipe.ID? = nil, recipesCollection: RecipeCollection = .all
     ) {
-        self.recipesCollection = recipesCollection
-        self.recipesPath = recipesPath
-        self.recipeSelection = recipeSelection
+        var path = recipesPath
+        if path.isEmpty {
+            if recipesCollection != .all { path.append(.collection(recipesCollection)) }
+            if let recipeSelection { path.append(.recipe(recipeSelection)) }
+        }
+        _recipesPath = State(initialValue: path)
         _tab = State(initialValue: tab)
-        _previousTab = State(initialValue: tab)
         _query = State(initialValue: searchQuery)
         self.planMode = planMode
         self.showsSmartPlan = showsSmartPlan
     }
-
-    /// On the Plan and Groceries tabs the tab bar's search button becomes an add button for that tab.
-    private func searchBecomesAdd(on tab: AppTab) -> Bool { sizeClass == .compact && (tab == .plan || tab == .groceries) }
 
     private var sidebarCollections: [RecipeCollection] {
         RecipeCollection.smart(for: RatingStyle(rawValue: ratingStyleRaw) ?? .favorites)
@@ -58,7 +57,7 @@ struct RootView: View {
         TabView(selection: $tab) {
             if sizeClass == .regular {
                 TabSection("Recipes") {
-                    Tab("All Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+                    Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
                     ForEach(sidebarCollections, id: \.self) { collection in
                         Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
                             .defaultVisibility(.hidden, for: .tabBar)
@@ -73,28 +72,32 @@ struct RootView: View {
                     }
                 }
             } else {
-                Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: recipesPath, selection: recipeSelection, collection: recipesCollection) }
+                Tab("Home", systemImage: "house", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
-            if sizeClass == .regular {
-                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: true) }
-            }
-            Tab(value: AppTab.search, role: .search) {
-                SearchTab(query: $query)
-            } label: {
-                if searchBecomesAdd(on: tab) { Label("Add", systemImage: "plus") } else { Label("Search", systemImage: "magnifyingglass") }
+            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: sizeClass == .regular) }
+            // Wide screens search from the My Recipes page itself.
+            if sizeClass != .regular {
+                Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { SearchTab(query: $query, path: $searchPath) }
             }
         }
+        .environment(browsing)
         .tabViewStyle(.sidebarAdaptable)
         .sidebarFirst()
         .reviewPrompt()
         .tabViewSearchActivation(.searchTabSelection)
         .cookModeCover(cook)
-        .onChange(of: tab) { _, new in
-            guard new == .search, searchBecomesAdd(on: previousTab) else { previousTab = new; return }
-            tab = previousTab
-            router.add = previousTab == .plan ? .plan : .groceries
+        .onChange(of: sizeClass) { _, size in
+            if size != .regular, case .collection(let collection) = tab {
+                recipesPath = [.collection(collection)]
+                tab = .recipes
+                return
+            }
+            guard size == .regular, tab == .search else { return }
+            if !searchPath.isEmpty { recipesPath = searchPath }
+            searchPath = []
+            tab = .recipes
         }
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
@@ -122,46 +125,57 @@ private extension View {
     }
 }
 
+/// The My Recipes page again, with the search text as one more filter.
 struct SearchTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Binding var query: String
-    @State private var path: [UUID] = []
-
-    private var results: [Recipe] {
-        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : library.recipes.filter { $0.matches(query) }
-    }
+    @Binding var path: [RecipesRoute]
+    @State private var selection: Recipe.ID?
+    @FocusState private var isTyping: Bool
 
     var body: some View {
         NavigationStack(path: $path) {
-            List(results) { recipe in
-                NavigationLink(value: recipe.id) { RecipeRow(recipe: recipe) }
-                    .themedRow()
-                    .recipeSwipeActions(for: recipe)
-            }
-            .listStyle(.plain)
-            .themedCanvas()
-            .overlay {
-                if query.isEmpty {
-                    MascotEmptyState(scene: .bookPages, title: "Search Recipes",
-                                     message: "Find a recipe by name, ingredient, or category.")
-                } else if results.isEmpty {
-                    ContentUnavailableView.search(text: query)
+            RecipesHomeView(selection: $selection, query: query, showsQuickFilters: true, isSearching: isTyping) { isTyping = false }
+                .navigationDestination(for: RecipesRoute.self) { route in
+                    switch route {
+                    case .collection(let collection):
+                        RecipeListView(collection: .constant(collection), selection: $selection)
+                    case .recipe(let id):
+                        if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+                    case .tag(let path):
+                        RecipesHomeView(selection: $selection, tag: path).id(path)
+                    case .allRecipes:
+                        RecipesHomeView(selection: $selection, showsAllRecipes: true)
+                    case .homeSettings:
+                        HomeSettingsPage()
+                    case .discoverSources:
+                        DiscoverSourcesView()
+                    case .discover(let source, let route):
+                        DiscoverPage(sourceID: source, route: route) { path.append(.discover(source, .recipe($0))) }
+                    }
                 }
-            }
-            .navigationTitle("Search")
-            .navigationDestination(for: UUID.self) { id in
-                if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe) }
-            }
         }
-        .searchable(text: $query, prompt: "Search recipes")
+        .environment(\.openRecipesRoute) { path.append($0) }
+        .searchable(text: $query, prompt: "Search My Recipes")
+        .searchFocused($isTyping)
+        .onChange(of: selection) { _, id in
+            guard let id else { return }
+            isTyping = false
+            path.append(.recipe(id))
+            selection = nil
+        }
     }
 }
 
 struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
-    @State private var path: [RecipesRoute]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var localPath: [RecipesRoute] = []
     @State private var selection: Recipe.ID?
+    @FocusState private var isTyping: Bool
+    @Binding private var query: String
+    private let sharedPath: Binding<[RecipesRoute]>?
     private let root: RecipesRoute?
 
     init(root: RecipeCollection) {
@@ -170,29 +184,40 @@ struct RecipesTab: View {
 
     init(root: RecipesRoute) {
         self.root = root
-        _path = State(initialValue: [])
+        sharedPath = nil
+        _query = .constant("")
     }
 
-    init(path: [RecipesRoute] = [], selection: Recipe.ID? = nil, collection: RecipeCollection = .all) {
+    init(path: Binding<[RecipesRoute]>, query: Binding<String>) {
         root = nil
-        var path = path
-        if path.isEmpty {
-            if collection != .all { path.append(.collection(collection)) }
-            if let selection { path.append(.recipe(selection)) }
-        }
-        _path = State(initialValue: path)
+        sharedPath = path
+        _query = query
+    }
+
+    private var path: [RecipesRoute] {
+        get { sharedPath?.wrappedValue ?? localPath }
+        nonmutating set { if let sharedPath { sharedPath.wrappedValue = newValue } else { localPath = newValue } }
     }
 
     /// Home, then a collection or category, then a recipe, each pushed onto one stack. On iPad the first two are grids and a recipe fills the screen.
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: sharedPath ?? $localPath) {
             Group {
-                if let root { destination(root) } else { RecipesHomeView(selection: $selection) }
+                if let root { destination(root) }
+                else if sizeClass == .regular {
+                    RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty, isSearching: isTyping) { isTyping = false }
+                        .searchable(text: $query, prompt: "Search My Recipes")
+                        .searchFocused($isTyping)
+                } else {
+                    RecipesHomeView(selection: $selection)
+                }
             }
             .navigationDestination(for: RecipesRoute.self) { destination($0) }
         }
+        .environment(\.openRecipesRoute) { path.append($0) }
         .onChange(of: selection) { _, id in
             guard let id else { return }
+            isTyping = false
             path.append(.recipe(id))
             selection = nil
         }
@@ -217,6 +242,12 @@ struct RecipesTab: View {
             DiscoverSourcesView()
         case .discover(let source, let route):
             DiscoverPage(sourceID: source, route: route) { path.append(.discover(source, .recipe($0))) }
+        case .tag(let path):
+            RecipesHomeView(selection: $selection, tag: path).id(path)
+        case .allRecipes:
+            RecipesHomeView(selection: $selection, showsAllRecipes: true)
+        case .homeSettings:
+            HomeSettingsPage()
         }
     }
 }
@@ -236,6 +267,11 @@ struct PlanTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             PlanView(mode: $mode, open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { router.add = .plan } label: { Label("Add", systemImage: "plus") }
+                    }
+                }
                 .navigationDestination(for: UUID.self) { id in
                     if let recipe = library.recipe(id: id) {
                         RecipeDetailView(recipe: recipe)
@@ -251,6 +287,7 @@ struct PlanTab: View {
 }
 
 struct GroceriesTab: View {
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
@@ -259,6 +296,11 @@ struct GroceriesTab: View {
                 GroceriesBoard()
             } else {
                 GroceriesView(layout: .combined)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { router.add = .groceries } label: { Label("Add", systemImage: "plus") }
+                        }
+                    }
             }
         }
     }
@@ -447,7 +489,7 @@ struct SidebarView: View {
                 HStack {
                     Label(library.isICloud ? "Synced with iCloud" : "Stored on this device",
                           systemImage: library.isICloud ? "icloud" : "internaldrive")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
                     SettingsLink { Image(systemName: "gearshape") }

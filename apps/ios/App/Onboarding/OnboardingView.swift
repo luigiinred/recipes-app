@@ -90,7 +90,7 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text("Save, organize, and cook the recipes you love.")
-                    .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .appFont(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             stage(decorations: [.basil, .garlic, .broccoli]) { MascotCluster(height: 220) }
             VStack(alignment: .leading, spacing: 18) {
@@ -113,7 +113,7 @@ struct OnboardingView: View {
                 shareStep(4, "Check it over", "Recipes opens the editor with everything filled in. Tap the checkmark to save.")
             }
             Text("You can also paste a link from the Recipes toolbar.")
-                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .appFont(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
     }
 
@@ -198,11 +198,11 @@ struct OnboardingView: View {
             VStack(spacing: 12) {
                 MascotCluster(height: 150)
                 Text("You're all set!")
-                    .font(.system(.largeTitle, weight: .bold))
+                    .appFont(.largeTitle, weight: .bold)
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text("A few things worth knowing about as you settle in.")
-                    .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .appFont(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             VStack(alignment: .leading, spacing: 22) {
                 feature("frying.pan", "Cook mode", "Tap Cook on a recipe for big step-by-step text. Timers in the steps are found for you, and the screen stays awake.")
@@ -219,11 +219,11 @@ struct OnboardingView: View {
         VStack(spacing: 12) {
             if let character { MascotView(character: character, scene: scene, height: 150) }
             Text(title)
-                .font(.system(.largeTitle, weight: .bold))
+                .appFont(.largeTitle, weight: .bold)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
-                .font(.body)
+                .appFont(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -253,13 +253,13 @@ struct OnboardingView: View {
     private func feature(_ symbol: String, _ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: symbol)
-                .font(.title2)
+                .appFont(.title2)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 34)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).appFont(.headline)
+                Text(detail).appFont(.subheadline).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -269,14 +269,14 @@ struct OnboardingView: View {
     private func shareStep(_ number: Int, _ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Text("\(number)")
-                .font(.subheadline.weight(.bold))
+                .appFont(.subheadline, weight: .bold)
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(Theme.accent, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).appFont(.headline)
+                Text(detail).appFont(.subheadline).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -293,19 +293,19 @@ struct OnboardingView: View {
                         .overlay { sourceImage(source, saved: saved) }
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                     Image(systemName: saved != nil ? "checkmark.circle.fill" : "arrow.down.circle.fill")
-                        .font(.title)
+                        .appFont(.title)
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(Color.white, saved != nil ? accent : Color.black.opacity(0.45))
                         .symbolEffect(.bounce, value: saved != nil)
                         .padding(10)
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(source.title).font(.system(.title3, weight: .semibold)).foregroundStyle(.primary)
-                    Text(source.site).font(.caption.weight(.medium)).foregroundStyle(Theme.accent)
+                    Text(source.title).appFont(.title3, weight: .semibold).foregroundStyle(.primary)
+                    Text(source.site).appFont(.caption, weight: .medium).foregroundStyle(Theme.accent)
                     if let failure = failures[source.id] {
-                        Text(failure).font(.caption).foregroundStyle(.red).lineLimit(2)
+                        Text(failure).appFont(.caption).foregroundStyle(.red).lineLimit(2)
                     } else {
-                        Text(source.detail).font(.subheadline).foregroundStyle(.secondary)
+                        Text(source.detail).appFont(.subheadline).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, 4)
@@ -334,7 +334,7 @@ struct OnboardingView: View {
                     ProgressView()
                 } else {
                     Image(systemName: source.kind == .video ? "play.rectangle.fill" : "fork.knife")
-                        .font(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))
+                        .appFont(.largeTitle).foregroundStyle(Theme.accent.opacity(0.45))
                 }
                 if source.kind == .video, covers[source.id] != nil {
                     Image(systemName: "play.circle.fill").font(.system(size: 44)).foregroundStyle(.white.opacity(0.9)).shadow(radius: 4)
@@ -426,11 +426,11 @@ struct OnboardingView: View {
                 .frame(maxWidth: 400)
                 .disabled(step == .add && addedRecipes.isEmpty)
             if step == .add && addedRecipes.isEmpty {
-                Text("Add at least one recipe to continue.").font(.footnote).foregroundStyle(.secondary)
+                Text("Add at least one recipe to continue.").appFont(.footnote).foregroundStyle(.secondary)
             }
             Button("Skip Tour", action: onFinish)
                 .buttonStyle(.plain)
-                .font(.subheadline)
+                .appFont(.subheadline)
                 .foregroundStyle(.secondary)
                 .opacity(step == .discover ? 0 : 1)
                 .disabled(step == .discover)
@@ -465,8 +465,8 @@ private struct TryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: symbol).font(.headline).foregroundStyle(Theme.accent)
-            Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            Label(title, systemImage: symbol).appFont(.headline).foregroundStyle(Theme.accent)
+            Text(detail).appFont(.subheadline).foregroundStyle(.secondary)
             Button(action: perform) {
                 Label(action, systemImage: isDone ? "checkmark.circle.fill" : "plus.circle.fill").frame(maxWidth: .infinity)
             }
@@ -494,7 +494,7 @@ private struct CollectionStack: View {
             ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
                 HStack(spacing: 8) {
                     Image(systemName: item.symbol)
-                    Text(item.name).font(.system(.subheadline, weight: .semibold))
+                    Text(item.name).appFont(.subheadline, weight: .semibold)
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(.white)
@@ -513,9 +513,9 @@ private struct CollectionStack: View {
 private struct CookStepCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Step 3 of 5").font(.caption).foregroundStyle(.secondary)
+            Text("Step 3 of 5").appFont(.caption).foregroundStyle(.secondary)
             (Text("Simmer for ") + Text("\u{23F2}\u{FE0E} 10 minutes").foregroundStyle(Theme.accent) + Text(" until thickened."))
-                .font(.system(.title3, weight: .medium))
+                .appFont(.title3, weight: .medium)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -541,8 +541,8 @@ private struct ShareSheetMock: View {
                 .frame(width: 56, height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("World's Best Lasagna").font(.subheadline.weight(.semibold))
-                    Text("allrecipes.com").font(.caption).foregroundStyle(.secondary)
+                    Text("World's Best Lasagna").appFont(.subheadline, weight: .semibold)
+                    Text("allrecipes.com").appFont(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
@@ -568,7 +568,7 @@ private struct ShareSheetMock: View {
     private func appIcon(_ symbol: String, _ name: String, _ color: Color, highlighted: Bool = false) -> some View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(.title3)
+                .appFont(.title3)
                 .foregroundStyle(.white)
                 .frame(width: 52, height: 52)
                 .background(color.gradient, in: RoundedRectangle(cornerRadius: 12))
@@ -576,7 +576,7 @@ private struct ShareSheetMock: View {
                     if highlighted { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.accent, lineWidth: 2.5).padding(-5) }
                 }
             Text(name)
-                .font(.caption2.weight(highlighted ? .semibold : .regular))
+                .appFont(.caption2, weight: highlighted ? .semibold : .regular)
                 .foregroundStyle(highlighted ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 .multilineTextAlignment(.center)
         }

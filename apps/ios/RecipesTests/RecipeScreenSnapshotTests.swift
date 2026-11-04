@@ -28,6 +28,11 @@ struct RecipeScreenSnapshotTests {
         assertPageSnapshots(of: RecipeDetailView(recipe: SampleData.soup))
     }
 
+    @Test("edit a recipe's tags")
+    func editTags() {
+        assertPageSnapshots(of: TagsSheet(recipe: SampleData.shakshuka), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+    }
+
     @Test("add ingredients to groceries")
     func addToGroceries() {
         assertPageSnapshots(of: AddToGroceriesSheet(recipe: SampleData.chili), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)

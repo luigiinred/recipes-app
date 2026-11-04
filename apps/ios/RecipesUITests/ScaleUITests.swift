@@ -29,8 +29,7 @@ final class ScaleUITests: XCTestCase {
 
     func testScalingTheRecipeChangesTheIngredients() {
         let app = launch()
-        XCTAssertTrue(app.staticTexts["All Recipes"].waitForExistence(timeout: 15))
-        app.staticTexts["Dessert"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
         app.staticTexts["Too Much Chocolate Cake"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Servings"].waitForExistence(timeout: 5))
 

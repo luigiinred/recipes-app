@@ -103,10 +103,10 @@ struct RecipeSwipeActions: ViewModifier {
                 Button {
                     Task { await library.setQueued(recipe, !recipe.wantToCook) }
                 } label: {
-                    Label(recipe.wantToCook ? "Unqueue" : "Up Next",
-                          systemImage: recipe.wantToCook ? "minus.circle" : "text.line.first.and.arrowtriangle.forward")
+                    Label("Up Next", systemImage: recipe.wantToCook ? "text.badge.minus" : "text.badge.plus")
                 }
                 .tint(.orange)
+                .accessibilityLabel(recipe.wantToCook ? "Remove from Up Next" : "Add to Up Next")
             }
             .confirmationDialog("Delete “\(recipe.title)”?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Delete Recipe", role: .destructive) { Task { await library.delete(recipe) } }

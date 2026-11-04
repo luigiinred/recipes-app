@@ -64,6 +64,7 @@ struct DeveloperToolsView: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSpacing()
         .navigationTitle("Developer Tools")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -74,9 +75,9 @@ struct DeveloperToolsView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(source.name)
-                Text(source.site).font(.caption).foregroundStyle(.secondary)
+                Text(source.site).appFont(.caption).foregroundStyle(.secondary)
                 if case .failed(let message) = statuses[source.id] {
-                    Text(message).font(.caption).foregroundStyle(.red).lineLimit(2)
+                    Text(message).appFont(.caption).foregroundStyle(.red).lineLimit(2)
                 }
             }
             Spacer()

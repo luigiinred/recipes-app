@@ -15,8 +15,8 @@ settings:
     RECIPES_ICLOUD_CONTAINER: ${RECIPES_ICLOUD_CONTAINER}
     RECIPES_APP_GROUP: group.${RECIPES_BUNDLE_ID}
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.2"
-    CURRENT_PROJECT_VERSION: "17"
+    MARKETING_VERSION: "1.3"
+    CURRENT_PROJECT_VERSION: "20"
 targets:
   Recipes:
     type: application
@@ -36,7 +36,7 @@ targets:
         CFBundleDisplayName: Recipes
         NSRemindersFullAccessUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
         NSRemindersUsageDescription: Recipes keeps your grocery list in sync with a list in the Reminders app.
-        NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts.
+        NSCameraUsageDescription: Recipes uses the camera to scan recipes from books and printouts and to photograph meals you want to save.
         CFBundleIconName: AppIcon
         RecipesICloudContainer: "$(RECIPES_ICLOUD_CONTAINER)"
         RecipesAppGroup: "$(RECIPES_APP_GROUP)"

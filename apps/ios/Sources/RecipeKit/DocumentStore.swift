@@ -7,15 +7,18 @@ public struct DocumentStore<Item: Codable & Identifiable & Sendable>: Sendable w
         self.directory = directory
     }
 
-    public func list() throws -> [Item] {
+    /// Reading a file iCloud hasn't downloaded yet waits for it, so `progress` reports each file as it finishes.
+    public func list(progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }) throws -> [Item] {
         try ensureDirectory()
         let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: [])
+            .filter { $0.pathExtension == "json" || FileIO.isPlaceholder($0) }
         let decoder = RecipeCoding.makeDecoder()
         var items: [Item] = []
-        for url in urls {
+        progress(0, urls.count)
+        for (index, url) in urls.enumerated() {
+            defer { progress(index + 1, urls.count) }
             if FileIO.startDownloadIfPlaceholder(url, in: directory) { continue }
-            guard url.pathExtension == "json",
-                  let data = try? FileIO.read(url),
+            guard let data = try? FileIO.read(url),
                   let item = try? decoder.decode(Item.self, from: data) else { continue }
             items.append(item)
         }

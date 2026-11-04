@@ -12,7 +12,10 @@ struct RecipesApp: App {
     @StateObject private var discover = DiscoverController()
     @Environment(\.scenePhase) private var scenePhase
 
-    init() { ReminderCenter.shared.install() }
+    init() {
+        ColorTheme.migrateLegacyAppearance()
+        ReminderCenter.shared.install()
+    }
 
     var body: some Scene {
         WindowGroup {

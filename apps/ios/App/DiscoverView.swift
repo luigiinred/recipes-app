@@ -71,7 +71,7 @@ private struct DiscoverCatalogPage: View {
         switch route {
         case .home:
             #if os(iOS)
-            RecipesHomeView(selection: $selection)
+            DiscoverHomeView(catalog: catalog)
             #else
             RecipeListView(collection: .constant(.all), selection: $selection)
             #endif
@@ -167,6 +167,110 @@ struct DiscoverSourcesView: View {
         }
         .themedCanvas()
         .navigationTitle("Discover")
+    }
+}
+
+/// Home's way into Discover: straight into the server when only one has been shared.
+struct DiscoverEntryTile: View {
+    @Environment(\.appearance) private var appearance
+    @Environment(\.appAccent) private var accent
+    @Environment(\.openRecipesRoute) private var openRoute
+    let sources: [DiscoverSource]
+
+    private var detail: String {
+        sources.count == 1 ? sources[0].name : "\(sources.count) servers"
+    }
+
+    var body: some View {
+        Button { openRoute(.discoverHome(sources)) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "binoculars")
+                    .appFont(.title2)
+                    .foregroundStyle(accent)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Browse Shared Recipes").appFont(.headline).lineLimit(1)
+                    Text(detail).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.primary)
+    }
+}
+
+/// A Discover server's home: its collections, then its categories to drill into.
+private struct DiscoverHomeView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.discover) private var scope
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @ObservedObject var catalog: DiscoverCatalog
+
+    private var collections: [RecipeCollection] {
+        [.all, .recent, .uncategorized].filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
+    }
+
+    var body: some View {
+        Group {
+            if library.recipes.isEmpty {
+                DiscoverStatusView(catalog: catalog)
+            } else if sizeClass == .regular {
+                grid
+            } else {
+                list
+            }
+        }
+        .themedCanvas()
+        .navigationTitle(catalog.source.name)
+    }
+
+    private var list: some View {
+        List {
+            Section {
+                ForEach(collections, id: \.self) { collection in
+                    NavigationLink(value: RecipesRoute.opening(collection, in: scope)) {
+                        LabeledContent {
+                            Text("\(collection.filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
+                        } label: {
+                            Label(collection.title, systemImage: collection.symbol)
+                        }
+                    }
+                    .themedRow(raised: true)
+                }
+            }
+            if !library.categoryTree.isEmpty {
+                Section("Categories") {
+                    ForEach(library.categoryTree) { CategoryRow(node: $0) }
+                }
+            }
+        }
+        .contentMargins(.top, 16, for: .scrollContent)
+        .refreshable { await catalog.load(force: true) }
+    }
+
+    private var grid: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                GridSection(title: nil, minimum: 240, spacing: 16) {
+                    ForEach(collections, id: \.self) { FolderTile(collection: $0, recipes: library.recipes, scope: scope) }
+                }
+                if !library.categoryTree.isEmpty {
+                    GridSection(title: "Categories", minimum: 240, spacing: 16) {
+                        ForEach(library.categoryTree) {
+                            FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder", recipes: library.recipes, scope: scope)
+                        }
+                    }
+                }
+            }
+            .padding(24)
+        }
+        .refreshable { await catalog.load(force: true) }
     }
 }
 

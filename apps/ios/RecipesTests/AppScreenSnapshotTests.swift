@@ -12,6 +12,16 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
     }
 
+    @Test("A tag's page, with its subtags")
+    func tagPage() {
+        assertPageSnapshots(of: RootView(tab: .recipes, recipesPath: [.tag("Dinner")]), inNavigationStack: false)
+    }
+
+    @Test("Every recipe, from View All")
+    func allRecipes() {
+        assertPageSnapshots(of: RootView(tab: .recipes, recipesPath: [.allRecipes]), inNavigationStack: false)
+    }
+
     @Test("iPad: Recipes home as a grid of collections and categories")
     func iPadRecipesHome() {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .iPad)

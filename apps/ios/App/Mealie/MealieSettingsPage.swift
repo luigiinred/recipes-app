@@ -24,6 +24,7 @@ struct MealieSettingsPage: View {
             discoverSection
         }
         .formStyle(.grouped)
+        .settingsSpacing()
         .themedCanvas()
         .navigationTitle("Mealie")
         #if os(iOS)
@@ -216,7 +217,7 @@ private struct ShareAccessSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Image(systemName: isDiscover ? "binoculars" : "key.horizontal").font(.largeTitle).foregroundStyle(.tint)
+                Image(systemName: isDiscover ? "binoculars" : "key.horizontal").appFont(.largeTitle).foregroundStyle(.tint)
                 Text(isDiscover
                      ? "A new token was made for this link. Whoever opens it can browse your Mealie recipes in Recipes and copy them. The token could also change them outside the app, so send it only to people you trust."
                      : "A new token was made for this link. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust.")

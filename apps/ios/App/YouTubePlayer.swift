@@ -171,11 +171,11 @@ struct YouTubeEmbed: View {
             .shadow(color: .black.opacity(isCompact ? 0.25 : 0.3 * progress), radius: isCompact ? 8 : 10 * progress, y: 4)
 
             if let message = controller.errorMessage {
-                Label(message, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
+                Label(message, systemImage: "exclamationmark.triangle").appFont(.footnote).foregroundStyle(.orange)
             }
             if !isCompact, let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
                 Link(destination: url) { Label("Open in YouTube", systemImage: "arrow.up.right.square") }
-                    .font(.footnote)
+                    .appFont(.footnote)
                     .foregroundStyle(Theme.accent)
             }
         }

@@ -248,7 +248,7 @@ Verify the Developer Tools path on the final build, and decide whether you want 
 
 - [ ] **Support and privacy policy URLs.** Required, and neither exists in the repo.
 - [ ] **Reserve the app name** (see alternates above).
-- [ ] **Set the Apple ID** in `App/AppStoreLink.swift` once the app exists in App Store Connect. Until then Settings hides the "Help Support Us" section. The "Rate us" banner uses the in-app rating dialog and needs no ID.
+- [x] **Set the Apple ID** in `App/AppStoreLink.swift`. Without it Settings hides the "Help Support Us" section, and the "Rate us" banner falls back to the in-app rating dialog, which iOS may not show.
 - [x] **Mac screenshots.** Captured in a 1280 × 800 point window (2560 × 1600 pixels) from the capture tool, see [Regenerating the assets](#regenerating-the-assets). Re-run them whenever the Mac layout changes.
 - [ ] **Decide the accent.** The icon is peach, terracotta and orange, while the app's accent is a tomato red. The artwork keeps its dark brown ground with the icon's orange. See [`design.markdown`](../../../design.markdown).
 - [ ] **Preview the creative assets** in App Store Connect's template for header, search and universal.

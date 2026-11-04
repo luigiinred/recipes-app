@@ -2,12 +2,13 @@ import Foundation
 
 /// Something the on-device model does for the app, with the instructions it is given. Each can be replaced in Settings.
 public enum AIAction: String, CaseIterable, Identifiable, Sendable {
-    case videoCaptions, webPage, splitSteps, groupIngredients, planWeek
+    case mealPhotoName, videoCaptions, webPage, splitSteps, groupIngredients, planWeek
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
+        case .mealPhotoName: "Name a meal photo"
         case .videoCaptions: "Recipe from video captions"
         case .webPage: "Recipe from a web page"
         case .splitSteps: "Split a pasted method into steps"
@@ -18,6 +19,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
 
     public var summary: String {
         switch self {
+        case .mealPhotoName: "Names the dish or packaged food in a photo so it can be saved as an idea."
         case .videoCaptions: "Writes a recipe from what the cook says when a video has no written recipe."
         case .webPage: "Finds the recipe in a page's text when the page has no recipe data."
         case .splitSteps: "Breaks a method that was pasted as one block into separate steps."
@@ -28,6 +30,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
 
     public var symbol: String {
         switch self {
+        case .mealPhotoName: "camera"
         case .videoCaptions: "play.rectangle"
         case .webPage: "doc.text"
         case .splitSteps: "list.number"
@@ -42,6 +45,12 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
     /// The instructions the app ships with.
     public var defaultInstructions: String {
         switch self {
+        case .mealPhotoName: """
+            You name the food in a photo so the cook can find it later when deciding what to eat. \
+            Name a home-cooked dish plainly, the way a cook would, such as "Chicken Fried Rice". \
+            For packaged or store-bought food, use the product's name as printed, such as "Frozen Meat Lasagna", \
+            and leave out the brand unless it is part of how people refer to it.
+            """
         case .videoCaptions: """
             You turn the spoken captions of a cooking video into a written recipe. \
             Only use what the cook says. Do not invent ingredients, quantities or steps.

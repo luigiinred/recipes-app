@@ -21,7 +21,7 @@ struct ImportURLView: View {
                     Section {
                         VStack(spacing: 12) {
                             MascotLoader(height: 120).frame(maxWidth: .infinity)
-                            Text(address).font(.footnote).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                            Text(address).appFont(.footnote).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                             ImportProgressView(model: progress)
                         }
                         .padding(.vertical, 4)

@@ -35,7 +35,7 @@ struct PaperButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(.headline, weight: .semibold))
+            .appFont(.headline, weight: .semibold)
             .frame(maxWidth: .infinity, minHeight: 50)
             .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
             .background {
@@ -71,9 +71,9 @@ struct MascotEmptyState<Actions: View>: View {
     var body: some View {
         VStack(spacing: 10) {
             MascotView(character: character, scene: scene, height: 130)
-            Text(title).font(.system(.title3, weight: .bold)).multilineTextAlignment(.center)
+            Text(title).appFont(.title3, weight: .bold).multilineTextAlignment(.center)
             if let message {
-                Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(message).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             actions.padding(.top, 6)
         }
@@ -122,9 +122,9 @@ struct ImportLoadingView: View {
         VStack(spacing: 18) {
             MascotLoader(height: mascotHeight, character: character, frozenAt: mascotFrozenAt)
             VStack(spacing: 6) {
-                Text(title).font(.system(.title2, weight: .bold)).multilineTextAlignment(.center)
+                Text(title).appFont(.title2, weight: .bold).multilineTextAlignment(.center)
                 if let subtitle {
-                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(2)
+                    Text(subtitle).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(2)
                 }
             }
             ImportProgressView(model: model)
