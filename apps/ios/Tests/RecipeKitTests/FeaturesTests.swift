@@ -84,6 +84,14 @@ final class FeaturesTests: XCTestCase {
         XCTAssertEqual(parsedAtom.title, "Atom Eats")
         XCTAssertEqual(parsedAtom.entries.map(\.link.absoluteString), ["https://example.com/tart"])
         XCTAssertThrowsError(try FeedParser.parse(Data("<html></html>".utf8)))
+
+        let media = """
+        <rss xmlns:media="http://search.yahoo.com/mrss/"><channel><title>Paper</title>
+        <item><title>Stew</title><link>https://example.com/stew</link>
+        <media:content width="140" url="https://example.com/small.jpg"/><media:content width="460" url="https://example.com/large.jpg"/>
+        <media:content medium="video" url="https://example.com/clip.mp4"/></item></channel></rss>
+        """
+        XCTAssertEqual(try FeedParser.parse(Data(media.utf8)).entries.first?.imageURL?.absoluteString, "https://example.com/large.jpg")
     }
 
     func testCollections() {

@@ -33,12 +33,20 @@ struct DeveloperToolsView: View {
     ]
 
     @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
     @State private var statuses: [String: Status] = [:]
     @State private var isImportingAll = false
     @State private var addedSamples = false
 
     var body: some View {
         Form {
+            Section {
+                Toggle(isOn: $showsDiscover) { Label("Discover Tab", systemImage: "safari") }
+            } header: {
+                Text("Experiments")
+            } footer: {
+                Text("Adds a Discover tab that shows the newest recipes from RSS feeds, and a Discover Feeds page in Settings for picking them.")
+            }
             Section {
                 Button { addSamples() } label: { Label("Add Sample Recipes, Plan and Groceries", systemImage: "square.stack.3d.up") }
                     .sensoryFeedback(.success, trigger: addedSamples)

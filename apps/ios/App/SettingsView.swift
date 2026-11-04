@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
+    case recipes, planner, cooking, groceries, reminders, theme, discover, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -17,6 +17,7 @@ struct SettingsView: View {
     var listing = AppStoreLink.listing
     var writeReview = AppStoreLink.writeReview
 
+    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -81,6 +82,11 @@ struct SettingsView: View {
         Section {
             NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
         }
+        if showsDiscover {
+            Section {
+                NavigationLink(value: SettingsPage.discover) { Label("Discover Feeds", systemImage: "dot.radiowaves.up.forward") }
+            }
+        }
         Section {
             NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
         } header: {
@@ -130,6 +136,7 @@ struct SettingsView: View {
         case .groceries: GroceriesSettingsPage()
         case .reminders: RemindersSettingsPage()
         case .theme: ThemeSettingsPage()
+        case .discover: DiscoverFeedsPage()
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()

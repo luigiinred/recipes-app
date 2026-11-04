@@ -77,7 +77,7 @@ struct FeedEntryPreview: View {
             if let result = loader.results[entry.id] {
                 RecipeDetailView(recipe: result.recipe, previewSave: {
                     Task { _ = await library.add(result) }
-                }, previewImage: result.imageData)
+                }, previewImage: result.imageData, previewSaved: isSaved(result.recipe))
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("No recipe found", systemImage: "fork.knife")
@@ -94,6 +94,11 @@ struct FeedEntryPreview: View {
             errorMessage = nil
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func isSaved(_ recipe: Recipe) -> Bool {
+        let source = recipe.sourceURL ?? entry.link.absoluteString
+        return library.recipes.contains { $0.sourceURL == source }
     }
 }
 
@@ -181,6 +186,12 @@ struct AddFeedSheet: View {
     @State private var address = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var preview: FoundFeed?
+
+    private struct FoundFeed: Hashable {
+        let url: String
+        let title: String
+    }
 
     var body: some View {
         NavigationStack {
@@ -197,6 +208,13 @@ struct AddFeedSheet: View {
                     Text("Enter a recipe blog's address or its RSS feed.")
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                Section {
+                    Button("Preview Feed") { find { preview = FoundFeed(url: $0.url.absoluteString, title: $0.title) } }
+                        .disabled(address.isEmpty || isLoading)
+                }
+            }
+            .navigationDestination(item: $preview) { found in
+                FeedPreviewPage(url: found.url, title: found.title, onFollow: { dismiss() })
             }
             .formStyle(.grouped)
             .navigationTitle("Add Feed")
@@ -218,6 +236,13 @@ struct AddFeedSheet: View {
     }
 
     private func subscribe() {
+        find { found in
+            await library.add(Feed(url: found.url.absoluteString, title: found.title))
+            dismiss()
+        }
+    }
+
+    private func find(then use: @escaping (_ found: (url: URL, title: String)) async -> Void) {
         guard !isLoading else { return }
         var text = address.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.contains("://") { text = "https://" + text }
@@ -230,8 +255,8 @@ struct AddFeedSheet: View {
         Task {
             do {
                 let found = try await FeedService.discover(from: url)
-                await library.add(Feed(url: found.url.absoluteString, title: found.title))
-                dismiss()
+                isLoading = false
+                await use(found)
             } catch {
                 errorMessage = error.localizedDescription
                 isLoading = false

@@ -4,6 +4,7 @@ import SwiftUI
 enum AppSection: Hashable {
     case recipes(RecipeCollection)
     case feed(UUID)
+    case discover
     case plan
     case groceries
 }
@@ -11,12 +12,13 @@ enum AppSection: Hashable {
 #if os(iOS)
 struct RootView: View {
     enum AppTab: Hashable {
-        case recipes, feeds, plan, groceries, settings, search
+        case recipes, feeds, discover, plan, groceries, settings, search
         case collection(RecipeCollection)
     }
 
     @EnvironmentObject private var library: RecipeLibrary
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -68,6 +70,9 @@ struct RootView: View {
             } else {
                 Tab("Recipes", systemImage: "book.closed", value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
             }
+            if showsDiscover {
+                Tab("Discover", systemImage: "safari", value: AppTab.discover) { DiscoverTab() }
+            }
             Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(mode: planMode, showsSmartPlan: showsSmartPlan) }
             Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: sizeClass == .regular) }
@@ -82,6 +87,9 @@ struct RootView: View {
         .reviewPrompt()
         .tabViewSearchActivation(.searchTabSelection)
         .cookModeCover(cook)
+        .onChange(of: showsDiscover) { _, shows in
+            if !shows, tab == .discover { tab = .recipes }
+        }
         .onChange(of: sizeClass) { _, size in
             if size != .regular, case .collection(let collection) = tab {
                 recipesPath = [.collection(collection)]
@@ -394,6 +402,8 @@ struct RootView: View {
                 }
                 .id(feed.id)
             }
+        case .discover:
+            DiscoverView()
         case .plan:
             PlanView(mode: $planMode, open: { path.append($0) })
         case .groceries:
@@ -407,6 +417,7 @@ struct SidebarView: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.onboardingCompleted) private var onboarded = false
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
+    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
     @Binding var section: AppSection?
     @Binding var addingFeed: Bool
     @State private var recipesExpanded = true
@@ -426,6 +437,7 @@ struct SidebarView: View {
                         .onTapGesture { recipesExpanded.toggle() }
                         .categoryRootDrop()
                 }
+                if showsDiscover { Label("Discover", systemImage: "safari").tag(AppSection.discover) }
                 Label("Plan", systemImage: "calendar").tag(AppSection.plan)
                 Label("Groceries", systemImage: "checklist").tag(AppSection.groceries)
             }
