@@ -169,13 +169,12 @@ struct FeedStreamView: View {
 /// Popular feeds a kind of cooking at a time: tap a tab or swipe between them.
 struct FeedDiscoverPage: View {
     @Environment(\.appAccent) private var accent
-    @Environment(\.appearance) private var appearance
     @Environment(\.colorScheme) private var colorScheme
     @State private var kind = PopularFeed.Kind.allCases[0]
 
     var body: some View {
         pages
-            .safeAreaInset(edge: .top, spacing: 0) { tabs }
+            .safeAreaBar(edge: .top) { tabs }
             .themedCanvas()
             .navigationTitle("Discover")
             #if os(iOS)
@@ -219,15 +218,6 @@ struct FeedDiscoverPage: View {
             }
             .onChange(of: kind) { _, kind in withAnimation(.snappy) { proxy.scrollTo(kind, anchor: .center) } }
         }
-        .background(canvas)
-    }
-
-    private var canvas: Color {
-        #if os(iOS)
-        appearance.canvas ?? Color(uiColor: .systemBackground)
-        #else
-        appearance.canvas ?? Color(nsColor: .windowBackgroundColor)
-        #endif
     }
 
     private func tab(_ kind: PopularFeed.Kind) -> some View {
