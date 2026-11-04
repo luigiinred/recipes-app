@@ -1085,8 +1085,6 @@ struct HeroPick: Identifiable {
 /// The Today section: large photo cards a page at a time, with dots when there's more than one.
 /// Wide screens fit several cards side by side and scroll them like the other shelves.
 private struct HeroCarousel<Actions: View>: View {
-    static let minCardWidth: CGFloat = 340
-
     let picks: [HeroPick]
     let margin: CGFloat
     let open: (Recipe.ID) -> Void
@@ -1097,7 +1095,7 @@ private struct HeroCarousel<Actions: View>: View {
     private var available: CGFloat { max(width - 2 * margin, 0) }
 
     private var columns: Int {
-        max(1, Int((available + TagTile.spacing) / (Self.minCardWidth + TagTile.spacing)))
+        max(1, Int((available + TagTile.spacing) / (HeroCard.minWidth + TagTile.spacing)))
     }
 
     private var cardWidth: CGFloat {
@@ -1132,6 +1130,8 @@ private struct HeroCarousel<Actions: View>: View {
 }
 
 private struct HeroCard: View {
+    static let minWidth: CGFloat = 340
+
     let pick: HeroPick
 
     var body: some View {

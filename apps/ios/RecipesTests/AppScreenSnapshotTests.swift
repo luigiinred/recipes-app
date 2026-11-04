@@ -12,6 +12,18 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
     }
 
+    @Test("Home hero cards share the row on wide screens", arguments: [HomeSection.today, .upNext, .favorites])
+    func homeHero(_ section: HomeSection) {
+        let keys = [AppSettings.Key.homeSections, AppSettings.Key.hiddenHomeSections, AppSettings.Key.homeTipDismissed]
+        SampleData.defaults.set(section.rawValue, forKey: AppSettings.Key.homeSections)
+        SampleData.defaults.set(HomeSection.raw(HomeSection.allCases.filter { $0 != section }), forKey: AppSettings.Key.hiddenHomeSections)
+        SampleData.defaults.set(true, forKey: AppSettings.Key.homeTipDismissed)
+        defer { keys.forEach { SampleData.defaults.removeObject(forKey: $0) } }
+        let home = RootView(tab: .recipes)
+        assertPageSnapshots(of: home, named: section.rawValue, inNavigationStack: false, coverage: .adaptive, testName: "homeHero")
+        assertPageSnapshots(of: home, named: section.rawValue, inNavigationStack: false, coverage: .iPad, testName: "homeHero")
+    }
+
     @Test("A tag's page, with its subtags")
     func tagPage() {
         assertPageSnapshots(of: RootView(tab: .recipes, recipesPath: [.tag("Dinner")]), inNavigationStack: false)
