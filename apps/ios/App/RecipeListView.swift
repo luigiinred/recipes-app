@@ -529,6 +529,22 @@ extension View {
 enum RecipesRoute: Hashable {
     case collection(RecipeCollection)
     case recipe(UUID)
+    /// A tag's own home page.
+    case tag(String)
+    /// Every tag under a parent, or every top-level tag.
+    case tags(under: String?)
+}
+
+private struct OpenRecipesRouteKey: EnvironmentKey {
+    static let defaultValue: (RecipesRoute) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    /// Pushes onto the Recipes stack from views that can't use a `NavigationLink`, like tiles inside a list row.
+    var openRecipesRoute: (RecipesRoute) -> Void {
+        get { self[OpenRecipesRouteKey.self] }
+        set { self[OpenRecipesRouteKey.self] = newValue }
+    }
 }
 
 struct CategoryRow: View {

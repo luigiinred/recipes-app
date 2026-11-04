@@ -206,25 +206,30 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(HomeBrowsing.self) private var browsing
+    @Environment(\.openRecipesRoute) private var openRoute
     @Environment(\.appAccent) private var accent
     @Binding var selection: Recipe.ID?
     var query = ""
     var showsQuickFilters = false
     var isSearching = false
+    /// Shows one tag's page with its own filters instead of the shared home.
+    var tag: String?
     var onScroll: (() -> Void)?
 
     private var filter: HomeFilter {
         get {
-            var filter = browsing.filter
+            var filter = tag == nil ? browsing.filter : tagFilter
             filter.query = query
+            if let tag { filter.scope = .category(tag) }
             return filter
         }
         nonmutating set {
             var filter = newValue
             filter.query = ""
-            browsing.filter = filter
+            if tag == nil { browsing.filter = filter } else { tagFilter = filter }
         }
     }
+    @State private var tagFilter = HomeFilter()
     private var chosenSort: RecipeSort? {
         get { browsing.chosenSort }
         nonmutating set { browsing.chosenSort = newValue }
@@ -237,11 +242,8 @@ struct RecipesHomeView: View {
     @State private var pinnedWidth: CGFloat = 0
     /// A line of chip text, so icon-only chips are as tall as the labeled ones.
     @ScaledMetric(relativeTo: .body) private var chipLine: CGFloat = 22
-    @State private var showsAllTags = false
     @State private var titleInBar = false
     @State private var tagShelfWidth: CGFloat = 0
-    @State private var tagRowWidth: CGFloat = 0
-    @State private var tagScroll = ScrollPosition(edge: .leading)
     @State private var editing: Recipe?
 
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
@@ -274,6 +276,9 @@ struct RecipesHomeView: View {
         .toolbar {
             if !library.recipes.isEmpty {
                 ToolbarItem(placement: .primaryAction) { sortMenu }
+                if !isRegular {
+                    ToolbarItem(placement: .primaryAction) { styleButton }
+                }
             }
         }
         .safeAreaBar(edge: .bottom) {
@@ -354,67 +359,89 @@ struct RecipesHomeView: View {
         .reviewPromptInset()
     }
 
-    /// Searching hides the tags unless one is already narrowing the results.
-    private var showsTags: Bool {
-        !library.categoryTree.isEmpty && (!showsQuickFilters || filter.scope != .all)
+    private var tagNodes: [CategoryNode] {
+        guard let tag else { return library.categoryTree }
+        return CategoryTree.node(at: tag, in: library.categoryTree)?.children ?? []
     }
 
-    private var tagsOverflow: Bool { tagRowWidth > tagShelfWidth - 2 * margin }
+    /// Searching hides the tags unless one is already narrowing the results.
+    private var showsTags: Bool {
+        !tagNodes.isEmpty && (!showsQuickFilters || filter.scope != .all)
+    }
+
+    private var tagColumns: Int {
+        max(1, Int((tagShelfWidth - 2 * margin + TagTile.minSpacing) / (TagTile.width + TagTile.minSpacing)))
+    }
+
+    /// Spreads each page's columns across the full width.
+    private var tagSpacing: CGFloat {
+        let columns = CGFloat(tagColumns)
+        return columns > 1 ? max(TagTile.minSpacing, (tagShelfWidth - 2 * margin - columns * TagTile.width) / (columns - 1)) : 0
+    }
+
+    /// Pages of rows: two rows a page once the tags overflow one row.
+    private var tagPages: [[[CategoryNode]]] {
+        let tree = tagNodes, columns = tagColumns
+        let rows = stride(from: 0, to: tree.count, by: columns).map { Array(tree[$0..<min($0 + columns, tree.count)]) }
+        return stride(from: 0, to: rows.count, by: 2).map { Array(rows[$0..<min($0 + 2, rows.count)]) }
+    }
 
     private var tagsRow: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button(action: toggleAllTags) {
-                HStack {
-                    Text("Tags").appFont(.title3, weight: .semibold).foregroundStyle(.primary)
-                    Spacer()
-                    if tagsOverflow || showsAllTags {
-                        HStack(spacing: 4) {
-                            Text(showsAllTags ? "Show Less" : "Show All").contentTransition(.interpolate)
-                            Image(systemName: "chevron.down")
-                                .appFont(.caption, weight: .semibold)
-                                .rotationEffect(.degrees(showsAllTags ? 180 : 0))
+        let pages = tagPages
+        return VStack(alignment: .leading, spacing: 20) {
+            Group {
+                if pages.count > 1 {
+                    Button { openRoute(.tags(under: tag)) } label: {
+                        HStack {
+                            tagsTitle
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Text("View All")
+                                Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
+                            }
+                            .appFont(.subheadline, weight: .medium)
+                            .foregroundStyle(.tint)
                         }
-                        .appFont(.subheadline, weight: .medium)
-                        .foregroundStyle(.tint)
-                        .transition(.opacity)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("View All Tags")
+                } else {
+                    tagsTitle
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(!tagsOverflow && !showsAllTags)
-            .accessibilityLabel("Tags")
-            .accessibilityValue(tagsOverflow || showsAllTags ? (showsAllTags ? "Showing all" : "Showing one row") : "")
             .padding(.horizontal, margin)
             ScrollView(.horizontal, showsIndicators: false) {
-                TagShelf(wraps: showsAllTags, width: tagShelfWidth - 2 * margin, spacing: 16) { tagTiles }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-                        if !showsAllTags { tagRowWidth = width }
+                HStack(alignment: .top, spacing: tagSpacing) {
+                    ForEach(pages, id: \.first?.first?.id) { page in
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(page, id: \.first?.id) { row in
+                                HStack(alignment: .top, spacing: tagSpacing) {
+                                    ForEach(row) { tagTile($0) }
+                                }
+                            }
+                        }
+                        .frame(width: max(tagShelfWidth - 2 * margin, 0), alignment: .topLeading)
                     }
+                }
+                .scrollTargetLayout()
             }
             .contentMargins(.horizontal, margin, for: .scrollContent)
-            .scrollPosition($tagScroll)
-            .scrollDisabled(showsAllTags || !tagsOverflow)
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+            .scrollDisabled(pages.count < 2)
             .scrollClipDisabled()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagShelfWidth = $0 }
         }
     }
 
-    private func toggleAllTags() {
-        withAnimation(.spring(duration: 0.5, bounce: 0.2)) {
-            tagScroll.scrollTo(edge: .leading)
-            showsAllTags.toggle()
-        }
+    private var tagsTitle: some View {
+        Text("Tags").appFont(.title3, weight: .semibold).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
     }
 
-    private var tagTiles: some View {
-        ForEach(library.categoryTree) { node in
-            let collection = RecipeCollection.category(node.path)
-            TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
-                    count: count(in: collection), isOn: isWithin(node)) {
-                filter.scope = isWithin(node) ? .all : collection
-            }
-        }
+    private func tagTile(_ node: CategoryNode) -> some View {
+        let collection = RecipeCollection.category(node.path)
+        return TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                       count: count(in: collection), isOn: isWithin(node), route: .tag(node.path))
     }
 
     private func isWithin(_ node: CategoryNode) -> Bool {
@@ -511,7 +538,16 @@ struct RecipesHomeView: View {
         .accessibilityValue(sort.title)
     }
 
-    static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
+    private var styleButton: some View {
+        let other: RecipeListStyle = style == .cards ? .list : .cards
+        return Button { withAnimation(.snappy) { style = other } } label: {
+            Label("Show \(other.title)", systemImage: other.symbol)
+                .labelStyle(.iconOnly)
+                .contentTransition(.symbolEffect(.replace))
+        }
+    }
+
+        static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
 
     /// The page title sits here; once it scrolls under the bar, the bar shows it instead.
     private func header(count: Int) -> some View {
@@ -529,15 +565,6 @@ struct RecipesHomeView: View {
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
-            if !isRegular {
-                Picker("View as", selection: $style) {
-                    ForEach(RecipeListStyle.allCases, id: \.self) { option in
-                        Image(systemName: option.symbol).accessibilityLabel(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
         }
         .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).midY < 0 } action: { hidden in
             withAnimation(.easeInOut(duration: 0.2)) { titleInBar = hidden }
@@ -589,37 +616,44 @@ private extension View {
     }
 }
 
-/// Tag tiles in one row, or wrapped to `width` so every tag shows; the same tiles move between the two.
-private struct TagShelf: Layout {
-    var wraps: Bool
-    var width: CGFloat
-    var spacing: CGFloat = 14
+/// Every tag under `parent` as tiles, then each folder's subtags; each opens that tag's page.
+struct AllTagsView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let parent: String?
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let frames = frames(subviews)
-        return CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+    private var nodes: [CategoryNode] {
+        guard let parent else { return library.categoryTree }
+        return CategoryTree.node(at: parent, in: library.categoryTree)?.children ?? []
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, frames(subviews)) {
-            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+    private static func folders(in nodes: [CategoryNode]) -> [CategoryNode] {
+        nodes.flatMap { $0.children.isEmpty ? [] : [$0] + folders(in: $0.children) }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                grid(nodes)
+                ForEach(Self.folders(in: nodes)) { folder in
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(CategoryTree.displayName(folder.path)).appFont(.title3, weight: .semibold)
+                        grid(folder.children)
+                    }
+                }
+            }
+            .padding(20)
         }
+        .themedCanvas()
+        .navigationTitle(parent.map { RecipeCollection.category($0).title } ?? "Tags")
     }
 
-    private func frames(_ subviews: Subviews) -> [CGRect] {
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
-        return subviews.map { subview in
-            let size = subview.sizeThatFits(.unspecified)
-            if wraps, x > 0, x + size.width > width {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
+    private func grid(_ nodes: [CategoryNode]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: TagTile.width + TagTile.minSpacing), spacing: 0)], spacing: 20) {
+            ForEach(nodes) { node in
+                let collection = RecipeCollection.category(node.path)
+                TagTile(title: node.name, collection: collection, symbol: node.children.isEmpty ? "tag" : "folder",
+                        count: collection.filter(library.recipes).count, route: .tag(node.path))
             }
-            defer {
-                x += size.width + spacing
-                rowHeight = max(rowHeight, size.height)
-            }
-            return CGRect(origin: CGPoint(x: x, y: y), size: size)
         }
     }
 }
@@ -628,12 +662,17 @@ private struct TagShelf: Layout {
 private struct TagTile: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.appAccent) private var accent
+    @Environment(\.openRecipesRoute) private var openRoute
     let title: String
     let collection: RecipeCollection
     let symbol: String
     let count: Int
-    let isOn: Bool
-    let action: () -> Void
+    var isOn = false
+    var route: RecipesRoute?
+    var action: () -> Void = {}
+
+    static let width: CGFloat = 76
+    static let minSpacing: CGFloat = 12
 
     private var cover: Recipe? {
         collection.filter(library.recipes)
@@ -642,43 +681,45 @@ private struct TagTile: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Group {
-                    if let cover {
-                        RecipeImageView(recipe: cover)
-                    } else {
-                        Image(systemName: symbol)
-                            .appFont(.title2)
-                            .foregroundStyle(accent)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }
-                }
-                .frame(width: 68, height: 68)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(isOn ? accent : .clear, lineWidth: 3)
-                }
-                .padding(.bottom, 2)
-                Text(title)
-                    .appFont(.footnote, weight: isOn ? .semibold : .regular)
-                    .foregroundStyle(isOn ? .primary : .secondary)
-                    .lineLimit(1)
-                Text(count == 1 ? "1 recipe" : "\(count) recipes")
-                    .appFont(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-            .frame(width: 76)
-            .opacity(count == 0 && !isOn ? 0.45 : 1)
-        }
+        Button { if let route { openRoute(route) } else { action() } } label: { label }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(count == 1 ? "1 recipe" : "\(count) recipes")")
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private var label: some View {
+        VStack(spacing: 4) {
+            Group {
+                if let cover {
+                    RecipeImageView(recipe: cover)
+                } else {
+                    Image(systemName: symbol)
+                        .appFont(.title2)
+                        .foregroundStyle(accent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+            }
+            .frame(width: 68, height: 68)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(isOn ? accent : .clear, lineWidth: 3)
+            }
+            .padding(.bottom, 2)
+            Text(title)
+                .appFont(.footnote, weight: isOn ? .semibold : .regular)
+                .foregroundStyle(isOn ? .primary : .secondary)
+                .lineLimit(1)
+            Text(count == 1 ? "1 recipe" : "\(count) recipes")
+                .appFont(.caption2)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+        .frame(width: Self.width)
+        .opacity(count == 0 && !isOn ? 0.45 : 1)
     }
 }
 
