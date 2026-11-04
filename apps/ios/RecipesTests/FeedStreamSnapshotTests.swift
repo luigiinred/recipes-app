@@ -23,9 +23,11 @@ final class FeedStreamSnapshotTests: XCTestCase {
     }
 
     func testHomeShelf() {
-        let defaults = UserDefaults(suiteName: "FeedsHomeShelf")!
-        defaults.set(true, forKey: AppSettings.Key.feedsTab)
-        assertPageSnapshots(of: RootView(tab: .recipes).defaultAppStorage(defaults), inNavigationStack: false, coverage: .adaptive)
+        assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
+    }
+
+    func testDiscover() {
+        assertPageSnapshots(of: FeedDiscoverPage())
     }
 
     func testFeedsPage() {

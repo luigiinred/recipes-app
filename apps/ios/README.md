@@ -31,7 +31,6 @@ A recipe manager synced through iCloud Drive, with a command-line tool for agent
 - **Apple Intelligence** (Settings shows what's ready on this device, and why when it isn't): writing a recipe from a video's captions, grouping ingredients, and Image Playground photos. When the model isn't available, imports still work and say why.
 - **Printing** and sharing.
 - Layouts respond to width (ingredients and steps sit side by side when there's room), including iPad multitasking, landscape, and wide dual-screen canvases.
-- Feeds (subscribing to recipe blogs) are built but hidden behind `AppFeatures.feeds`.
 
 ## Recipe format
 

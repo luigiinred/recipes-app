@@ -34,7 +34,6 @@ struct PopularFeed: Identifiable {
         PopularFeed(name: "RecipeTin Eats", detail: "Nagi Maehashi", url: "https://www.recipetineats.com/feed/", kind: .weeknight),
         PopularFeed(name: "Pinch of Yum", detail: "Lindsay Ostrom", url: "https://pinchofyum.com/feed", kind: .weeknight),
         PopularFeed(name: "Once Upon a Chef", detail: "Jennifer Segal", url: "https://www.onceuponachef.com/feed", kind: .weeknight),
-        PopularFeed(name: "Smitten Kitchen", detail: "Deb Perelman", url: "https://smittenkitchen.com/feed/", kind: .weeknight),
         PopularFeed(name: "Half Baked Harvest", detail: "Tieghan Gerard", url: "https://www.halfbakedharvest.com/feed/", kind: .weeknight),
         PopularFeed(name: "Spend With Pennies", detail: "Budget comfort food", url: "https://www.spendwithpennies.com/feed/", kind: .weeknight),
         PopularFeed(name: "Cafe Delites", detail: "Karina Carrington", url: "https://cafedelites.com/feed/", kind: .weeknight),
@@ -94,11 +93,6 @@ struct PopularFeed: Identifiable {
     ]
 }
 
-private enum FeedStreamRoute: Hashable {
-    case entry(FeedEntry)
-    case feeds
-}
-
 struct FeedStreamItem: Identifiable {
     let entry: FeedEntry
     let source: String
@@ -111,106 +105,135 @@ struct FeedStreamTab: View {
     }
 }
 
-/// Every subscribed feed merged into one stream, newest first.
+/// Each followed feed as its own row, with Discover a tap away. Rows load as they scroll into view and page in older posts at their ends.
 struct FeedStreamView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.appAccent) private var accent
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var source: UUID?
-
-    private var shownFeeds: [Feed] {
-        library.feeds.filter { source == nil || $0.id == source }
-    }
-
-    private var items: [FeedStreamItem] { loader.items(for: shownFeeds) }
-
-    private var failedFeeds: [Feed] {
-        shownFeeds.filter { if case .failed? = loader.states[$0.id] { true } else { false } }
-    }
-
-    private var isLoading: Bool {
-        shownFeeds.contains { if case .loaded? = loader.states[$0.id] { false } else if case .failed? = loader.states[$0.id] { false } else { true } }
-    }
 
     var body: some View {
-        Group {
-            if library.feeds.isEmpty {
-                ContentUnavailableView {
-                    Label("No feeds yet", systemImage: "dot.radiowaves.up.forward")
-                } description: {
-                    Text("Follow recipe sites and blogs to see their newest recipes here.")
-                } actions: {
-                    NavigationLink("Browse Popular Feeds", value: FeedStreamRoute.feeds)
-                        .buttonStyle(.borderedProminent)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 36) {
+                discoverLink
+                if library.feeds.isEmpty {
+                    Text("Follow recipe sites, blogs and YouTube channels from Discover and their newest posts show up here.")
+                        .appFont(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                } else {
+                    Text("Following")
+                        .appFont(.title2, weight: .bold)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.horizontal)
+                        .padding(.bottom, -20)
+                    ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title) }
                 }
-            } else {
-                stream
             }
+            .padding(.vertical)
         }
         .themedCanvas()
         .navigationTitle("Feeds")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                NavigationLink(value: FeedStreamRoute.feeds) { Label("Feeds", systemImage: "dot.radiowaves.up.forward") }
+                // Destination links, so this page works inside any stack, including Home's typed path.
+                NavigationLink { RecipeFeedsPage() } label: { Label("Manage Feeds", systemImage: "slider.horizontal.3") }
             }
         }
-        .navigationDestination(for: FeedStreamRoute.self) { route in
-            switch route {
-            case .entry(let entry): FeedEntryPreview(entry: entry)
-            case .feeds: RecipeFeedsPage()
+        .refreshable {
+            await withTaskGroup(of: Void.self) { group in
+                for feed in library.feeds { group.addTask { await loader.load(feed, force: true) } }
             }
-        }
-        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
-        .refreshable { await loader.loadAll(library.feeds, force: true) }
-        .onChange(of: library.feeds) { _, feeds in
-            if let source, !feeds.contains(where: { $0.id == source }) { self.source = nil }
         }
     }
 
-    private var stream: some View {
+    private var discoverLink: some View {
+        NavigationLink { FeedDiscoverPage() } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkle.magnifyingglass").appFont(.title2).foregroundStyle(accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Discover").appFont(.headline)
+                    Text("Popular recipe sites by kind of cooking").appFont(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+    }
+}
+
+/// Popular feeds a kind of cooking at a time: tap a tab or swipe between them.
+struct FeedDiscoverPage: View {
+    @Environment(\.appAccent) private var accent
+    @Environment(\.appearance) private var appearance
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var kind = PopularFeed.Kind.allCases[0]
+
+    var body: some View {
+        pages
+            .safeAreaInset(edge: .top, spacing: 0) { tabs }
+            .themedCanvas()
+            .navigationTitle("Discover")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+    }
+
+    @ViewBuilder
+    private var pages: some View {
+        #if os(iOS)
+        TabView(selection: $kind) {
+            ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
+                page(kind).tag(kind)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        #else
+        page(kind).id(kind)
+        #endif
+    }
+
+    private func page(_ kind: PopularFeed.Kind) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                sourceChips
-                if items.isEmpty, isLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
-                } else {
-                    GridSection(title: nil, minimum: 300, spacing: 20) {
-                        ForEach(items) { item in
-                            NavigationLink(value: FeedStreamRoute.entry(item.entry)) {
-                                FeedCard(entry: item.entry, source: item.source)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                if !failedFeeds.isEmpty {
-                    Text("Couldn't load \(failedFeeds.map(\.title).formatted()).")
-                        .appFont(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                }
+            LazyVStack(alignment: .leading, spacing: 36) {
+                ForEach(PopularFeed.all.filter { $0.kind == kind }) { FeedRow(url: $0.url, title: $0.name, detail: $0.detail) }
             }
             .padding(.vertical)
         }
     }
 
-    private var sourceChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip("All", isOn: source == nil) { source = nil }
-                ForEach(library.feeds) { feed in
-                    chip(feed.title, isOn: source == feed.id) { source = feed.id }
+    private var tabs: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
+                        tab(kind).id(kind)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal)
+            .onChange(of: kind) { _, kind in withAnimation(.snappy) { proxy.scrollTo(kind, anchor: .center) } }
         }
+        .background(canvas)
     }
 
-    private func chip(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
+    private var canvas: Color {
+        #if os(iOS)
+        appearance.canvas ?? Color(uiColor: .systemBackground)
+        #else
+        appearance.canvas ?? Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
+    private func tab(_ kind: PopularFeed.Kind) -> some View {
+        let isOn = self.kind == kind
+        return Button { withAnimation(.snappy) { self.kind = kind } } label: {
+            Text(kind.rawValue)
                 .appFont(.subheadline, weight: .medium)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -218,8 +241,77 @@ struct FeedStreamView: View {
                 .foregroundStyle(isOn ? .white : accent.mix(with: colorScheme == .dark ? .white : .black, by: 0.35))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// One feed's posts, swiped sideways.
+struct FeedRow: View {
+    static let cardWidth: CGFloat = 240
+
+    @EnvironmentObject private var loader: FeedLoader
+    let url: String
+    let title: String
+    var detail: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                NavigationLink { FeedPreviewPage(url: url, title: title) } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(title).appFont(.headline).lineLimit(1)
+                            Image(systemName: "chevron.right").appFont(.caption, weight: .semibold).foregroundStyle(.secondary)
+                        }
+                        if let detail { Text(detail).appFont(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                FollowFeedButton(url: url, title: title)
+            }
+            .padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 16) { cards }
+                    .scrollTargetLayout()
+            }
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollClipDisabled()
+        }
+        .task { await loader.load(url: url) }
     }
 
+    @ViewBuilder
+    private var cards: some View {
+        switch loader.states[url] {
+        case .loaded(let entries):
+            ForEach(entries) { entry in
+                NavigationLink { FeedEntryPreview(entry: entry) } label: {
+                    FeedCard(entry: entry, source: "").frame(width: Self.cardWidth)
+                }
+                .buttonStyle(.plain)
+            }
+            if entries.isEmpty {
+                Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
+            } else if !loader.exhausted.contains(url) {
+                ProgressView()
+                    .frame(width: 60, height: Self.cardWidth * 10 / 16)
+                    .onAppear { Task { await loader.loadMore(url: url) } }
+                    .id(entries.count)
+            }
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .appFont(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(height: Self.cardWidth * 10 / 16)
+        case .loading, nil:
+            ForEach(0..<3, id: \.self) { index in
+                FeedCard(entry: .placeholder(index), source: "").frame(width: Self.cardWidth).loadingPlaceholder()
+            }
+        }
+    }
 }
 
 extension FeedLoader {
@@ -228,7 +320,7 @@ extension FeedLoader {
         var seen = Set<String>()
         return feeds
             .flatMap { feed -> [FeedStreamItem] in
-                guard case .loaded(let entries)? = states[feed.id] else { return [] }
+                guard let entries = states[feed.url]?.entries else { return [] }
                 return entries.map { FeedStreamItem(entry: $0, source: feed.title) }
             }
             .filter { seen.insert($0.id).inserted }
@@ -260,7 +352,9 @@ struct FeedShelf: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 16) {
                 if items.isEmpty {
-                    ProgressView().frame(width: cardWidth, height: cardWidth * 10 / 16)
+                    ForEach(0..<2, id: \.self) { index in
+                        FeedCard(entry: .placeholder(index), source: "Recipe site").frame(width: cardWidth).loadingPlaceholder()
+                    }
                 }
                 ForEach(items) { item in
                     Button { openRoute(.feedPost(item.entry)) } label: {
@@ -278,6 +372,14 @@ struct FeedShelf: View {
     }
 }
 #endif
+
+extension FeedEntry {
+    /// Stand-in post whose title gives a loading card its shape.
+    static func placeholder(_ index: Int) -> FeedEntry {
+        FeedEntry(title: index.isMultiple(of: 2) ? "A recipe title that wraps onto two lines" : "A shorter recipe title",
+                  link: URL(string: "https://example.com/\(index)")!, published: .now)
+    }
+}
 
 struct FeedCard: View {
     let entry: FeedEntry
@@ -302,9 +404,9 @@ struct FeedCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.title).appFont(.title3, weight: .semibold).lineLimit(2)
                 HStack(spacing: 4) {
-                    Text(source)
+                    if !source.isEmpty { Text(source) }
                     if let date = entry.published {
-                        Text("·")
+                        if !source.isEmpty { Text("·") }
                         Text(date, format: .relative(presentation: .named))
                     }
                 }
@@ -323,6 +425,7 @@ struct FeedCard: View {
 struct RecipeFeedsPage: View {
     @EnvironmentObject private var library: RecipeLibrary
     @State private var adding = false
+    var showsTabToggle = false
 
     private var customFeeds: [Feed] {
         let popular = Set(PopularFeed.all.map(\.url))
@@ -330,7 +433,8 @@ struct RecipeFeedsPage: View {
     }
 
     var body: some View {
-        Form {
+        List {
+            if showsTabToggle { TabVisibilitySection(tab: .feeds) }
             Section {
                 ForEach(customFeeds) { feed in
                     NavigationLink { FeedPreviewPage(url: feed.url, title: feed.title) } label: {
@@ -344,7 +448,7 @@ struct RecipeFeedsPage: View {
             } header: {
                 Text("Your Feeds")
             } footer: {
-                Text("Tap a feed to preview its newest posts. Paste any recipe site's address and Recipes finds its RSS feed.")
+                Text("Tap a feed to preview its newest posts. Paste any recipe site's or YouTube channel's address and Recipes finds its feed.")
             }
             ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
                 Section(kind.rawValue) {
@@ -352,13 +456,17 @@ struct RecipeFeedsPage: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .settingsSpacing()
+        .listStyle(.plain)
         .themedCanvas()
-        .navigationTitle("Recipe Feeds")
+        .navigationTitle("Feeds")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { adding = true } label: { Label("Add a Site or Feed", systemImage: "plus") }
+            }
+        }
         .sheet(isPresented: $adding) { AddFeedSheet() }
     }
 
@@ -390,10 +498,14 @@ struct FollowFeedButton: View {
     var body: some View {
         Button {
             Task {
-                if let subscribed { await library.remove(subscribed) }
-                else {
-                    await library.add(Feed(url: url, title: title))
+                if let subscribed {
+                    await library.remove(subscribed)
+                    ToastCenter.shared.show("Unfollowed \(title)", symbol: "minus.circle.fill") { await library.add(subscribed) }
+                } else {
+                    let feed = Feed(url: url, title: title)
+                    await library.add(feed)
                     onFollow?()
+                    ToastCenter.shared.show("Following \(title)") { await library.remove(feed) }
                 }
             }
         } label: {
@@ -409,34 +521,47 @@ struct FollowFeedButton: View {
 
 /// A feed's newest posts, to look at before following it.
 struct FeedPreviewPage: View {
+    @EnvironmentObject private var loader: FeedLoader
     let url: String
     let title: String
     var onFollow: (() -> Void)?
-    @State private var state: FeedLoader.State
+    private let seed: [FeedEntry]?
 
     init(url: String, title: String, seed: [FeedEntry]? = nil, onFollow: (() -> Void)? = nil) {
         self.url = url
         self.title = title
         self.onFollow = onFollow
-        _state = State(initialValue: seed.map { .loaded($0) } ?? .loading)
+        self.seed = seed
     }
 
     var body: some View {
         Group {
-            switch state {
+            switch seed.map(FeedLoader.State.loaded) ?? loader.states[url] ?? .loading {
             case .loading:
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                ScrollView {
+                    GridSection(title: nil, minimum: 300, spacing: 20) {
+                        ForEach(0..<6, id: \.self) { FeedCard(entry: .placeholder($0), source: "").loadingPlaceholder() }
+                    }
+                    .padding()
+                }
+                .scrollDisabled(true)
             case .failed(let message):
                 ContentUnavailableView("Couldn't load feed", systemImage: "exclamationmark.triangle", description: Text(message))
             case .loaded(let entries):
                 ScrollView {
                     GridSection(title: nil, minimum: 300, spacing: 20) {
                         ForEach(entries) { entry in
-                            NavigationLink { FeedEntryPreview(entry: entry) } label: { FeedCard(entry: entry, source: title) }
+                            NavigationLink { FeedEntryPreview(entry: entry) } label: { FeedCard(entry: entry, source: "") }
                                 .buttonStyle(.plain)
                         }
                     }
                     .padding()
+                    if seed == nil, !entries.isEmpty, !loader.exhausted.contains(url) {
+                        ProgressView()
+                            .padding()
+                            .onAppear { Task { await loader.loadMore(url: url) } }
+                            .id(entries.count)
+                    }
                 }
             }
         }
@@ -448,21 +573,6 @@ struct FeedPreviewPage: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) { FollowFeedButton(url: url, title: title, onFollow: onFollow) }
         }
-        .task(id: url) {
-            if case .loaded = state { return }
-            await load()
-        }
-    }
-
-    private func load() async {
-        guard let feedURL = URL(string: url) else {
-            state = .failed("Bad feed address.")
-            return
-        }
-        do {
-            state = .loaded(try await FeedService.fetch(feedURL).entries)
-        } catch {
-            state = .failed(error.localizedDescription)
-        }
+        .task(id: url) { if seed == nil { await loader.load(url: url) } }
     }
 }

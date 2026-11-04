@@ -1,58 +1,6 @@
 import RecipeKit
 import SwiftUI
 
-enum PlanMode: String, CaseIterable {
-    case queue, week
-
-    var title: String { self == .queue ? "Up Next" : "My Week" }
-}
-
-/// The planner: the queue of recipes to cook soon, and the week they land in. On an unfolded Duo each gets a page.
-struct PlanView: View {
-    @Binding var mode: PlanMode
-    let open: (UUID) -> Void
-    var showsSmartPlan = false
-
-    var body: some View {
-        GeometryReader { geometry in
-            if let fold = geometry.verticalFold {
-                HStack(spacing: 0) {
-                    page(.queue) { QueueView(open: open) }
-                        .frame(width: fold.minX)
-                    Color.clear.frame(width: fold.width)
-                    page(.week) { MyWeekView(open: open, showsSmartPlan: showsSmartPlan) }
-                }
-            } else {
-                VStack(spacing: 0) {
-                    Picker("Plan", selection: $mode) {
-                        ForEach(PlanMode.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    switch mode {
-                    case .queue: QueueView(open: open)
-                    case .week: MyWeekView(open: open, showsSmartPlan: showsSmartPlan)
-                    }
-                }
-            }
-        }
-        .navigationTitle("Plan")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-    }
-
-    private func page(_ mode: PlanMode, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(mode.title)
-                .appFont(.title3, weight: .semibold)
-                .padding(.horizontal, 20).padding(.vertical, 8)
-            content()
-        }
-    }
-}
-
 struct QueueView: View {
     @Environment(\.appAccent) private var accent
     @EnvironmentObject private var library: RecipeLibrary
@@ -112,11 +60,6 @@ struct QueueView: View {
         .environment(\.editMode, $editMode)
         .onChange(of: queue.count) { _, count in if count < 2 { editMode = .inactive } }
         #endif
-        .onChange(of: router.add) { _, target in
-            guard target == .plan else { return }
-            router.add = nil
-            adding = true
-        }
         .toolbar {
             #if os(iOS)
             if queue.count > 1 {

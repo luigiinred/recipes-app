@@ -33,20 +33,12 @@ struct DeveloperToolsView: View {
     ]
 
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @State private var statuses: [String: Status] = [:]
     @State private var isImportingAll = false
     @State private var addedSamples = false
 
     var body: some View {
         Form {
-            Section {
-                Toggle(isOn: $showsFeeds) { Label("Feeds Tab", systemImage: "dot.radiowaves.up.forward") }
-            } header: {
-                Text("Experiments")
-            } footer: {
-                Text("Adds a Feeds tab and a Home section with the newest recipes from RSS feeds, and a Recipe Feeds page in Settings for picking them.")
-            }
             Section {
                 Button { addSamples() } label: { Label("Add Sample Recipes, Plan and Groceries", systemImage: "square.stack.3d.up") }
                     .sensoryFeedback(.success, trigger: addedSamples)

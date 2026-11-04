@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case home, recipes, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
+    case home, recipes, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -17,7 +17,7 @@ struct SettingsView: View {
     var listing = AppStoreLink.listing
     var writeReview = AppStoreLink.writeReview
 
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
+    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -76,19 +76,28 @@ struct SettingsView: View {
             #if os(iOS)
             NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
             #endif
+            NavigationLink(value: SettingsPage.feeds) { TabRowLabel(tab: .feeds) }
+            NavigationLink(value: SettingsPage.upNext) { TabRowLabel(tab: .upNext) }
+            NavigationLink(value: SettingsPage.planner) { TabRowLabel(tab: .plan) }
+            NavigationLink(value: SettingsPage.groceries) { TabRowLabel(tab: .groceries) }
+            #if os(iOS)
+            if !splitsPages {
+                Toggle(isOn: $settingsInTabBar) { Label("Settings in Tab Bar", systemImage: "gearshape") }
+            }
+            #endif
+        } header: {
+            Text("Tabs")
+        } footer: {
+            Text(splitsPages ? "Open a tab to change how it works, or hide it if you don't use it." :
+                "Open a tab to change how it works, or hide it if you don't use it. Settings sits in the tab bar, or behind the gear on Home.")
+        }
+        Section {
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
-            NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
-            NavigationLink(value: SettingsPage.groceries) { Label("Groceries", systemImage: "checklist") }
             NavigationLink(value: SettingsPage.reminders) { Label("Reminders", systemImage: "bell") }
         }
         Section {
             NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
-        }
-        if showsFeeds {
-            Section {
-                NavigationLink(value: SettingsPage.feeds) { Label("Recipe Feeds", systemImage: "dot.radiowaves.up.forward") }
-            }
         }
         Section {
             NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
@@ -140,12 +149,13 @@ struct SettingsView: View {
             EmptyView()
             #endif
         case .recipes: RecipesSettingsPage()
+        case .upNext: UpNextSettingsPage()
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
         case .reminders: RemindersSettingsPage()
         case .theme: ThemeSettingsPage()
-        case .feeds: RecipeFeedsPage()
+        case .feeds: RecipeFeedsPage(showsTabToggle: true)
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
@@ -246,11 +256,8 @@ private struct RecipesSettingsPage: View {
 struct HomeSettingsPage: View {
     @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
-    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
 
-    private var listed: [HomeSection] {
-        HomeSection.order(orderRaw).filter { showsFeeds || $0 != .feeds }
-    }
+    private var listed: [HomeSection] { HomeSection.order(orderRaw) }
 
     var body: some View {
         let hidden = HomeSection.hidden(hiddenRaw, order: orderRaw)
@@ -365,6 +372,21 @@ private struct QuickFiltersSettingsPage: View {
 }
 #endif
 
+private struct UpNextSettingsPage: View {
+    var body: some View {
+        Form {
+            TabVisibilitySection(tab: .upNext)
+            Section {
+                Text("Swipe a recipe left to add it to Up Next. Planning a recipe takes it off the list.")
+                    .appFont(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Up Next")
+    }
+}
+
 private struct PlannerSettingsPage: View {
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue
     @AppStorage(AppSettings.Key.hiddenMeals) private var hiddenMeals = ""
@@ -372,6 +394,7 @@ private struct PlannerSettingsPage: View {
 
     var body: some View {
         Form {
+            TabVisibilitySection(tab: .plan)
             Section {
                 Picker("Add recipes as", selection: $defaultMeal) {
                     ForEach(MealChoice.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
@@ -391,7 +414,7 @@ private struct PlannerSettingsPage: View {
             }
         }
         .formStyle(.grouped)
-        .settingsPage("Planner")
+        .settingsPage("Plan")
     }
 
     private func shown(_ meal: Meal) -> Binding<Bool> {
@@ -429,6 +452,7 @@ private struct GroceriesSettingsPage: View {
 
     var body: some View {
         Form {
+            TabVisibilitySection(tab: .groceries)
             Section {
                 Toggle("Sync with Reminders", isOn: Binding(
                     get: { library.remindersEnabled },
@@ -1129,7 +1153,44 @@ extension View {
     }
 }
 
-private extension View {
+/// A tab's name in Settings, marked when it's hidden from the tab bar.
+private struct TabRowLabel: View {
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
+    let tab: MainTab
+
+    var body: some View {
+        LabeledContent {
+            if AppSettings.hiddenTabs(hiddenRaw).contains(tab) { Text("Hidden") }
+        } label: {
+            Label(tab.title, systemImage: tab.symbol)
+        }
+    }
+}
+
+/// The switch that shows or hides a tab, at the top of its settings page.
+struct TabVisibilitySection: View {
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
+    let tab: MainTab
+
+    var body: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { !AppSettings.hiddenTabs(hiddenRaw).contains(tab) },
+                set: { shown in
+                    var hidden = AppSettings.hiddenTabs(hiddenRaw)
+                    if shown { hidden.remove(tab) } else { hidden.insert(tab) }
+                    hiddenRaw = AppSettings.encode(hidden)
+                }
+            )) {
+                Label("Show \(tab.title) Tab", systemImage: tab.symbol)
+            }
+        } footer: {
+            Text("Hiding a tab keeps everything in it. Turn it back on any time.")
+        }
+    }
+}
+
+extension View {
     func settingsPage(_ title: String) -> some View {
         settingsSpacing()
             .themedCanvas()

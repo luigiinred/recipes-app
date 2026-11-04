@@ -115,10 +115,10 @@ private final class FeedXMLDelegate: NSObject, XMLParserDelegate {
     private func finishItem() {
         inItem = false
         guard let link = URL(string: draft.link, relativeTo: baseURL)?.absoluteURL, !draft.title.isEmpty else { return }
-        var image = URL(string: draft.image, relativeTo: baseURL)?.absoluteURL
-        if image == nil, let range = draft.summary.range(of: #"<img[^>]+src=["']([^"']+)["']"#, options: .regularExpression),
-           let src = draft.summary[range].range(of: #"(?<=src=["'])[^"']+"#, options: .regularExpression) {
-            image = URL(string: String(draft.summary[range][src]), relativeTo: baseURL)?.absoluteURL
+        var image = URL(string: Self.unescape(draft.image), relativeTo: baseURL)?.absoluteURL
+        if image == nil, let tag = draft.summary.range(of: #"<img\b[^>]*>"#, options: .regularExpression).map({ String(draft.summary[$0]) }) {
+            image = (Self.largestSource(inSrcset: tag) ?? Self.attribute("src", in: tag))
+                .flatMap { URL(string: Self.unescape($0), relativeTo: baseURL)?.absoluteURL }
         }
         let summary = RecipeImporter.clean(draft.summary)
         entries.append(FeedEntry(
@@ -126,8 +126,29 @@ private final class FeedXMLDelegate: NSObject, XMLParserDelegate {
             link: link,
             published: Self.date(from: draft.date),
             summary: String(summary.prefix(240)),
-            imageURL: image
+            imageURL: image.map(FeedImage.full)
         ))
+    }
+
+    private static func attribute(_ name: String, in tag: String) -> String? {
+        guard let range = tag.range(of: #"\b"# + name + #"\s*=\s*["']([^"']+)["']"#, options: [.regularExpression, .caseInsensitive]),
+              let value = tag[range].range(of: #"(?<=["'])[^"']+"#, options: .regularExpression) else { return nil }
+        return String(tag[range][value])
+    }
+
+    private static func largestSource(inSrcset tag: String) -> String? {
+        guard let srcset = attribute("srcset", in: tag) else { return nil }
+        return srcset.split(separator: ",")
+            .compactMap { candidate -> (url: String, width: Int)? in
+                let parts = candidate.split(separator: " ")
+                guard let url = parts.first else { return nil }
+                return (String(url), parts.dropFirst().first.flatMap { Int($0.dropLast()) } ?? 0)
+            }
+            .max { $0.width < $1.width }?.url
+    }
+
+    private static func unescape(_ string: String) -> String {
+        string.replacingOccurrences(of: "&amp;", with: "&").replacingOccurrences(of: "&#038;", with: "&")
     }
 
     private static func date(from string: String) -> Date? {
@@ -146,10 +167,47 @@ private final class FeedXMLDelegate: NSObject, XMLParserDelegate {
     }
 }
 
+public enum FeedImage {
+    /// Drops the on-the-fly resize WordPress image CDNs add, so a post shows its full photo.
+    public static func full(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), let items = parts.queryItems,
+              url.host?.hasSuffix(".wp.com") == true || url.path.contains("/tachyon/") || url.path.contains("/wp-content/") else { return url }
+        let resizing: Set<String> = ["resize", "fit", "w", "h", "crop"]
+        let kept = items.filter { !resizing.contains($0.name) }
+        guard kept.count != items.count else { return url }
+        parts.queryItems = kept.isEmpty ? nil : kept
+        return parts.url ?? url
+    }
+}
+
 public enum FeedService {
+    /// The given page of a feed. WordPress feeds page with `paged`; others ignore it and repeat the first page.
+    public static func pageURL(_ url: URL, page: Int) -> URL {
+        guard page > 1, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        parts.queryItems = (parts.queryItems ?? []).filter { $0.name != "paged" } + [URLQueryItem(name: "paged", value: String(page))]
+        return parts.url ?? url
+    }
+
     public static func fetch(_ url: URL) async throws -> (title: String, entries: [FeedEntry]) {
         let (data, _) = try await download(url)
         return try FeedParser.parse(data, baseURL: url)
+    }
+
+    /// The feed behind a shared link that names a source rather than one post: a YouTube channel or playlist, a site's front page, or a feed itself.
+    public static func followable(_ url: URL) async -> (url: URL, title: String)? {
+        let host = url.host?.lowercased() ?? ""
+        let path = url.path
+        if host == "youtube.com" || host.hasSuffix(".youtube.com") {
+            if path == "/playlist", let list = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "list" })?.value,
+               let feed = URL(string: "https://www.youtube.com/feeds/videos.xml?playlist_id=\(list)") {
+                return (try? await fetch(feed)).map { (feed, $0.title) }
+            }
+            guard ["/@", "/channel/", "/c/", "/user/"].contains(where: path.hasPrefix) else { return nil }
+            return try? await discover(from: url)
+        }
+        let lowered = path.lowercased()
+        let isSourcePage = path.isEmpty || path == "/" || ["/feed", "/feed/", "/rss", "/rss/", ".xml", ".rss", ".atom"].contains(where: lowered.hasSuffix)
+        return isSourcePage ? try? await discover(from: url) : nil
     }
 
     /// Accepts a feed URL or a site URL and finds the feed behind it.

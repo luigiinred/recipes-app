@@ -219,7 +219,7 @@ enum SampleData {
 
     static func feedLoader() -> FeedLoader {
         FeedLoader(
-            seed: Dictionary(uniqueKeysWithValues: feeds.map { ($0.id, FeedLoader.State.loaded(feedEntries)) }),
+            seed: Dictionary(uniqueKeysWithValues: feeds.map { ($0.url, FeedLoader.State.loaded(feedEntries)) }),
             results: [feedEntries[0].id: ImportResult(recipe: chili, imageData: images[chili.id])]
         )
     }
