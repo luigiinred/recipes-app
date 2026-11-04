@@ -38,7 +38,7 @@ enum AppSettings {
         static let customThemeDarkCanvas = "customThemeDarkCanvasHex"
         static let customThemeDarkSurface = "customThemeDarkSurfaceHex"
         static let customThemeDarkAccent = "customThemeDarkAccentHex"
-        static let discoverTab = "experimentDiscoverTab"
+        static let feedsTab = "experimentFeedsTab"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }

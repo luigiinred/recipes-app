@@ -138,7 +138,7 @@ enum QuickChip: Hashable {
 
 /// A block on the Home page; Settings → Home orders them and hides any.
 enum HomeSection: String, CaseIterable, Identifiable {
-    case today, upNext, tags, discover, recipes
+    case today, upNext, tags, discover, feeds, recipes
 
     var id: Self { self }
 
@@ -148,6 +148,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .upNext: "Up Next"
         case .tags: "Tags"
         case .discover: "Discover"
+        case .feeds: "Feeds"
         case .recipes: "Recipes"
         }
     }
@@ -157,7 +158,8 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .today: "sun.max"
         case .upNext: "text.line.first.and.arrowtriangle.forward"
         case .tags: "tag"
-        case .discover: "safari"
+        case .discover: "binoculars"
+        case .feeds: "dot.radiowaves.up.forward"
         case .recipes: "book.closed"
         }
     }
@@ -167,12 +169,13 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .today: "What's planned for today."
         case .upNext: "The recipes you've queued to cook."
         case .tags: "Your top-level tags as photo tiles."
-        case .discover: "The newest posts from feeds you follow."
+        case .discover: "Mealie servers shared with you."
+        case .feeds: "The newest posts from recipe sites you follow."
         case .recipes: "Your first five recipes, with View All."
         }
     }
 
-    var isOnByDefault: Bool { true }
+    var isOnByDefault: Bool { self != .discover }
 
     private static func parse(_ raw: String) -> [HomeSection] {
         raw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) }
@@ -256,13 +259,14 @@ final class HomeBrowsing {
 struct RecipesHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.listStyle) private var style = RecipeListStyle.list
     @AppStorage(AppSettings.Key.homeSort) private var savedSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
-    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @AppStorage(AppSettings.Key.homeSections) private var homeSectionsRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
@@ -348,7 +352,7 @@ struct RecipesHomeView: View {
         switch section {
         case .today: todayPicks
         case .upNext: upNextPicks
-        case .tags, .discover, .recipes: []
+        case .tags, .discover, .feeds, .recipes: []
         }
     }
 
@@ -441,8 +445,15 @@ struct RecipesHomeView: View {
                     .themedRow()
             }
         case .discover:
-            if showsDiscoverShelf {
-                discoverRow
+            if !discover.sources.isEmpty {
+                discoverSection
+                    .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: 20, trailing: margin))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+            }
+        case .feeds:
+            if showsFeedShelf {
+                feedsRow
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 20, trailing: 0))
                     .listRowSeparator(.hidden)
                     .themedRow()
@@ -503,7 +514,9 @@ struct RecipesHomeView: View {
         case .tags:
             if showsTags { tagsRow }
         case .discover:
-            if showsDiscoverShelf { discoverRow }
+            if !discover.sources.isEmpty { discoverSection.padding(.horizontal, margin) }
+        case .feeds:
+            if showsFeedShelf { feedsRow }
         case .recipes:
             if isHome { recipesHeader(count: total).padding(.horizontal, margin) }
             GridSection(title: nil, minimum: 260, spacing: 24) {
@@ -573,6 +586,13 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             HeroCarousel(picks: picks, margin: margin) { selection = $0 }
+        }
+    }
+
+    private var discoverSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle(HomeSection.discover.title)
+            DiscoverEntryTile(sources: discover.sources)
         }
     }
 
@@ -685,14 +705,14 @@ struct RecipesHomeView: View {
         }
     }
 
-    private var showsDiscoverShelf: Bool { showsDiscover && isHome && !library.feeds.isEmpty }
+    private var showsFeedShelf: Bool { showsFeeds && isHome && !library.feeds.isEmpty }
 
-    private var discoverRow: some View {
+    private var feedsRow: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                sectionTitle("Discover")
+                sectionTitle(HomeSection.feeds.title)
                 Spacer()
-                Button { openRoute(.discover) } label: {
+                Button { openRoute(.feeds) } label: {
                     HStack(spacing: 4) {
                         Text("View All")
                         Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
@@ -702,10 +722,10 @@ struct RecipesHomeView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("View All of Discover")
+                .accessibilityLabel("View All Feeds")
             }
             .padding(.horizontal, margin)
-            DiscoverShelf(margin: margin, cardWidth: isRegular ? 300 : 260)
+            FeedShelf(margin: margin, cardWidth: isRegular ? 300 : 260)
         }
     }
 

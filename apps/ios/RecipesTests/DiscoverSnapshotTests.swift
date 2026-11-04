@@ -1,34 +1,46 @@
-import RecipeKit
-import SnapshotTesting
 import SwiftUI
-import XCTest
+import Testing
 @testable import Recipes
 
+@Suite("Discover", .serialized)
 @MainActor
-final class DiscoverSnapshotTests: XCTestCase {
-    func testStream() {
-        assertPageSnapshots(of: DiscoverView(), coverage: .adaptive)
+struct DiscoverSnapshotTests {
+    #if os(iOS)
+    @Test("recipes home lists Discover under the collections")
+    func home() {
+        assertPageSnapshots(of: RecipesHomeView(selection: .constant(nil)).environmentObject(SampleData.discover()))
     }
 
-    func testNoFeeds() {
-        assertPageSnapshots(of: DiscoverView().environmentObject(RecipeLibrary(recipes: [])))
+    @Test("iPad recipes home has a Discover tile and sidebar row")
+    func iPadHome() {
+        assertPageSnapshots(of: RootView(tab: .recipes).environmentObject(SampleData.discover()), inNavigationStack: false, coverage: .iPad)
     }
 
-    func testFeedPreview() {
-        assertPageSnapshots(of: FeedPreviewPage(url: SampleData.feeds[0].url, title: "Simply Recipes", seed: SampleData.feedEntries))
+    @Test("a category on the shared server")
+    func category() {
+        assertPageSnapshots(of: page(.collection(.category("Dinner"))))
+    }
+    #endif
+
+    @Test("the shared server's recipes, read-only")
+    func serverHome() {
+        assertPageSnapshots(of: page(.home))
     }
 
-    func testPostAsRecipe() {
-        assertPageSnapshots(of: FeedEntryPreview(entry: SampleData.feedEntries[0]))
+    @Test("a shared recipe offers to add it to yours")
+    func recipe() {
+        assertPageSnapshots(of: page(.recipe(SampleData.chili.id)))
     }
 
-    func testHomeShelf() {
-        let defaults = UserDefaults(suiteName: "DiscoverHomeShelf")!
-        defaults.set(true, forKey: AppSettings.Key.discoverTab)
-        assertPageSnapshots(of: RootView(tab: .recipes).defaultAppStorage(defaults), inNavigationStack: false, coverage: .adaptive)
+    @Test("Mealie settings list the Discover servers")
+    func settings() {
+        assertPageSnapshots(
+            of: MealieSettingsPage().environmentObject(SampleData.discover()),
+            macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet
+        )
     }
 
-    func testFeedsPage() {
-        assertPageSnapshots(of: DiscoverFeedsPage(), coverage: .sheet)
+    private func page(_ route: DiscoverRoute) -> some View {
+        DiscoverPage(sourceID: SampleData.discoverSource.id, route: route) { _ in }.environmentObject(SampleData.discover())
     }
 }

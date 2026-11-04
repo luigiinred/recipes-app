@@ -14,11 +14,18 @@ final class MealieLinkTests: XCTestCase {
         XCTAssertEqual(link.token, "abc")
     }
 
+    func testRoundTripsADiscoverLink() throws {
+        let link = MealieLink(server: URL(string: "https://mealie.example.com")!, token: "abc", kind: .discover)
+        XCTAssertEqual(link.url.host, "discover")
+        XCTAssertEqual(MealieLink(url: link.url), link)
+        XCTAssertEqual(MealieLink(url: URL(string: "recipes://mealie?server=m.example.com&token=abc")!)?.kind, .sync)
+    }
+
     func testRejectsLinksMissingAServerOrToken() throws {
         for text in [
             "recipes://mealie", "recipes://mealie?server=https://m.example.com", "recipes://mealie?token=abc",
             "recipes://mealie?server=https://m.example.com&token=", "recipes://mealie?server=ftp://m.example.com&token=abc",
-            "recipes://recipe/\(UUID().uuidString)", "https://mealie?server=m.example.com&token=abc",
+            "recipes://recipe/\(UUID().uuidString)", "recipes://discover?server=https://m.example.com", "https://mealie?server=m.example.com&token=abc",
         ] {
             XCTAssertNil(MealieLink(url: URL(string: text)!), text)
         }

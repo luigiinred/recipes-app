@@ -1,468 +1,290 @@
 import RecipeKit
 import SwiftUI
 
-struct PopularFeed: Identifiable {
-    enum Kind: String, CaseIterable {
-        case publications = "Magazines & Newspapers"
-        case weeknight = "Weeknight & Family"
-        case baking = "Baking & Desserts"
-        case vegetarian = "Vegetarian & Vegan"
-        case healthy = "Healthy & Low-Carb"
-        case asian = "Asian & Indian"
-        case latin = "Latin American"
-        case mediterranean = "Mediterranean & Middle Eastern"
-        case grilling = "Grilling & BBQ"
+/// Set inside Discover, where the Recipes tab's views show a shared server's recipes read-only and offer to add them to yours.
+struct DiscoverScope {
+    let catalog: DiscoverCatalog
+    let add: @MainActor (Recipe.ID) -> Void
+}
+
+private struct DiscoverScopeKey: EnvironmentKey {
+    static let defaultValue: DiscoverScope? = nil
+}
+
+extension EnvironmentValues {
+    var discover: DiscoverScope? {
+        get { self[DiscoverScopeKey.self] }
+        set { self[DiscoverScopeKey.self] = newValue }
     }
-
-    let name: String
-    let detail: String
-    let url: String
-    let kind: Kind
-    var id: String { url }
-
-    /// Feeds that load with images. Some blogs block non-browser imports, so their posts may only open in the browser.
-    static let all: [PopularFeed] = [
-        PopularFeed(name: "Bon Appétit", detail: "Recipes", url: "https://www.bonappetit.com/feed/recipes-rss-feed/rss", kind: .publications),
-        PopularFeed(name: "Epicurious", detail: "Recipes and cooking", url: "https://www.epicurious.com/feed/rss", kind: .publications),
-        PopularFeed(name: "BBC Good Food", detail: "Recipes and guides", url: "https://www.bbcgoodfood.com/rss", kind: .publications),
-        PopularFeed(name: "Delish", detail: "Recipes and food news", url: "https://www.delish.com/rss/all.xml/", kind: .publications),
-        PopularFeed(name: "Taste of Home", detail: "Home-style recipes", url: "https://www.tasteofhome.com/feed/", kind: .publications),
-        PopularFeed(name: "The Guardian", detail: "Food", url: "https://www.theguardian.com/food/rss", kind: .publications),
-        PopularFeed(name: "Saveur", detail: "Recipes and food culture", url: "https://www.saveur.com/feed/", kind: .publications),
-        PopularFeed(name: "Tasting Table", detail: "Recipes and cooking tips", url: "https://www.tastingtable.com/feed/", kind: .publications),
-        PopularFeed(name: "olive", detail: "BBC olive magazine", url: "https://www.olivemagazine.com/feed/", kind: .publications),
-        PopularFeed(name: "RecipeTin Eats", detail: "Nagi Maehashi", url: "https://www.recipetineats.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Pinch of Yum", detail: "Lindsay Ostrom", url: "https://pinchofyum.com/feed", kind: .weeknight),
-        PopularFeed(name: "Once Upon a Chef", detail: "Jennifer Segal", url: "https://www.onceuponachef.com/feed", kind: .weeknight),
-        PopularFeed(name: "Smitten Kitchen", detail: "Deb Perelman", url: "https://smittenkitchen.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Half Baked Harvest", detail: "Tieghan Gerard", url: "https://www.halfbakedharvest.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Spend With Pennies", detail: "Budget comfort food", url: "https://www.spendwithpennies.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Cafe Delites", detail: "Karina Carrington", url: "https://cafedelites.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Tastes Better From Scratch", detail: "Lauren Allen", url: "https://tastesbetterfromscratch.com/feed/", kind: .weeknight),
-        PopularFeed(name: "The Recipe Critic", detail: "Alyssa Rivers", url: "https://therecipecritic.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Jo Cooks", detail: "Jo Bourne", url: "https://www.jocooks.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Mel's Kitchen Cafe", detail: "Family dinners", url: "https://www.melskitchencafe.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Dinner at the Zoo", detail: "Easy family meals", url: "https://www.dinneratthezoo.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Dinner, then Dessert", detail: "Copycat and comfort food", url: "https://dinnerthendessert.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Iowa Girl Eats", detail: "Kristin Porter", url: "https://iowagirleats.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Nicky's Kitchen Sanctuary", detail: "British family cooking", url: "https://www.kitchensanctuary.com/feed/", kind: .weeknight),
-        PopularFeed(name: "foodiecrush", detail: "Heidi Larsen", url: "https://www.foodiecrush.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Two Peas & Their Pod", detail: "Maria Lichty", url: "https://www.twopeasandtheirpod.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Bowl of Delicious", detail: "Quick weeknight meals", url: "https://www.bowlofdelicious.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Kevin Is Cooking", detail: "Kevin Lynch", url: "https://www.keviniscooking.com/feed/", kind: .weeknight),
-        PopularFeed(name: "Platings + Pairings", detail: "Dinners and drinks", url: "https://www.platingsandpairings.com/feed/", kind: .weeknight),
-        PopularFeed(name: "King Arthur Baking", detail: "Baking blog", url: "https://www.kingarthurbaking.com/blog/feed", kind: .baking),
-        PopularFeed(name: "Handle the Heat", detail: "Tessa Arias", url: "https://handletheheat.com/feed/", kind: .baking),
-        PopularFeed(name: "Broma Bakery", detail: "Sarah Fennel", url: "https://bromabakery.com/feed", kind: .baking),
-        PopularFeed(name: "Joy the Baker", detail: "Joy Wilson", url: "https://joythebaker.com/feed/", kind: .baking),
-        PopularFeed(name: "Baker by Nature", detail: "Ashley Manila", url: "https://www.bakerbynature.com/feed/", kind: .baking),
-        PopularFeed(name: "Live Well Bake Often", detail: "Lindsay Grimes", url: "https://www.livewellbakeoften.com/feed/", kind: .baking),
-        PopularFeed(name: "Love and Olive Oil", detail: "Lindsay and Taylor", url: "https://www.loveandoliveoil.com/feed", kind: .baking),
-        PopularFeed(name: "David Lebovitz", detail: "Desserts from Paris", url: "https://www.davidlebovitz.com/feed/", kind: .baking),
-        PopularFeed(name: "Love and Lemons", detail: "Vegetarian", url: "https://www.loveandlemons.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Minimalist Baker", detail: "Simple plant-based", url: "https://minimalistbaker.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Rainbow Plant Life", detail: "Nisha Vora", url: "https://rainbowplantlife.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Oh She Glows", detail: "Angela Liddon", url: "https://ohsheglows.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Vegan Richa", detail: "Richa Hingle", url: "https://www.veganricha.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Nora Cooks", detail: "Vegan comfort food", url: "https://www.noracooks.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "Connoisseurus Veg", detail: "Alissa Saenz", url: "https://www.connoisseurusveg.com/feed/", kind: .vegetarian),
-        PopularFeed(name: "101 Cookbooks", detail: "Heidi Swanson", url: "https://www.101cookbooks.com/feed", kind: .vegetarian),
-        PopularFeed(name: "Skinnytaste", detail: "Lighter recipes", url: "https://www.skinnytaste.com/feed/", kind: .healthy),
-        PopularFeed(name: "Well Plated", detail: "Erin Clarke", url: "https://www.wellplated.com/feed/", kind: .healthy),
-        PopularFeed(name: "Ambitious Kitchen", detail: "Monique Volz", url: "https://www.ambitiouskitchen.com/feed/", kind: .healthy),
-        PopularFeed(name: "Eating Bird Food", detail: "Brittany Mullins", url: "https://www.eatingbirdfood.com/feed/", kind: .healthy),
-        PopularFeed(name: "Fit Foodie Finds", detail: "Lee Funke", url: "https://fitfoodiefinds.com/feed/", kind: .healthy),
-        PopularFeed(name: "Wholesome Yum", detail: "Low-carb and keto", url: "https://www.wholesomeyum.com/feed/", kind: .healthy),
-        PopularFeed(name: "Low Carb Yum", detail: "Keto recipes", url: "https://www.lowcarbyum.com/feed/", kind: .healthy),
-        PopularFeed(name: "Thinlicious", detail: "Low-carb family meals", url: "https://www.ditchthecarbs.com/feed/", kind: .healthy),
-        PopularFeed(name: "Just One Cookbook", detail: "Japanese home cooking", url: "https://www.justonecookbook.com/feed/", kind: .asian),
-        PopularFeed(name: "The Woks of Life", detail: "Chinese home cooking", url: "https://thewoksoflife.com/feed/", kind: .asian),
-        PopularFeed(name: "Red House Spice", detail: "Sichuan and Chinese", url: "https://redhousespice.com/feed/", kind: .asian),
-        PopularFeed(name: "Hot Thai Kitchen", detail: "Pailin Chongchitnant", url: "https://hot-thai-kitchen.com/feed/", kind: .asian),
-        PopularFeed(name: "Rasa Malaysia", detail: "Asian weeknight dishes", url: "https://rasamalaysia.com/feed/", kind: .asian),
-        PopularFeed(name: "Hebbar's Kitchen", detail: "Indian vegetarian", url: "https://hebbarskitchen.com/feed/", kind: .asian),
-        PopularFeed(name: "Tea for Turmeric", detail: "Pakistani and Indian", url: "https://www.teaforturmeric.com/feed/", kind: .asian),
-        PopularFeed(name: "Isabel Eats", detail: "Mexican home cooking", url: "https://www.isabeleats.com/feed/", kind: .latin),
-        PopularFeed(name: "Muy Bueno", detail: "Mexican family recipes", url: "https://muybuenoblog.com/feed/", kind: .latin),
-        PopularFeed(name: "Dominican Cooking", detail: "Dominican recipes", url: "https://www.dominicancooking.com/feed", kind: .latin),
-        PopularFeed(name: "The Mediterranean Dish", detail: "Suzy Karadsheh", url: "https://www.themediterraneandish.com/feed/", kind: .mediterranean),
-        PopularFeed(name: "Feel Good Foodie", detail: "Yumna Jawad", url: "https://feelgoodfoodie.net/feed/", kind: .mediterranean),
-        PopularFeed(name: "Cleobuttera", detail: "Egyptian and Middle Eastern", url: "https://cleobuttera.com/feed/", kind: .mediterranean),
-        PopularFeed(name: "Hey Grill, Hey", detail: "Susie Bulloch", url: "https://heygrillhey.com/feed/", kind: .grilling),
-        PopularFeed(name: "Girls Can Grill", detail: "Christie Vanover", url: "https://girlscangrill.com/feed/", kind: .grilling),
-        PopularFeed(name: "Vindulge", detail: "Smoking and wine pairing", url: "https://www.vindulge.com/feed/", kind: .grilling),
-    ]
 }
 
-private enum DiscoverRoute: Hashable {
-    case entry(FeedEntry)
-    case feeds
+enum DiscoverRoute: Hashable {
+    case home
+    case collection(RecipeCollection)
+    case recipe(UUID)
 }
 
-struct DiscoverItem: Identifiable {
-    let entry: FeedEntry
-    let source: String
-    var id: String { entry.id }
-}
+/// A page inside one Discover server: its home, a collection or category, or a recipe.
+struct DiscoverPage: View {
+    @EnvironmentObject private var discover: DiscoverController
+    let sourceID: UUID
+    let route: DiscoverRoute
+    let open: (Recipe.ID) -> Void
 
-struct DiscoverTab: View {
     var body: some View {
-        NavigationStack { DiscoverView() }
+        if let catalog = discover.catalog(for: sourceID) {
+            DiscoverCatalogPage(catalog: catalog, route: route, open: open)
+        } else {
+            ContentUnavailableView("Server Removed", systemImage: "binoculars", description: Text("This server isn't in Discover anymore."))
+        }
     }
 }
 
-/// Every subscribed feed merged into one stream, newest first.
-struct DiscoverView: View {
+private struct DiscoverCatalogPage: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @EnvironmentObject private var loader: FeedLoader
-    @Environment(\.appAccent) private var accent
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var source: UUID?
+    @ObservedObject var catalog: DiscoverCatalog
+    let route: DiscoverRoute
+    let open: (Recipe.ID) -> Void
+    @State private var selection: Recipe.ID?
 
-    private var shownFeeds: [Feed] {
-        library.feeds.filter { source == nil || $0.id == source }
+    var body: some View {
+        content
+            .environmentObject(catalog.library)
+            .environment(\.discover, DiscoverScope(catalog: catalog) { [library, catalog] id in
+                Task { await catalog.add(id, to: library) }
+            })
+            .task { await catalog.load() }
+            .onChange(of: selection) { _, id in
+                guard let id else { return }
+                open(id)
+                selection = nil
+            }
+            .alert("Couldn't Add Recipe", isPresented: Binding(get: { catalog.problem != nil }, set: { if !$0 { catalog.problem = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(catalog.problem ?? "")
+            }
     }
 
-    private var items: [DiscoverItem] { loader.items(for: shownFeeds) }
-
-    private var failedFeeds: [Feed] {
-        shownFeeds.filter { if case .failed? = loader.states[$0.id] { true } else { false } }
+    @ViewBuilder
+    private var content: some View {
+        switch route {
+        case .home:
+            #if os(iOS)
+            DiscoverHomeView(catalog: catalog)
+            #else
+            RecipeListView(collection: .constant(.all), selection: $selection)
+            #endif
+        case .collection(let collection):
+            RecipeListView(collection: .constant(collection), selection: $selection)
+        case .recipe(let id):
+            DiscoverRecipePage(catalog: catalog, id: id)
+        }
     }
+}
 
-    private var isLoading: Bool {
-        shownFeeds.contains { if case .loaded? = loader.states[$0.id] { false } else if case .failed? = loader.states[$0.id] { false } else { true } }
-    }
+private struct DiscoverRecipePage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.discover) private var scope
+    @ObservedObject var catalog: DiscoverCatalog
+    let id: UUID
+    @State private var photo: Data?
+    @State private var failure: String?
 
     var body: some View {
         Group {
-            if library.feeds.isEmpty {
-                ContentUnavailableView {
-                    Label("No feeds yet", systemImage: "dot.radiowaves.up.forward")
-                } description: {
-                    Text("Follow recipe sites and blogs to see their newest recipes here.")
-                } actions: {
-                    NavigationLink("Browse Popular Feeds", value: DiscoverRoute.feeds)
-                        .buttonStyle(.borderedProminent)
-                }
+            if let recipe = library.recipe(id: id), catalog.detailed.contains(id) {
+                RecipeDetailView(
+                    recipe: recipe, previewSave: { scope?.add(id) }, previewImage: photo,
+                    previewSaveTitle: "Add to My Recipes", previewSaved: catalog.added.contains(id)
+                )
+            } else if let failure {
+                ContentUnavailableView("Couldn't Load Recipe", systemImage: "exclamationmark.triangle", description: Text(failure))
             } else {
-                stream
+                ProgressView("Loading recipe…").frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .themedCanvas()
-        .navigationTitle("Discover")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink(value: DiscoverRoute.feeds) { Label("Feeds", systemImage: "dot.radiowaves.up.forward") }
-            }
-        }
-        .navigationDestination(for: DiscoverRoute.self) { route in
-            switch route {
-            case .entry(let entry): FeedEntryPreview(entry: entry)
-            case .feeds: DiscoverFeedsPage()
-            }
-        }
-        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
-        .refreshable { await loader.loadAll(library.feeds, force: true) }
-        .onChange(of: library.feeds) { _, feeds in
-            if let source, !feeds.contains(where: { $0.id == source }) { self.source = nil }
+        .task(id: id) {
+            do { try await catalog.loadDetails(id) } catch { failure = error.localizedDescription }
+            photo = await catalog.photo(for: id)
         }
     }
-
-    private var stream: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                sourceChips
-                if items.isEmpty, isLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
-                } else {
-                    GridSection(title: nil, minimum: 300, spacing: 20) {
-                        ForEach(items) { item in
-                            NavigationLink(value: DiscoverRoute.entry(item.entry)) {
-                                DiscoverCard(entry: item.entry, source: item.source)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                if !failedFeeds.isEmpty {
-                    Text("Couldn't load \(failedFeeds.map(\.title).formatted()).")
-                        .appFont(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                }
-            }
-            .padding(.vertical)
-        }
-    }
-
-    private var sourceChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip("All", isOn: source == nil) { source = nil }
-                ForEach(library.feeds) { feed in
-                    chip(feed.title, isOn: source == feed.id) { source = feed.id }
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-
-    private func chip(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .appFont(.subheadline, weight: .medium)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(isOn ? accent : accent.opacity(colorScheme == .dark ? 0.24 : 0.12), in: Capsule())
-                .foregroundStyle(isOn ? .white : accent.mix(with: colorScheme == .dark ? .white : .black, by: 0.35))
-        }
-        .buttonStyle(.plain)
-    }
-
 }
 
-extension FeedLoader {
-    /// Posts from `feeds` merged newest first, without repeats.
-    func items(for feeds: [Feed]) -> [DiscoverItem] {
-        var seen = Set<String>()
-        return feeds
-            .flatMap { feed -> [DiscoverItem] in
-                guard case .loaded(let entries)? = states[feed.id] else { return [] }
-                return entries.map { DiscoverItem(entry: $0, source: feed.title) }
-            }
-            .filter { seen.insert($0.id).inserted }
-            .sorted { ($0.entry.published ?? .distantPast) > ($1.entry.published ?? .distantPast) }
-    }
+/// What a Discover server's home shows before its recipes arrive, or when it has none.
+struct DiscoverStatusView: View {
+    @ObservedObject var catalog: DiscoverCatalog
 
-    func loadAll(_ feeds: [Feed], force: Bool = false) async {
-        await withTaskGroup(of: Void.self) { group in
-            for feed in feeds {
-                group.addTask { await self.load(feed, force: force) }
+    var body: some View {
+        switch catalog.state {
+        case .loading:
+            ProgressView("Loading recipes…").frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let message):
+            ContentUnavailableView {
+                Label("Couldn't Reach \(catalog.source.name)", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button("Try Again") { Task { await catalog.load() } }
             }
+        case .loaded:
+            ContentUnavailableView("No Recipes", systemImage: "binoculars", description: Text("\(catalog.source.name) has no recipes to browse yet."))
+        }
+    }
+}
+
+/// Saves the recipe to your own; once it's there, says so instead.
+struct DiscoverAddButton: View {
+    @ObservedObject var catalog: DiscoverCatalog
+    let scope: DiscoverScope
+    let id: Recipe.ID
+
+    var body: some View {
+        if catalog.added.contains(id) {
+            Label("Added to My Recipes", systemImage: "checkmark.circle")
+        } else {
+            Button("Add to My Recipes", systemImage: "plus.circle") { scope.add(id) }
         }
     }
 }
 
 #if os(iOS)
-/// The newest followed posts as a swipeable row, for the Recipes home.
-struct DiscoverShelf: View {
-    static let limit = 10
-
-    @EnvironmentObject private var library: RecipeLibrary
-    @EnvironmentObject private var loader: FeedLoader
-    @Environment(\.openRecipesRoute) private var openRoute
-    let margin: CGFloat
-    var cardWidth: CGFloat = 260
+/// Discover when more than one server has been shared: pick which one to browse.
+struct DiscoverSourcesView: View {
+    @EnvironmentObject private var discover: DiscoverController
 
     var body: some View {
-        let items = Array(loader.items(for: library.feeds).prefix(Self.limit))
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 16) {
-                if items.isEmpty {
-                    ProgressView().frame(width: cardWidth, height: cardWidth * 10 / 16)
-                }
-                ForEach(items) { item in
-                    Button { openRoute(.discoverPost(item.entry)) } label: {
-                        DiscoverCard(entry: item.entry, source: item.source).frame(width: cardWidth)
-                    }
-                    .buttonStyle(.plain)
+        List(discover.sources) { source in
+            NavigationLink(value: RecipesRoute.discover(source.id, .home)) {
+                Label {
+                    Text(source.name)
+                    if let username = source.username, !username.isEmpty { Text(username) }
+                } icon: {
+                    Image(systemName: "server.rack")
                 }
             }
-            .scrollTargetLayout()
+            .themedRow(raised: true)
         }
-        .contentMargins(.horizontal, margin, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollClipDisabled()
-        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
-    }
-}
-#endif
-
-struct DiscoverCard: View {
-    let entry: FeedEntry
-    let source: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Color.clear
-                .aspectRatio(16 / 10, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .overlay {
-                    AsyncImage(url: entry.imageURL) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        ZStack {
-                            Color.secondary.opacity(0.12)
-                            Image(systemName: "fork.knife").font(.largeTitle).foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.title).appFont(.title3, weight: .semibold).lineLimit(2)
-                HStack(spacing: 4) {
-                    Text(source)
-                    if let date = entry.published {
-                        Text("·")
-                        Text(date, format: .relative(presentation: .named))
-                    }
-                }
-                .appFont(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            }
-            .padding(.horizontal, 4)
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// Pick popular recipe feeds with one tap, or add any site that has a feed.
-struct DiscoverFeedsPage: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @State private var adding = false
-
-    private var customFeeds: [Feed] {
-        let popular = Set(PopularFeed.all.map(\.url))
-        return library.feeds.filter { !popular.contains($0.url) }
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                ForEach(customFeeds) { feed in
-                    NavigationLink { FeedPreviewPage(url: feed.url, title: feed.title) } label: {
-                        Label(feed.title, systemImage: "dot.radiowaves.up.forward")
-                    }
-                    .swipeActions {
-                        Button("Unsubscribe", role: .destructive) { Task { await library.remove(feed) } }
-                    }
-                }
-                Button { adding = true } label: { Label("Add a Site or Feed…", systemImage: "plus") }
-            } header: {
-                Text("Your Feeds")
-            } footer: {
-                Text("Tap a feed to preview its newest posts. Paste any recipe site's address and Recipes finds its RSS feed.")
-            }
-            ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
-                Section(kind.rawValue) {
-                    ForEach(PopularFeed.all.filter { $0.kind == kind }) { row($0) }
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .settingsSpacing()
         .themedCanvas()
-        .navigationTitle("Discover Feeds")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .sheet(isPresented: $adding) { AddFeedSheet() }
-    }
-
-    private func row(_ popular: PopularFeed) -> some View {
-        NavigationLink {
-            FeedPreviewPage(url: popular.url, title: popular.name)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(popular.name)
-                    Text(popular.detail).appFont(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                FollowFeedButton(url: popular.url, title: popular.name)
-            }
-        }
+        .navigationTitle("Discover")
     }
 }
 
-/// Follows or unfollows a feed.
-struct FollowFeedButton: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    let url: String
-    let title: String
-    var onFollow: (() -> Void)?
+/// Home's way into Discover: straight into the server when only one has been shared.
+struct DiscoverEntryTile: View {
+    @Environment(\.appearance) private var appearance
+    @Environment(\.appAccent) private var accent
+    @Environment(\.openRecipesRoute) private var openRoute
+    let sources: [DiscoverSource]
 
-    private var subscribed: Feed? { library.feeds.first { $0.url == url } }
+    private var detail: String {
+        sources.count == 1 ? sources[0].name : "\(sources.count) servers"
+    }
 
     var body: some View {
-        Button {
-            Task {
-                if let subscribed { await library.remove(subscribed) }
-                else {
-                    await library.add(Feed(url: url, title: title))
-                    onFollow?()
+        Button { openRoute(.discoverHome(sources)) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "binoculars")
+                    .appFont(.title2)
+                    .foregroundStyle(accent)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Browse Shared Recipes").appFont(.headline).lineLimit(1)
+                    Text(detail).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
             }
-        } label: {
-            Image(systemName: subscribed == nil ? "plus.circle" : "checkmark.circle.fill")
-                .foregroundStyle(subscribed == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.accent))
-                .imageScale(.large)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.borderless)
-        .accessibilityLabel(subscribed == nil ? "Follow \(title)" : "Unfollow \(title)")
-        .sensoryFeedback(.selection, trigger: subscribed == nil)
+        .foregroundStyle(.primary)
     }
 }
 
-/// A feed's newest posts, to look at before following it.
-struct FeedPreviewPage: View {
-    let url: String
-    let title: String
-    var onFollow: (() -> Void)?
-    @State private var state: FeedLoader.State
+/// A Discover server's home: its collections, then its categories to drill into.
+private struct DiscoverHomeView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.discover) private var scope
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @ObservedObject var catalog: DiscoverCatalog
 
-    init(url: String, title: String, seed: [FeedEntry]? = nil, onFollow: (() -> Void)? = nil) {
-        self.url = url
-        self.title = title
-        self.onFollow = onFollow
-        _state = State(initialValue: seed.map { .loaded($0) } ?? .loading)
+    private var collections: [RecipeCollection] {
+        [.all, .recent, .uncategorized].filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
     }
 
     var body: some View {
         Group {
-            switch state {
-            case .loading:
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .failed(let message):
-                ContentUnavailableView("Couldn't load feed", systemImage: "exclamationmark.triangle", description: Text(message))
-            case .loaded(let entries):
-                ScrollView {
-                    GridSection(title: nil, minimum: 300, spacing: 20) {
-                        ForEach(entries) { entry in
-                            NavigationLink { FeedEntryPreview(entry: entry) } label: { DiscoverCard(entry: entry, source: title) }
-                                .buttonStyle(.plain)
-                        }
-                    }
-                    .padding()
-                }
+            if library.recipes.isEmpty {
+                DiscoverStatusView(catalog: catalog)
+            } else if sizeClass == .regular {
+                grid
+            } else {
+                list
             }
         }
         .themedCanvas()
-        .navigationTitle(title)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) { FollowFeedButton(url: url, title: title, onFollow: onFollow) }
-        }
-        .task(id: url) {
-            if case .loaded = state { return }
-            await load()
-        }
+        .navigationTitle(catalog.source.name)
     }
 
-    private func load() async {
-        guard let feedURL = URL(string: url) else {
-            state = .failed("Bad feed address.")
-            return
+    private var list: some View {
+        List {
+            Section {
+                ForEach(collections, id: \.self) { collection in
+                    NavigationLink(value: RecipesRoute.opening(collection, in: scope)) {
+                        LabeledContent {
+                            Text("\(collection.filter(library.recipes).count)").foregroundStyle(.secondary).monospacedDigit()
+                        } label: {
+                            Label(collection.title, systemImage: collection.symbol)
+                        }
+                    }
+                    .themedRow(raised: true)
+                }
+            }
+            if !library.categoryTree.isEmpty {
+                Section("Categories") {
+                    ForEach(library.categoryTree) { CategoryRow(node: $0) }
+                }
+            }
         }
-        do {
-            state = .loaded(try await FeedService.fetch(feedURL).entries)
-        } catch {
-            state = .failed(error.localizedDescription)
+        .contentMargins(.top, 16, for: .scrollContent)
+        .refreshable { await catalog.load(force: true) }
+    }
+
+    private var grid: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                GridSection(title: nil, minimum: 240, spacing: 16) {
+                    ForEach(collections, id: \.self) { FolderTile(collection: $0, recipes: library.recipes, scope: scope) }
+                }
+                if !library.categoryTree.isEmpty {
+                    GridSection(title: "Categories", minimum: 240, spacing: 16) {
+                        ForEach(library.categoryTree) {
+                            FolderTile(collection: .category($0.path), symbol: $0.children.isEmpty ? "tag" : "folder", recipes: library.recipes, scope: scope)
+                        }
+                    }
+                }
+            }
+            .padding(24)
         }
+        .refreshable { await catalog.load(force: true) }
     }
 }
+
+extension RecipesRoute {
+    /// Discover on the Recipes home: straight into the server when there's only one.
+    static func discoverHome(_ sources: [DiscoverSource]) -> RecipesRoute {
+        if sources.count == 1, let only = sources.first { return .discover(only.id, .home) }
+        return .discoverSources
+    }
+
+    /// Opens a collection or category in the library that's showing, which inside Discover is the server's.
+    static func opening(_ collection: RecipeCollection, in scope: DiscoverScope?) -> RecipesRoute {
+        guard let scope else { return .collection(collection) }
+        return .discover(scope.catalog.source.id, .collection(collection))
+    }
+}
+#endif

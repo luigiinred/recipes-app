@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case home, recipes, planner, cooking, groceries, reminders, theme, discover, mealie, intelligence, data
+    case home, recipes, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -17,7 +17,7 @@ struct SettingsView: View {
     var listing = AppStoreLink.listing
     var writeReview = AppStoreLink.writeReview
 
-    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -85,9 +85,9 @@ struct SettingsView: View {
         Section {
             NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
         }
-        if showsDiscover {
+        if showsFeeds {
             Section {
-                NavigationLink(value: SettingsPage.discover) { Label("Discover Feeds", systemImage: "dot.radiowaves.up.forward") }
+                NavigationLink(value: SettingsPage.feeds) { Label("Recipe Feeds", systemImage: "dot.radiowaves.up.forward") }
             }
         }
         Section {
@@ -145,7 +145,7 @@ struct SettingsView: View {
         case .groceries: GroceriesSettingsPage()
         case .reminders: RemindersSettingsPage()
         case .theme: ThemeSettingsPage()
-        case .discover: DiscoverFeedsPage()
+        case .feeds: RecipeFeedsPage()
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
@@ -246,10 +246,10 @@ private struct RecipesSettingsPage: View {
 struct HomeSettingsPage: View {
     @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
-    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
+    @AppStorage(AppSettings.Key.feedsTab) private var showsFeeds = false
 
     private var listed: [HomeSection] {
-        HomeSection.order(orderRaw).filter { showsDiscover || $0 != .discover }
+        HomeSection.order(orderRaw).filter { showsFeeds || $0 != .feeds }
     }
 
     var body: some View {

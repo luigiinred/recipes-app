@@ -77,7 +77,7 @@ struct FeedEntryPreview: View {
             if let result = loader.results[entry.id] {
                 RecipeDetailView(recipe: result.recipe, previewSave: {
                     Task { _ = await library.add(result) }
-                }, previewImage: result.imageData, previewSaved: isSaved(result.recipe))
+                }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("No recipe found", systemImage: "fork.knife")

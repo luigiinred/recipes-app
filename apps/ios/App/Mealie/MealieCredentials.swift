@@ -10,22 +10,42 @@ enum MealieCredentials {
     }
 
     private static let service = "\(Bundle.main.bundleIdentifier ?? "Recipes").mealie"
+    // Its own service, so clearing the connection's service leaves Discover alone.
+    private static let discoverService = "\(service).discover"
     private static let account = "connection"
 
     static func load() -> Connection? {
-        var query = base(account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-        return try? JSONDecoder().decode(Connection.self, from: data)
+        read(base(account)).flatMap { try? JSONDecoder().decode(Connection.self, from: $0) }
     }
 
     static func save(_ connection: Connection) {
         guard let data = try? JSONEncoder().encode(connection) else { return }
-        let update = SecItemUpdate(base(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        write(data, to: base(account))
+    }
+
+    /// The servers browsed in Discover, kept like the connection so they appear on every device.
+    static func discoverSources() -> [DiscoverSource] {
+        read(base("sources", service: discoverService)).flatMap { try? JSONDecoder().decode([DiscoverSource].self, from: $0) } ?? []
+    }
+
+    static func saveDiscoverSources(_ sources: [DiscoverSource]) {
+        guard let data = try? JSONEncoder().encode(sources) else { return }
+        write(data, to: base("sources", service: discoverService))
+    }
+
+    private static func read(_ query: [String: Any]) -> Data? {
+        var query = query
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    private static func write(_ data: Data, to query: [String: Any]) {
+        let update = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         guard update == errSecItemNotFound else { return }
-        var item = base(account)
+        var item = query
         item[kSecValueData as String] = data
         item[kSecAttrSynchronizable as String] = true
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
@@ -62,7 +82,7 @@ enum MealieCredentials {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func base(_ account: String?) -> [String: Any] {
+    private static func base(_ account: String?, service: String = service) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
