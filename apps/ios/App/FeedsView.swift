@@ -18,6 +18,7 @@ struct FeedEntryPreview: View {
                         ToastCenter.shared.show("Added \(saved.title) to My Recipes") { await library.delete(saved) }
                     }
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
+                .transition(.opacity)
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("No recipe found", systemImage: "fork.knife")
@@ -31,9 +32,10 @@ struct FeedEntryPreview: View {
                     #endif
                 }
             } else {
-                RecipeDetailSkeleton()
+                RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
             }
         }
+        .animation(.recipeArrives, value: loader.results[entry.id] != nil)
         #if os(iOS)
         .sheet(isPresented: $browsing) { SafariView(url: entry.link).ignoresSafeArea() }
         #endif

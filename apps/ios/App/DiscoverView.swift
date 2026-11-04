@@ -89,24 +89,30 @@ private struct DiscoverRecipePage: View {
     @ObservedObject var catalog: DiscoverCatalog
     let id: UUID
     @State private var photo: Data?
+    @State private var loaded = false
     @State private var failure: String?
 
     var body: some View {
         Group {
-            if let recipe = library.recipe(id: id), catalog.detailed.contains(id) {
+            if loaded, let recipe = library.recipe(id: id), catalog.detailed.contains(id) {
                 RecipeDetailView(
                     recipe: recipe, previewSave: { scope?.add(id) }, previewImage: photo,
                     previewSaveTitle: "Add to My Recipes", previewSaved: catalog.added.contains(id)
                 )
+                .transition(.opacity)
             } else if let failure {
                 ContentUnavailableView("Couldn't Load Recipe", systemImage: "exclamationmark.triangle", description: Text(failure))
             } else {
-                RecipeDetailSkeleton()
+                RecipeDetailSkeleton(hasPhoto: library.hasImage(id))
             }
         }
+        .animation(.recipeArrives, value: loaded)
         .task(id: id) {
+            loaded = false
+            async let image = catalog.photo(for: id)
             do { try await catalog.loadDetails(id) } catch { failure = error.localizedDescription }
-            photo = await catalog.photo(for: id)
+            photo = await image
+            loaded = true
         }
     }
 }
