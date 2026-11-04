@@ -16,7 +16,17 @@ final class FeedLoader: ObservableObject {
     @Published private(set) var exhausted: Set<String> = []
     private var pages: [String: Int] = [:]
     private var loadingMore: Set<String> = []
+    /// Feeds fetched since launch; any others may only have saved posts.
+    private var fresh: Set<String> = []
+    private var lastOfflineRefresh: Date?
     private let fetches: Bool
+    private let cache = FeedCache.standard
+
+    static let offlineRefreshInterval: TimeInterval = 15 * 60
+
+    nonisolated static var savesOffline: Bool {
+        UserDefaults.standard.object(forKey: AppSettings.Key.feedsOffline) as? Bool ?? true
+    }
 
     /// A seeded loader never fetches, so previews and snapshots stay offline.
     init(seed: [String: State]? = nil, results: [String: ImportResult] = [:]) {
@@ -37,18 +47,45 @@ final class FeedLoader: ObservableObject {
 
     func load(url address: String, force: Bool = false) async {
         guard fetches else { return }
-        if !force, let state = states[address], !state.isFailed { return }
+        if !force, fresh.contains(address) { return }
         guard let url = URL(string: address) else {
             states[address] = .failed("Bad feed address.")
             return
         }
-        if states[address]?.entries == nil { states[address] = .loading }
+        if states[address]?.entries == nil {
+            let cache = cache
+            if let saved = await Task.detached(operation: { cache.snapshot(for: address) }).value, !saved.entries.isEmpty {
+                states[address] = .loaded(saved.entries)
+            } else {
+                states[address] = .loading
+            }
+        }
         do {
-            states[address] = .loaded(try await FeedService.fetch(url).entries)
+            let entries = try await FeedService.fetch(url).entries
+            states[address] = .loaded(entries)
+            fresh.insert(address)
             pages[address] = 1
             exhausted.remove(address)
+            if Self.savesOffline {
+                let cache = cache
+                Task.detached { try? cache.save(entries, for: address) }
+            }
         } catch {
-            states[address] = .failed(error.localizedDescription)
+            if states[address]?.entries == nil { states[address] = .failed(error.localizedDescription) }
+        }
+    }
+
+    /// Saves the newest posts and photos of followed feeds for offline reading, at most every so often.
+    func refreshOffline(_ feeds: [Feed]) async {
+        guard fetches, Self.savesOffline, !feeds.isEmpty else { return }
+        if let last = lastOfflineRefresh, Date().timeIntervalSince(last) < Self.offlineRefreshInterval { return }
+        lastOfflineRefresh = Date()
+        let fetched = await cache.refresh(feeds)
+        for (address, entries) in fetched where !fresh.contains(address) {
+            states[address] = .loaded(entries)
+            fresh.insert(address)
+            pages[address] = 1
+            exhausted.remove(address)
         }
     }
 

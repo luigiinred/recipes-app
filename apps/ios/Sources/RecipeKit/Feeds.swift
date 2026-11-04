@@ -14,7 +14,7 @@ public struct Feed: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-public struct FeedEntry: Identifiable, Hashable, Sendable {
+public struct FeedEntry: Identifiable, Hashable, Codable, Sendable {
     public var title: String
     public var link: URL
     public var published: Date?
