@@ -22,6 +22,12 @@ final class DiscoverSnapshotTests: XCTestCase {
         assertPageSnapshots(of: FeedEntryPreview(entry: SampleData.feedEntries[0]))
     }
 
+    func testHomeShelf() {
+        let defaults = UserDefaults(suiteName: "DiscoverHomeShelf")!
+        defaults.set(true, forKey: AppSettings.Key.discoverTab)
+        assertPageSnapshots(of: RootView(tab: .recipes).defaultAppStorage(defaults), inNavigationStack: false, coverage: .adaptive)
+    }
+
     func testFeedsPage() {
         assertPageSnapshots(of: DiscoverFeedsPage(), coverage: .sheet)
     }

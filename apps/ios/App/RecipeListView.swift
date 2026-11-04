@@ -533,6 +533,8 @@ enum RecipesRoute: Hashable {
     case tag(String)
     /// Every recipe, from the home's View All.
     case allRecipes
+    case discover
+    case discoverPost(FeedEntry)
 }
 
 private struct OpenRecipesRouteKey: EnvironmentKey {

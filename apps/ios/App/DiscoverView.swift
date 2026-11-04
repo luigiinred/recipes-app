@@ -99,7 +99,7 @@ private enum DiscoverRoute: Hashable {
     case feeds
 }
 
-private struct DiscoverItem: Identifiable {
+struct DiscoverItem: Identifiable {
     let entry: FeedEntry
     let source: String
     var id: String { entry.id }
@@ -123,16 +123,7 @@ struct DiscoverView: View {
         library.feeds.filter { source == nil || $0.id == source }
     }
 
-    private var items: [DiscoverItem] {
-        var seen = Set<String>()
-        return shownFeeds
-            .flatMap { feed -> [DiscoverItem] in
-                guard case .loaded(let entries)? = loader.states[feed.id] else { return [] }
-                return entries.map { DiscoverItem(entry: $0, source: feed.title) }
-            }
-            .filter { seen.insert($0.id).inserted }
-            .sorted { ($0.entry.published ?? .distantPast) > ($1.entry.published ?? .distantPast) }
-    }
+    private var items: [DiscoverItem] { loader.items(for: shownFeeds) }
 
     private var failedFeeds: [Feed] {
         shownFeeds.filter { if case .failed? = loader.states[$0.id] { true } else { false } }
@@ -170,8 +161,8 @@ struct DiscoverView: View {
             case .feeds: DiscoverFeedsPage()
             }
         }
-        .task(id: library.feeds.map(\.id)) { await load(force: false) }
-        .refreshable { await load(force: true) }
+        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
+        .refreshable { await loader.loadAll(library.feeds, force: true) }
         .onChange(of: library.feeds) { _, feeds in
             if let source, !feeds.contains(where: { $0.id == source }) { self.source = nil }
         }
@@ -229,12 +220,60 @@ struct DiscoverView: View {
         .buttonStyle(.plain)
     }
 
-    private func load(force: Bool) async {
+}
+
+extension FeedLoader {
+    /// Posts from `feeds` merged newest first, without repeats.
+    func items(for feeds: [Feed]) -> [DiscoverItem] {
+        var seen = Set<String>()
+        return feeds
+            .flatMap { feed -> [DiscoverItem] in
+                guard case .loaded(let entries)? = states[feed.id] else { return [] }
+                return entries.map { DiscoverItem(entry: $0, source: feed.title) }
+            }
+            .filter { seen.insert($0.id).inserted }
+            .sorted { ($0.entry.published ?? .distantPast) > ($1.entry.published ?? .distantPast) }
+    }
+
+    func loadAll(_ feeds: [Feed], force: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
-            for feed in library.feeds {
-                group.addTask { await loader.load(feed, force: force) }
+            for feed in feeds {
+                group.addTask { await self.load(feed, force: force) }
             }
         }
+    }
+}
+
+/// The newest followed posts as a swipeable row, for the Recipes home.
+struct DiscoverShelf: View {
+    static let limit = 10
+
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var loader: FeedLoader
+    @Environment(\.openRecipesRoute) private var openRoute
+    let margin: CGFloat
+    var cardWidth: CGFloat = 260
+
+    var body: some View {
+        let items = Array(loader.items(for: library.feeds).prefix(Self.limit))
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 16) {
+                if items.isEmpty {
+                    ProgressView().frame(width: cardWidth, height: cardWidth * 10 / 16)
+                }
+                ForEach(items) { item in
+                    Button { openRoute(.discoverPost(item.entry)) } label: {
+                        DiscoverCard(entry: item.entry, source: item.source).frame(width: cardWidth)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .contentMargins(.horizontal, margin, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollClipDisabled()
+        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
     }
 }
 

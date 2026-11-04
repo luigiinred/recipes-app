@@ -148,6 +148,10 @@ struct SearchTab: View {
                         RecipesHomeView(selection: $selection, tag: path).id(path)
                     case .allRecipes:
                         RecipesHomeView(selection: $selection, showsAllRecipes: true)
+                    case .discover:
+                        DiscoverView()
+                    case .discoverPost(let entry):
+                        FeedEntryPreview(entry: entry)
                     }
                 }
         }
@@ -234,6 +238,10 @@ struct RecipesTab: View {
             RecipesHomeView(selection: $selection, tag: path).id(path)
         case .allRecipes:
             RecipesHomeView(selection: $selection, showsAllRecipes: true)
+        case .discover:
+            DiscoverView()
+        case .discoverPost(let entry):
+            FeedEntryPreview(entry: entry)
         }
     }
 }

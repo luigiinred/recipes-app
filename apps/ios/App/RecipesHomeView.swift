@@ -204,6 +204,7 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
     @AppStorage(AppSettings.Key.quickChips) private var quickChipsRaw = QuickChip.raw(QuickChip.defaults)
+    @AppStorage(AppSettings.Key.discoverTab) private var showsDiscover = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(HomeBrowsing.self) private var browsing
     @Environment(\.openRecipesRoute) private var openRoute
@@ -322,6 +323,12 @@ struct RecipesHomeView: View {
                         .listRowSeparator(.hidden)
                         .themedRow()
                 }
+                if showsDiscoverShelf {
+                    discoverRow
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 20, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
                 if isHome {
                     recipesHeader(count: all.count)
                         .listRowInsets(EdgeInsets(top: 4, leading: margin, bottom: 8, trailing: margin))
@@ -362,6 +369,7 @@ struct RecipesHomeView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header(count: all.count).padding(.horizontal, margin)
                 if showsTags { tagsRow }
+                if showsDiscoverShelf { discoverRow }
                 if isHome { recipesHeader(count: all.count).padding(.horizontal, margin) }
                 GridSection(title: nil, minimum: 260, spacing: 24) {
                     ForEach(items) { recipe in
@@ -489,6 +497,30 @@ struct RecipesHomeView: View {
         } else {
             tagPage = 0
             withAnimation(.smooth(duration: 0.4)) { tagsExpanded = true }
+        }
+    }
+
+    private var showsDiscoverShelf: Bool { showsDiscover && isHome && !library.feeds.isEmpty }
+
+    private var discoverRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                sectionTitle("Discover")
+                Spacer()
+                Button { openRoute(.discover) } label: {
+                    HStack(spacing: 4) {
+                        Text("View All")
+                        Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
+                    }
+                    .appFont(.subheadline, weight: .medium)
+                    .foregroundStyle(.tint)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("View All of Discover")
+            }
+            .padding(.horizontal, margin)
+            DiscoverShelf(margin: margin, cardWidth: isRegular ? 300 : 260)
         }
     }
 
