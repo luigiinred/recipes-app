@@ -105,14 +105,74 @@ struct FeedStreamTab: View {
     }
 }
 
-/// Followed posts merged newest first, or each feed as its own row, with Discover a tap away.
+enum FeedLayout: String, CaseIterable {
+    case stream, swipe, grouped
+
+    var title: String {
+        switch self {
+        case .stream: "All Posts"
+        case .swipe: "One at a Time"
+        case .grouped: "By Feed"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .stream: "list.bullet"
+        case .swipe: "rectangle.portrait.on.rectangle.portrait"
+        case .grouped: "rectangle.split.1x2"
+        }
+    }
+}
+
+/// Followed posts merged newest first, one at a time, or each feed as its own row, with Discover a tap away.
 struct FeedStreamView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.appAccent) private var accent
-    @AppStorage(AppSettings.Key.feedsGrouped) private var grouped = false
+    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
 
     var body: some View {
+        content
+            .themedCanvas()
+            .navigationTitle("Feeds")
+            .toolbar {
+                if layout == .swipe {
+                    ToolbarItem(placement: .navigation) {
+                        NavigationLink { FeedDiscoverPage() } label: { Label("Discover", systemImage: "sparkle.magnifyingglass") }
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Picker("View", selection: $layout) {
+                            ForEach(FeedLayout.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                        }
+                    } label: {
+                        Label("View", systemImage: layout.symbol)
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    // Destination links, so this page works inside any stack, including Home's typed path.
+                    NavigationLink { RecipeFeedsPage() } label: { Label("Manage Feeds", systemImage: "slider.horizontal.3") }
+                }
+            }
+            .refreshable {
+                await withTaskGroup(of: Void.self) { group in
+                    for feed in library.feeds { group.addTask { await loader.load(feed, force: true) } }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if layout == .swipe, !library.feeds.isEmpty {
+            FeedSwipeStream()
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 36) {
                 discoverLink
@@ -127,7 +187,7 @@ struct FeedStreamView: View {
                         .accessibilityAddTraits(.isHeader)
                         .padding(.horizontal)
                         .padding(.bottom, -20)
-                    if grouped {
+                    if layout == .grouped {
                         ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title) }
                     } else {
                         FeedStream().padding(.horizontal)
@@ -135,29 +195,6 @@ struct FeedStreamView: View {
                 }
             }
             .padding(.vertical)
-        }
-        .themedCanvas()
-        .navigationTitle("Feeds")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker("View", selection: $grouped) {
-                        Label("All Posts", systemImage: "list.bullet").tag(false)
-                        Label("By Feed", systemImage: "rectangle.split.1x2").tag(true)
-                    }
-                } label: {
-                    Label("View", systemImage: grouped ? "rectangle.split.1x2" : "list.bullet")
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                // Destination links, so this page works inside any stack, including Home's typed path.
-                NavigationLink { RecipeFeedsPage() } label: { Label("Manage Feeds", systemImage: "slider.horizontal.3") }
-            }
-        }
-        .refreshable {
-            await withTaskGroup(of: Void.self) { group in
-                for feed in library.feeds { group.addTask { await loader.load(feed, force: true) } }
-            }
         }
     }
 
@@ -255,19 +292,6 @@ private struct FeedStream: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
 
-    private var isLoading: Bool {
-        library.feeds.contains { feed in
-            switch loader.states[feed.url] {
-            case .loading, nil: true
-            default: false
-            }
-        }
-    }
-
-    private var hasMore: Bool {
-        library.feeds.contains { !loader.exhausted.contains($0.url) }
-    }
-
     var body: some View {
         let items = loader.items(for: library.feeds)
         GridSection(title: nil, minimum: 300, spacing: 20) {
@@ -277,11 +301,11 @@ private struct FeedStream: View {
                 }
                 .buttonStyle(.plain)
             }
-            if items.isEmpty ? isLoading : hasMore {
+            if items.isEmpty ? loader.isLoading(library.feeds) : loader.hasMore(library.feeds) {
                 ForEach(0..<2, id: \.self) { FeedCard(entry: .placeholder($0), source: "Recipe site").loadingPlaceholder() }
                     .onAppear {
                         guard !items.isEmpty else { return }
-                        Task { await loadMore() }
+                        Task { await loader.loadMore(library.feeds) }
                     }
                     .id(items.count)
             } else if items.isEmpty {
@@ -290,13 +314,79 @@ private struct FeedStream: View {
         }
         .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
     }
+}
 
-    private func loadMore() async {
-        await withTaskGroup(of: Void.self) { group in
-            for feed in library.feeds where !loader.exhausted.contains(feed.url) {
-                group.addTask { await loader.loadMore(url: feed.url) }
+/// Followed posts newest first, a full page each, swiped up and down; tap one to open it.
+private struct FeedSwipeStream: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var loader: FeedLoader
+
+    var body: some View {
+        let items = loader.items(for: library.feeds)
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(items) { item in
+                    NavigationLink { FeedEntryPreview(entry: item.entry) } label: { FeedSwipePage(item: item) }
+                        .buttonStyle(.plain)
+                        .containerRelativeFrame([.horizontal, .vertical])
+                        .onAppear {
+                            guard items.suffix(3).contains(where: { $0.id == item.id }), loader.hasMore(library.feeds) else { return }
+                            Task { await loader.loadMore(library.feeds) }
+                        }
+                }
+                if items.isEmpty {
+                    Group {
+                        if loader.isLoading(library.feeds) {
+                            FeedSwipePage(item: FeedStreamItem(entry: .placeholder(0), source: "Recipe site")).loadingPlaceholder()
+                        } else {
+                            ContentUnavailableView("No Posts Yet", systemImage: "dot.radiowaves.up.forward",
+                                                   description: Text("New posts from the feeds you follow show up here."))
+                        }
+                    }
+                    .containerRelativeFrame([.horizontal, .vertical])
+                }
             }
+            .scrollTargetLayout()
         }
+        .scrollTargetBehavior(.paging)
+        .scrollIndicators(.hidden)
+        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
+    }
+}
+
+private struct FeedSwipePage: View {
+    let item: FeedStreamItem
+
+    var body: some View {
+        Color.clear
+            .overlay { FeedPhoto(url: item.entry.imageURL) }
+            .overlay {
+                LinearGradient(colors: [.clear, .clear, .black.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+            }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !item.source.isEmpty {
+                        Text(item.source.uppercased())
+                            .appFont(.caption, weight: .bold)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    Text(item.entry.title)
+                        .appFont(.title, weight: .bold)
+                        .foregroundStyle(.white)
+                        .lineLimit(3)
+                    if let date = item.entry.published {
+                        Text(date, format: .relative(presentation: .named))
+                            .appFont(.subheadline, weight: .medium)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                }
+                .padding(24)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
     }
 }
 
@@ -371,6 +461,28 @@ struct FeedRow: View {
 }
 
 extension FeedLoader {
+    func isLoading(_ feeds: [Feed]) -> Bool {
+        feeds.contains { feed in
+            switch states[feed.url] {
+            case .loading, nil: true
+            default: false
+            }
+        }
+    }
+
+    func hasMore(_ feeds: [Feed]) -> Bool {
+        feeds.contains { !exhausted.contains($0.url) }
+    }
+
+    /// Pages in older posts from every feed that has more.
+    func loadMore(_ feeds: [Feed]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for feed in feeds where !exhausted.contains(feed.url) {
+                group.addTask { await self.loadMore(url: feed.url) }
+            }
+        }
+    }
+
     /// Posts from `feeds` merged newest first, without repeats.
     func items(for feeds: [Feed]) -> [FeedStreamItem] {
         var seen = Set<String>()
