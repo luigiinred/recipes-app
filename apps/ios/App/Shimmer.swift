@@ -8,25 +8,28 @@ extension View {
     }
 }
 
+/// Fades the content's one copy as a band sweeps across, so overlapping shapes never draw twice.
 private struct Shimmer: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sweeping = false
 
     func body(content: Content) -> some View {
-        content
-            .overlay {
-                GeometryReader { geometry in
-                    LinearGradient(colors: [.clear, .white.opacity(0.5), .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: geometry.size.width * 0.5)
-                        .offset(x: sweeping ? geometry.size.width * 1.25 : -geometry.size.width * 0.75)
+        if reduceMotion {
+            content
+        } else {
+            content
+                .mask {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            stops: [.init(color: .black.opacity(0.55), location: 0.35), .init(color: .black, location: 0.5), .init(color: .black.opacity(0.55), location: 0.65)],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .frame(width: geometry.size.width * 3)
+                        .offset(x: sweeping ? 0 : -geometry.size.width * 2)
+                    }
                 }
-                .mask(content)
-                .allowsHitTesting(false)
-            }
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { sweeping = true }
-            }
+                .onAppear { withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { sweeping = true } }
+        }
     }
 }
 
@@ -36,7 +39,7 @@ extension Recipe {
         title: "A recipe title that's loading",
         summary: "A short description of the dish while it loads.",
         servings: 4, prepMinutes: 15, cookMinutes: 30,
-        ingredients: ["2 cups of an ingredient", "1 tablespoon of another", "A pinch of something", "3 of something else, chopped", "1 cup of a liquid"],
+        ingredients: ["An ingredient for the dish", "Another ingredient", "Something to season it", "Something else, chopped", "A little liquid"],
         steps: ["The first step of the recipe, which takes a line or two to describe.", "The second step, a little shorter.", "A third step that finishes the dish and serves it."],
         tags: ["Loading"]
     )
