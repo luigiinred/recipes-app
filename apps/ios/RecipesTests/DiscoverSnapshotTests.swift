@@ -18,6 +18,10 @@ final class DiscoverSnapshotTests: XCTestCase {
         assertPageSnapshots(of: FeedPreviewPage(url: SampleData.feeds[0].url, title: "Simply Recipes", seed: SampleData.feedEntries))
     }
 
+    func testPostAsRecipe() {
+        assertPageSnapshots(of: FeedEntryPreview(entry: SampleData.feedEntries[0]))
+    }
+
     func testFeedsPage() {
         assertPageSnapshots(of: DiscoverFeedsPage(), coverage: .sheet)
     }
