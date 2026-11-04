@@ -397,9 +397,9 @@ struct RecipesHomeView: View {
                             Spacer()
                             HStack(spacing: 4) {
                                 Text("View All")
-                                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
                             }
-                            .font(.subheadline.weight(.medium))
+                            .appFont(.subheadline, weight: .medium)
                             .foregroundStyle(.tint)
                         }
                         .contentShape(Rectangle())
@@ -435,7 +435,7 @@ struct RecipesHomeView: View {
     }
 
     private var tagsTitle: some View {
-        Text("Tags").font(.title3.weight(.semibold)).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
+        Text("Tags").appFont(.title3, weight: .semibold).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
     }
 
     private func tagTile(_ node: CategoryNode) -> some View {
@@ -554,12 +554,12 @@ struct RecipesHomeView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(filter.scope == .all ? "My Recipes" : filter.scope.title)
-                    .font(.largeTitle.bold())
+                    .appFont(.largeTitle, weight: .bold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .accessibilityAddTraits(.isHeader)
                 Text(Self.countText(count))
-                    .font(.subheadline)
+                    .appFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -636,7 +636,7 @@ struct AllTagsView: View {
                 grid(nodes)
                 ForEach(Self.folders(in: nodes)) { folder in
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(CategoryTree.displayName(folder.path)).font(.title3.weight(.semibold))
+                        Text(CategoryTree.displayName(folder.path)).appFont(.title3, weight: .semibold)
                         grid(folder.children)
                     }
                 }
@@ -695,7 +695,7 @@ private struct TagTile: View {
                     RecipeImageView(recipe: cover)
                 } else {
                     Image(systemName: symbol)
-                        .font(.title2)
+                        .appFont(.title2)
                         .foregroundStyle(accent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -709,11 +709,11 @@ private struct TagTile: View {
             }
             .padding(.bottom, 2)
             Text(title)
-                .font(.footnote.weight(isOn ? .semibold : .regular))
+                .appFont(.footnote, weight: isOn ? .semibold : .regular)
                 .foregroundStyle(isOn ? .primary : .secondary)
                 .lineLimit(1)
             Text(count == 1 ? "1 recipe" : "\(count) recipes")
-                .font(.caption2)
+                .appFont(.caption2)
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
@@ -750,9 +750,9 @@ private struct HomeFilterSheet: View {
                     Slider(value: maxMinutes, in: Double(HomeFilter.timeStep)...Double(HomeFilter.timeLimit), step: Double(HomeFilter.timeStep)) {
                         Text("Maximum time")
                     } minimumValueLabel: {
-                        Text(HomeFilter.minutes(HomeFilter.timeStep)).font(.caption).foregroundStyle(.secondary)
+                        Text(HomeFilter.minutes(HomeFilter.timeStep)).appFont(.caption).foregroundStyle(.secondary)
                     } maximumValueLabel: {
-                        Text("Any").font(.caption).foregroundStyle(.secondary)
+                        Text("Any").appFont(.caption).foregroundStyle(.secondary)
                     }
                     .accessibilityValue(filter.timeTitle)
                 } header: {

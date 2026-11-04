@@ -17,7 +17,7 @@ struct ScaleMenu: View {
             }
         } label: {
             Label("Scale \(title)", systemImage: "slider.horizontal.3")
-                .font(.caption.weight(.semibold))
+                .appFont(.caption, weight: .semibold)
                 .foregroundStyle(scale == 1 ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.accent))
         }
         .accessibilityLabel("Scale recipe")

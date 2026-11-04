@@ -34,8 +34,8 @@ struct ReviewPromptBanner: View {
                 HStack(spacing: 10) {
                     Image(systemName: "star.bubble.fill").foregroundStyle(Theme.accent)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Rate us").font(.subheadline.weight(.semibold))
-                        Text("Help other cooks find Recipes").font(.caption).foregroundStyle(.secondary)
+                        Text("Rate us").appFont(.subheadline, weight: .semibold)
+                        Text("Help other cooks find Recipes").appFont(.caption).foregroundStyle(.secondary)
                     }
                     .lineLimit(1)
                     Spacer(minLength: 0)
@@ -44,7 +44,7 @@ struct ReviewPromptBanner: View {
             }
             .buttonStyle(.plain)
             Button { dismissed = true } label: {
-                Image(systemName: "xmark").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(6)
+                Image(systemName: "xmark").appFont(.footnote, weight: .semibold).foregroundStyle(.secondary).padding(6)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dismiss")

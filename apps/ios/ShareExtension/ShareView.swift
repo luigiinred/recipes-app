@@ -93,17 +93,17 @@ struct ShareView: View {
             case .saving:
                 VStack(spacing: 8) {
                     MascotLoader(height: 150)
-                    Text("Saving…").font(.system(.title3, weight: .bold))
+                    Text("Saving…").appFont(.title3, weight: .bold)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .saved(let recipe, let note):
                 VStack(spacing: 14) {
                     MascotCluster(height: 150)
-                    Text("Recipe added!").font(.system(.title, weight: .bold))
+                    Text("Recipe added!").appFont(.title, weight: .bold)
                     Text("\(recipe.title) has been added to your cookbook.")
-                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Text(note ?? "It will sync to your other devices through iCloud.")
-                        .font(.caption).foregroundStyle(note == nil ? Color.secondary : Color.orange).multilineTextAlignment(.center)
+                        .appFont(.caption).foregroundStyle(note == nil ? Color.secondary : Color.orange).multilineTextAlignment(.center)
                     VStack(spacing: 10) {
                         Button { openApp(RecipeLink.url(for: recipe.id)) } label: { Label("Open in Recipes", systemImage: "arrow.up.forward.app") }
                             .buttonStyle(PaperButtonStyle())
@@ -120,8 +120,8 @@ struct ShareView: View {
             case .failed(let message):
                 VStack(spacing: 12) {
                     MascotView(character: .lemon, scene: .sour, height: 130)
-                    Text("Couldn't import that").font(.system(.title3, weight: .bold))
-                    Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text("Couldn't import that").appFont(.title3, weight: .bold)
+                    Text(message).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Button("Done", action: cancel)
                         .buttonStyle(PaperButtonStyle())
                         .keyboardShortcut(.defaultAction)

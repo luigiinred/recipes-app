@@ -14,7 +14,7 @@ final class WidgetSync {
     func publish(recipes: [Recipe], mealPlan: [MealPlanEntry], groceries: [GroceryItem], imageIDs: Set<UUID>, library: Library) async {
         guard let store else { return }
         var snapshot = WidgetSnapshot.make(recipes: recipes, mealPlan: mealPlan, groceries: groceries, imageIDs: imageIDs)
-        snapshot.accentHex = UserDefaults.standard.string(forKey: AppSettings.Key.accentColor)
+        snapshot.accentHex = ColorTheme.currentAccentHex()
         guard snapshot != published else { return }
         let shown = snapshot
         let saved = await Task.detached {

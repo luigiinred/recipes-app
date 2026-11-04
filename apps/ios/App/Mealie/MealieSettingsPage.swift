@@ -21,6 +21,7 @@ struct MealieSettingsPage: View {
             if mealie.isConnected { connected } else { signIn }
         }
         .formStyle(.grouped)
+        .settingsSpacing()
         .themedCanvas()
         .navigationTitle("Mealie")
         #if os(iOS)
@@ -184,7 +185,7 @@ private struct ShareAccessSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Image(systemName: "key.horizontal").font(.largeTitle).foregroundStyle(.tint)
+                Image(systemName: "key.horizontal").appFont(.largeTitle).foregroundStyle(.tint)
                 Text("A new token was made for this link. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust.")
                     .multilineTextAlignment(.center)
                 ShareLink(item: link.url, message: Text("Open this on a phone with Recipes to sync with my Mealie server.")) {

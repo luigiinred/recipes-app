@@ -238,7 +238,7 @@ struct RecipeDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(recipe.title)
-                    .font(.system(.largeTitle, weight: .bold))
+                    .appFont(.largeTitle, weight: .bold)
                     .accessibilityAddTraits(.isHeader)
                 tagChips
             }
@@ -248,7 +248,7 @@ struct RecipeDetailView: View {
             }
             if previewSave == nil { actionTiles }
             if !recipe.summary.isEmpty {
-                Text(recipe.summary).font(.callout).foregroundStyle(.secondary)
+                Text(recipe.summary).appFont(.callout).foregroundStyle(.secondary)
             }
         }
     }
@@ -268,7 +268,7 @@ struct RecipeDetailView: View {
                 }
                 Button { editingTags = true } label: {
                     Label(recipe.tags.isEmpty ? "Add Tags" : "Add", systemImage: "plus")
-                        .font(.footnote.weight(.medium))
+                        .appFont(.footnote, weight: .medium)
                         .labelStyle(.titleAndIcon)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .overlay { Capsule().strokeBorder(Theme.accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
@@ -281,7 +281,7 @@ struct RecipeDetailView: View {
 
     private func tagChip(_ tag: String) -> some View {
         Text(CategoryTree.displayName(tag))
-            .font(.footnote.weight(.medium))
+            .appFont(.footnote, weight: .medium)
             .tagChip()
     }
 
@@ -297,8 +297,8 @@ struct RecipeDetailView: View {
                 ForEach(stats.indices, id: \.self) { index in
                     if index > 0 { Divider().frame(height: 34).padding(.horizontal, 14) }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(stats[index].0).font(.caption).foregroundStyle(.secondary)
-                        Text(stats[index].1).font(.title3.weight(.medium))
+                        Text(stats[index].0).appFont(.caption).foregroundStyle(.secondary)
+                        Text(stats[index].1).appFont(.title3, weight: .medium)
                     }
                 }
                 Spacer(minLength: 0)
@@ -332,8 +332,8 @@ struct RecipeDetailView: View {
     private func tile(_ title: String, systemImage: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: systemImage).font(.title3)
-                Text(title).font(.caption.weight(.medium))
+                Image(systemName: systemImage).appFont(.title3)
+                Text(title).appFont(.caption, weight: .medium)
             }
             .frame(maxWidth: .infinity, minHeight: 58)
             .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
@@ -347,7 +347,7 @@ struct RecipeDetailView: View {
 
     private var ideaNote: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Just an idea so far", systemImage: "lightbulb").font(.headline)
+            Label("Just an idea so far", systemImage: "lightbulb").appFont(.headline)
             Text("Add ingredients and steps when you have a recipe for it, and this becomes a full recipe.")
                 .foregroundStyle(.secondary)
             if previewSave == nil {
@@ -366,7 +366,7 @@ struct RecipeDetailView: View {
                 ForEach(Array(scaled.ingredientGroups.enumerated()), id: \.offset) { _, group in
                     if let title = group.title {
                         Text(title)
-                            .font(.subheadline.weight(.semibold))
+                            .appFont(.subheadline, weight: .semibold)
                             .padding(.top, 6)
                             .accessibilityAddTraits(.isHeader)
                     }
@@ -393,7 +393,7 @@ struct RecipeDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("STEP \(index + 1)")
-                                .font(.footnote.weight(.bold))
+                                .appFont(.footnote, weight: .bold)
                                 .foregroundStyle(Theme.accent)
                             Spacer(minLength: 0)
                             if recipe.youTubeVideoID != nil, let seconds = recipe.timestamp(forStep: index) {
@@ -401,7 +401,7 @@ struct RecipeDetailView: View {
                                     player.play(from: seconds)
                                 } label: {
                                     Label(Recipe.clock(seconds), systemImage: "play.fill")
-                                        .font(.caption.weight(.semibold).monospacedDigit())
+                                        .appFont(.caption, weight: .semibold).monospacedDigit()
                                         .padding(.horizontal, 9).padding(.vertical, 5)
                                         .background(Theme.accent.opacity(0.12), in: Capsule())
                                         .foregroundStyle(Theme.accent)
@@ -411,7 +411,7 @@ struct RecipeDetailView: View {
                             }
                         }
                         Text(text)
-                            .font(.system(.body))
+                            .appFont(.body)
                             .multilineTextAlignment(.leading)
                         StepIngredientChips(recipe: recipe, step: index)
                         if let imageID = recipe.stepImage(forStep: index) { StepImageView(id: imageID) }
@@ -441,7 +441,7 @@ struct RecipeDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary).tracking(1)
+                Text(title.uppercased()).appFont(.caption, weight: .semibold).foregroundStyle(.secondary).tracking(1)
                 Spacer()
                 trailing()
             }

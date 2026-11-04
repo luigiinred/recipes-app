@@ -28,7 +28,7 @@ struct SmartPlanSheet: View {
                 case .working:
                     VStack(spacing: 6) {
                         MascotLoader(height: 170)
-                        Text("Planning your week…").font(.system(.title3, weight: .bold))
+                        Text("Planning your week…").appFont(.title3, weight: .bold)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .review: review
@@ -93,7 +93,7 @@ struct SmartPlanSheet: View {
             Section {
                 Label(usedAppleIntelligence ? "Planned with Apple Intelligence" : "Planned from Up Next and favorites",
                       systemImage: usedAppleIntelligence ? "sparkles" : "arrow.triangle.2.circlepath")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .appFont(.footnote).foregroundStyle(.secondary)
             }
             ForEach(dayKeys.filter { day in suggestions.contains { $0.day == day } }, id: \.self) { day in
                 Section(header: Text(DayKey.date(from: day)?.formatted(.dateTime.weekday(.wide).month().day()) ?? day)) {
@@ -101,8 +101,8 @@ struct SmartPlanSheet: View {
                         HStack(spacing: 12) {
                             Image(systemName: suggestion.meal.symbol).foregroundStyle(Theme.accent).frame(width: 24)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(library.recipe(id: suggestion.recipeID)?.title ?? "Recipe").font(.system(.body))
-                                Text(suggestion.meal.title).font(.caption).foregroundStyle(.secondary)
+                                Text(library.recipe(id: suggestion.recipeID)?.title ?? "Recipe").appFont(.body)
+                                Text(suggestion.meal.title).appFont(.caption).foregroundStyle(.secondary)
                             }
                         }
                         .swipeActions {

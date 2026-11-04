@@ -453,7 +453,7 @@ struct SidebarView: View {
                 HStack {
                     Label(library.isICloud ? "Synced with iCloud" : "Stored on this device",
                           systemImage: library.isICloud ? "icloud" : "internaldrive")
-                        .font(.caption)
+                        .appFont(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
                     SettingsLink { Image(systemName: "gearshape") }

@@ -26,11 +26,15 @@ enum AppSettings {
         static let mealieSyncPlan = "mealieSyncMealPlan"
         static let mealieSyncGroceries = "mealieSyncGroceries"
         static let appearance = "appearance"
+        static let colorTheme = "colorTheme"
         static let fontStyle = "fontStyle"
         static let accentColor = "accentColorHex"
-        static let customThemeDark = "customThemeDark"
         static let customThemeCanvas = "customThemeCanvasHex"
         static let customThemeSurface = "customThemeSurfaceHex"
+        static let customThemeAccent = "customThemeAccentHex"
+        static let customThemeDarkCanvas = "customThemeDarkCanvasHex"
+        static let customThemeDarkSurface = "customThemeDarkSurfaceHex"
+        static let customThemeDarkAccent = "customThemeDarkAccentHex"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }

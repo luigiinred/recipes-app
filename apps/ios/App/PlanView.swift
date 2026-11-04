@@ -46,7 +46,7 @@ struct PlanView: View {
     private func page(_ mode: PlanMode, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(mode.title)
-                .font(.title3.weight(.semibold))
+                .appFont(.title3, weight: .semibold)
                 .padding(.horizontal, 20).padding(.vertical, 8)
             content()
         }
