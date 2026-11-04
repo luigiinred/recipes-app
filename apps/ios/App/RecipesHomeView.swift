@@ -260,6 +260,7 @@ struct RecipesHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var discover: DiscoverController
+    @EnvironmentObject private var cook: CookSession
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.listStyle) private var style = RecipeListStyle.list
     @AppStorage(AppSettings.Key.homeSort) private var savedSort = RecipeSort.recent
@@ -619,8 +620,9 @@ struct RecipesHomeView: View {
             HStack(alignment: .firstTextBaseline) {
                 if section == .upNext {
                     Button { openRoute(.upNext) } label: {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
                             sectionTitle(section.title)
+                            Spacer()
                             Image(systemName: "chevron.right").appFont(.subheadline, weight: .semibold).foregroundStyle(.secondary)
                         }
                         .contentShape(Rectangle())
@@ -629,13 +631,23 @@ struct RecipesHomeView: View {
                     .accessibilityHint("Opens Up Next to reorder it")
                 } else {
                     sectionTitle(section.title)
+                    Spacer()
+                    if section == .today { sectionLink("View Plan") { router.destination = .plan } }
                 }
-                Spacer()
-                if section == .today { sectionLink("View Plan") { router.destination = .plan } }
             }
             .padding(.horizontal, margin)
             HeroCarousel(picks: picks, margin: margin) { id in
                 if library.recipe(id: id) != nil { selection = id } else { router.destination = .plan }
+            } actions: { recipe in
+                if library.recipe(id: recipe.id) != nil {
+                    if section == .upNext {
+                        Button("Made It", systemImage: "checkmark.circle") { Task { await library.logMade(recipe) } }
+                        Button("Cook", systemImage: "frying.pan") { cook.start(recipe) }
+                            .disabled(recipe.steps.isEmpty)
+                        Divider()
+                    }
+                    recipeMenu(recipe)
+                }
             }
         }
     }
@@ -1051,10 +1063,11 @@ struct HeroPick: Identifiable {
 }
 
 /// The Today section: large photo cards a page at a time, with dots when there's more than one.
-private struct HeroCarousel: View {
+private struct HeroCarousel<Actions: View>: View {
     let picks: [HeroPick]
     let margin: CGFloat
     let open: (Recipe.ID) -> Void
+    @ViewBuilder let actions: (Recipe) -> Actions
     @State private var page: Int?
     @State private var width: CGFloat = 0
 
@@ -1065,6 +1078,7 @@ private struct HeroCarousel: View {
                     ForEach(picks.indices, id: \.self) { index in
                         Button { open(picks[index].recipe.id) } label: { HeroCard(pick: picks[index]) }
                             .buttonStyle(.plain)
+                            .contextMenu { actions(picks[index].recipe) }
                             .frame(width: max(width - 2 * margin, 0))
                             .id(index)
                     }
