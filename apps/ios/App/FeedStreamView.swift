@@ -105,11 +105,12 @@ struct FeedStreamTab: View {
     }
 }
 
-/// Each followed feed as its own row, with Discover a tap away. Rows load as they scroll into view and page in older posts at their ends.
+/// Followed posts merged newest first, or each feed as its own row, with Discover a tap away.
 struct FeedStreamView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.appAccent) private var accent
+    @AppStorage(AppSettings.Key.feedsGrouped) private var grouped = false
 
     var body: some View {
         ScrollView {
@@ -126,7 +127,11 @@ struct FeedStreamView: View {
                         .accessibilityAddTraits(.isHeader)
                         .padding(.horizontal)
                         .padding(.bottom, -20)
-                    ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title) }
+                    if grouped {
+                        ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title) }
+                    } else {
+                        FeedStream().padding(.horizontal)
+                    }
                 }
             }
             .padding(.vertical)
@@ -134,6 +139,16 @@ struct FeedStreamView: View {
         .themedCanvas()
         .navigationTitle("Feeds")
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("View", selection: $grouped) {
+                        Label("All Posts", systemImage: "list.bullet").tag(false)
+                        Label("By Feed", systemImage: "rectangle.split.1x2").tag(true)
+                    }
+                } label: {
+                    Label("View", systemImage: grouped ? "rectangle.split.1x2" : "list.bullet")
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 // Destination links, so this page works inside any stack, including Home's typed path.
                 NavigationLink { RecipeFeedsPage() } label: { Label("Manage Feeds", systemImage: "slider.horizontal.3") }
@@ -232,6 +247,56 @@ struct FeedDiscoverPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// Every followed feed's posts in one grid, newest first, paging in older posts at the end.
+private struct FeedStream: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var loader: FeedLoader
+
+    private var isLoading: Bool {
+        library.feeds.contains { feed in
+            switch loader.states[feed.url] {
+            case .loading, nil: true
+            default: false
+            }
+        }
+    }
+
+    private var hasMore: Bool {
+        library.feeds.contains { !loader.exhausted.contains($0.url) }
+    }
+
+    var body: some View {
+        let items = loader.items(for: library.feeds)
+        GridSection(title: nil, minimum: 300, spacing: 20) {
+            ForEach(items) { item in
+                NavigationLink { FeedEntryPreview(entry: item.entry) } label: {
+                    FeedCard(entry: item.entry, source: item.source)
+                }
+                .buttonStyle(.plain)
+            }
+            if items.isEmpty ? isLoading : hasMore {
+                ForEach(0..<2, id: \.self) { FeedCard(entry: .placeholder($0), source: "Recipe site").loadingPlaceholder() }
+                    .onAppear {
+                        guard !items.isEmpty else { return }
+                        Task { await loadMore() }
+                    }
+                    .id(items.count)
+            } else if items.isEmpty {
+                Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
+    }
+
+    private func loadMore() async {
+        await withTaskGroup(of: Void.self) { group in
+            for feed in library.feeds where !loader.exhausted.contains(feed.url) {
+                group.addTask { await loader.loadMore(url: feed.url) }
+            }
+        }
     }
 }
 
@@ -550,16 +615,16 @@ struct FollowFeedButton: View {
     let url: String
     let title: String
     var onFollow: (() -> Void)?
+    @State private var confirmingUnfollow = false
 
     private var subscribed: Feed? { library.feeds.first { $0.url == url } }
 
     var body: some View {
         Button {
-            Task {
-                if let subscribed {
-                    await library.remove(subscribed)
-                    ToastCenter.shared.show("Unfollowed \(title)", symbol: "minus.circle.fill") { await library.add(subscribed) }
-                } else {
+            if subscribed != nil {
+                confirmingUnfollow = true
+            } else {
+                Task {
                     let feed = Feed(url: url, title: title)
                     await library.add(feed)
                     onFollow?()
@@ -574,6 +639,17 @@ struct FollowFeedButton: View {
         .buttonStyle(.borderless)
         .accessibilityLabel(subscribed == nil ? "Follow \(title)" : "Unfollow \(title)")
         .sensoryFeedback(.selection, trigger: subscribed == nil)
+        .confirmationDialog("Unfollow \(title)?", isPresented: $confirmingUnfollow, titleVisibility: .visible) {
+            Button("Unfollow", role: .destructive) {
+                guard let subscribed else { return }
+                Task {
+                    await library.remove(subscribed)
+                    ToastCenter.shared.show("Unfollowed \(title)", symbol: "minus.circle.fill") { await library.add(subscribed) }
+                }
+            }
+        } message: {
+            Text("Its posts stop showing up in Feeds.")
+        }
     }
 }
 
