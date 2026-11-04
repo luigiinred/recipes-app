@@ -1083,7 +1083,10 @@ struct HeroPick: Identifiable {
 }
 
 /// The Today section: large photo cards a page at a time, with dots when there's more than one.
+/// Wide screens fit several cards side by side and scroll them like the other shelves.
 private struct HeroCarousel<Actions: View>: View {
+    static let minCardWidth: CGFloat = 340
+
     let picks: [HeroPick]
     let margin: CGFloat
     let open: (Recipe.ID) -> Void
@@ -1091,7 +1094,19 @@ private struct HeroCarousel<Actions: View>: View {
     @State private var page: Int?
     @State private var width: CGFloat = 0
 
+    private var available: CGFloat { max(width - 2 * margin, 0) }
+
+    private var columns: Int {
+        max(1, Int((available + TagTile.spacing) / (Self.minCardWidth + TagTile.spacing)))
+    }
+
+    private var cardWidth: CGFloat {
+        let columns = CGFloat(columns)
+        return max((available - (columns - 1) * TagTile.spacing) / columns, 0)
+    }
+
     var body: some View {
+        let pages = columns == 1
         VStack(spacing: 14) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: TagTile.spacing) {
@@ -1099,19 +1114,19 @@ private struct HeroCarousel<Actions: View>: View {
                         Button { open(picks[index].recipe.id) } label: { HeroCard(pick: picks[index]) }
                             .buttonStyle(.plain)
                             .contextMenu { actions(picks[index].recipe) }
-                            .frame(width: max(width - 2 * margin, 0))
+                            .frame(width: cardWidth)
                             .id(index)
                     }
                 }
                 .scrollTargetLayout()
             }
             .contentMargins(.horizontal, margin, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+            .scrollTargetBehavior(.viewAligned(limitBehavior: pages ? .always : .automatic))
             .scrollPosition(id: $page)
-            .scrollDisabled(picks.count < 2)
+            .scrollDisabled(picks.count <= columns)
             .scrollClipDisabled()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-            if picks.count > 1 { TagPageDots(count: picks.count, current: page ?? 0) }
+            if pages, picks.count > 1 { TagPageDots(count: picks.count, current: page ?? 0) }
         }
     }
 }
