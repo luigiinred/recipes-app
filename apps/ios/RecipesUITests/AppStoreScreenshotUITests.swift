@@ -65,7 +65,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             tab("Settings")
         case "roundtrip":
             tab("Settings")
-            tab("Recipes")
+            tab("Home")
         case "search":
             tab("Search")
         case "import":

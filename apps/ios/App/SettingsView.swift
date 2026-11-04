@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
+    case home, recipes, planner, cooking, groceries, reminders, theme, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -72,6 +72,9 @@ struct SettingsView: View {
     @ViewBuilder
     private var rows: some View {
         Section {
+            #if os(iOS)
+            NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
+            #endif
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
             NavigationLink(value: SettingsPage.planner) { Label("Planner", systemImage: "calendar") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
@@ -124,6 +127,12 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
+        case .home:
+            #if os(iOS)
+            HomeSettingsPage()
+            #else
+            EmptyView()
+            #endif
         case .recipes: RecipesSettingsPage()
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
@@ -226,6 +235,57 @@ private struct RecipesSettingsPage: View {
 }
 
 #if os(iOS)
+/// Which sections the Home page shows, in order.
+struct HomeSettingsPage: View {
+    @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
+    @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
+
+    var body: some View {
+        let hidden = HomeSection.hidden(hiddenRaw, order: orderRaw)
+        List {
+            Section {
+                ForEach(HomeSection.order(orderRaw)) { section in
+                    Toggle(isOn: Binding(
+                        get: { !hidden.contains(section) },
+                        set: { shown in
+                            var hidden = hidden
+                            if shown { hidden.remove(section) } else { hidden.insert(section) }
+                            hiddenRaw = HomeSection.raw(HomeSection.allCases.filter(hidden.contains))
+                            orderRaw = HomeSection.raw(HomeSection.order(orderRaw))
+                        }
+                    )) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(section.title)
+                                Text(section.detail).appFont(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: section.symbol)
+                        }
+                    }
+                }
+                .onMove { from, to in
+                    var order = HomeSection.order(orderRaw)
+                    order.move(fromOffsets: from, toOffset: to)
+                    orderRaw = HomeSection.raw(order)
+                }
+            } header: {
+                Text("Sections")
+            } footer: {
+                Text("Drag to reorder. Turned-off sections don't show on Home.")
+            }
+            Section {
+                Button("Reset to Default") {
+                    withAnimation { orderRaw = ""; hiddenRaw = "" }
+                }
+                .disabled(orderRaw.isEmpty && hiddenRaw.isEmpty)
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .settingsPage("Home")
+    }
+}
+
 /// Which quick filter chips the Search tab shows, in order: the built-in filters and any tags.
 private struct QuickFiltersSettingsPage: View {
     @EnvironmentObject private var library: RecipeLibrary
