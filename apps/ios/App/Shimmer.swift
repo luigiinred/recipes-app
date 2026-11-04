@@ -45,13 +45,20 @@ extension Recipe {
     )
 }
 
-/// A recipe page that's still loading, laid out like the real one.
+/// A recipe page that's still loading, laid out like the real one so it can fade into it without moving.
 struct RecipeDetailSkeleton: View {
+    var hasPhoto = true
+
     var body: some View {
-        RecipeDetailView(recipe: .placeholder, previewSave: {}, previewImage: nil)
+        RecipeDetailView(recipe: .placeholder, previewSave: {}, previewImage: nil, reservesArtwork: hasPhoto)
             .loadingPlaceholder()
             .allowsHitTesting(false)
+            .transition(.opacity)
     }
+}
+
+extension Animation {
+    static let recipeArrives = Animation.smooth(duration: 0.4)
 }
 
 /// Recipe rows that are still loading.

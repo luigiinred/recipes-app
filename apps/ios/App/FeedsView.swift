@@ -18,6 +18,7 @@ struct FeedEntryPreview: View {
                         ToastCenter.shared.show("Added \(saved.title) to My Recipes") { await library.delete(saved) }
                     }
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
+                .transition(.opacity)
             } else if errorMessage != nil {
                 WebView(url: entry.link)
                     .navigationTitle(entry.title)
@@ -30,9 +31,10 @@ struct FeedEntryPreview: View {
                         }
                     }
             } else {
-                RecipeDetailSkeleton()
+                RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
             }
         }
+        .animation(.recipeArrives, value: loader.results[entry.id] != nil)
         .task(id: entry.id) {
             errorMessage = nil
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }

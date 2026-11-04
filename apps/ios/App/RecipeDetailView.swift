@@ -12,6 +12,7 @@ struct RecipeDetailView: View {
     var previewImage: Data?
     var previewSaveTitle = "Save Recipe"
     var previewSaved = false
+    var reservesArtwork = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
@@ -226,6 +227,7 @@ struct RecipeDetailView: View {
 
     private var hasArtwork: Bool {
         guard recipe.youTubeVideoID == nil else { return false }
+        if reservesArtwork { return true }
         return previewSave != nil ? previewImage != nil : library.hasImage(recipe.id)
     }
 
@@ -234,6 +236,8 @@ struct RecipeDetailView: View {
         if previewSave != nil, let data = previewImage,
            let image = RecipeImageProcessing.thumbnail(from: data, maxPixelSize: RecipeLibrary.thumbnailSize) {
             Image(decorative: image, scale: 1).resizable().scaledToFill()
+        } else if reservesArtwork {
+            Color.secondary.opacity(0.12)
         } else {
             RecipeImageView(recipe: recipe)
         }
