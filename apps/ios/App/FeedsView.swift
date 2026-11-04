@@ -1,5 +1,6 @@
 import RecipeKit
 import SwiftUI
+import WebKit
 
 struct FeedEntryPreview: View {
     @EnvironmentObject private var library: RecipeLibrary
@@ -7,7 +8,6 @@ struct FeedEntryPreview: View {
     let entry: FeedEntry
 
     @State private var errorMessage: String?
-    @State private var browsing = false
 
     var body: some View {
         Group {
@@ -19,26 +19,22 @@ struct FeedEntryPreview: View {
                     }
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
                 .transition(.opacity)
-            } else if let errorMessage {
-                ContentUnavailableView {
-                    Label("No recipe found", systemImage: "fork.knife")
-                } description: {
-                    Text(errorMessage)
-                } actions: {
+            } else if errorMessage != nil {
+                WebView(url: entry.link)
+                    .navigationTitle(entry.title)
                     #if os(iOS)
-                    Button("View the Page") { browsing = true }
-                    #else
-                    Link("Open in Browser", destination: entry.link)
+                    .navigationBarTitleDisplayMode(.inline)
                     #endif
-                }
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Link(destination: entry.link) { Label("Open in Browser", systemImage: "safari") }
+                        }
+                    }
             } else {
                 RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
             }
         }
         .animation(.recipeArrives, value: loader.results[entry.id] != nil)
-        #if os(iOS)
-        .sheet(isPresented: $browsing) { SafariView(url: entry.link).ignoresSafeArea() }
-        #endif
         .task(id: entry.id) {
             errorMessage = nil
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
