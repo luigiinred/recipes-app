@@ -1092,7 +1092,7 @@ struct HeroPick: Identifiable {
 /// The Today section: large photo cards a page at a time, with dots when there's more than one.
 /// Wide screens fit several cards side by side and scroll them like the other shelves.
 private struct HeroCarousel<Actions: View>: View {
-    static let minCardWidth: CGFloat = 340
+    static var minCardWidth: CGFloat { 340 }
 
     let picks: [HeroPick]
     let margin: CGFloat
