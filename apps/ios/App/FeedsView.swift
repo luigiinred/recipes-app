@@ -5,6 +5,8 @@ import WebKit
 struct FeedEntryPreview: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
+    @AppStorage(AppSettings.Key.feedMarkViewed) private var markMode = FeedMarkMode.onClose
+    @AppStorage(AppSettings.Key.feedReader) private var opensInReader = true
     let entry: FeedEntry
 
     @State private var errorMessage: String?
@@ -20,16 +22,20 @@ struct FeedEntryPreview: View {
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
                 .transition(.opacity)
             } else if errorMessage != nil {
-                WebView(url: entry.link)
-                    .navigationTitle(entry.title)
-                    #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
-                    #endif
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Link(destination: entry.link) { Label("Open in Browser", systemImage: "safari") }
+                if opensInReader {
+                    ArticleReader(entry: entry)
+                } else {
+                    WebView(url: entry.link)
+                        .navigationTitle(entry.title)
+                        #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                        #endif
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Link(destination: entry.link) { Label("Open in Browser", systemImage: "safari") }
+                            }
                         }
-                    }
+                }
             } else {
                 RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
             }
@@ -39,6 +45,18 @@ struct FeedEntryPreview: View {
             errorMessage = nil
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
         }
+        .onAppear {
+            loader.opened(entry)
+            if markMode == .onOpen { loader.markViewed([entry.id]) }
+        }
+        .onDisappear(perform: closed)
+    }
+
+    private func closed() {
+        guard markMode == .onClose, !loader.isViewed(entry), !loader.keptNew.contains(entry.id) else { return }
+        let id = entry.id
+        loader.markViewed([id])
+        ToastCenter.shared.show("Marked as viewed") { loader.markNew([id]) }
     }
 
     private func isSaved(_ recipe: Recipe) -> Bool {
