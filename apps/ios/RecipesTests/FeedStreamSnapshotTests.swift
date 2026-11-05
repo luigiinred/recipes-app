@@ -22,9 +22,11 @@ final class FeedStreamSnapshotTests: XCTestCase {
         assertPageSnapshots(of: FeedEntryPreview(entry: SampleData.feedEntries[0]))
     }
 
+    #if os(iOS)
     func testHomeShelf() {
         assertPageSnapshots(of: RootView(tab: .recipes), inNavigationStack: false, coverage: .adaptive)
     }
+    #endif
 
     func testDiscover() {
         assertPageSnapshots(of: FeedDiscoverPage())

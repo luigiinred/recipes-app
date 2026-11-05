@@ -61,7 +61,7 @@ struct OrganizingSnapshotTests {
     @Test("sidebar: collections and feeds")
     func sidebar() {
         assertPageSnapshots(
-            of: SidebarView(section: .constant(.recipes(.favorites)), addingFeed: .constant(false)),
+            of: SidebarView(section: .constant(.recipes(.favorites))),
             inNavigationStack: false, macSize: CGSize(width: 260, height: 700)
         )
     }
