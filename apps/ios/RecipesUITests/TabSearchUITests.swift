@@ -17,29 +17,46 @@ final class TabSearchUITests: XCTestCase {
         try? FileManager.default.removeItem(at: library)
     }
 
-    func testSearchButtonExpandsIntoSearchField() {
+    private func launch(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"] + arguments
         app.launch()
+        return app
+    }
 
-        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.searchFields.firstMatch.exists, "the recipes tab should not show a search bar at the top")
-
-        let searchTab = app.tabBars.buttons["Search"].firstMatch
-        XCTAssertTrue(searchTab.waitForExistence(timeout: 5), "the search button should be in the tab bar")
-        searchTab.tap()
-
-        sleep(2)
-        if !app.searchFields.firstMatch.exists { print("UI TREE AFTER TAP:\n" + app.debugDescription) }
+    func testHomeSearchesFromTheHeader() {
+        let app = launch()
+        XCTAssertFalse(app.tabBars.buttons["Search"].waitForExistence(timeout: 5), "search is no longer a tab")
         let field = app.searchFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "tapping search should expand into a search field")
-        XCTAssertTrue(app.staticTexts["Roasted Soup"].waitForExistence(timeout: 5), "search starts by showing every recipe")
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "the first tab has a search bar in its header")
+        shot("home")
         field.tap()
         field.typeText("shak")
-        try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/private/tmp/claude-501/search-expanded.png"))
         XCTAssertTrue(app.staticTexts["Test Shakshuka"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Roasted Soup"].waitForNonExistence(timeout: 5), "results should be filtered by the query")
+    }
+
+    func testRecipesCanBeTheFirstTab() {
+        let app = launch(["-firstTab", "recipes"])
+        XCTAssertTrue(app.tabBars.buttons["Recipes"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.tabBars.buttons["Home"].exists)
+        XCTAssertTrue(app.staticTexts["Roasted Soup"].waitForExistence(timeout: 5), "Recipes lists every recipe")
+        XCTAssertTrue(app.searchFields.firstMatch.exists)
+        shot("recipes-first")
+    }
+
+    func testTabBarNeverHoldsMoreThanFive() {
+        let app = launch(["-settingsInTabBar", "YES", "-hiddenTabs", ""])
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 15))
+        XCTAssertLessThanOrEqual(app.tabBars.buttons.count, 5)
+        XCTAssertFalse(app.tabBars.buttons["More"].exists)
+        shot("five-tabs")
+    }
+
+    private func shot(_ name: String) {
+        guard let dir = ProcessInfo.processInfo.environment["TAB_SHOTS"] else { return }
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png"))
     }
 }
 #endif

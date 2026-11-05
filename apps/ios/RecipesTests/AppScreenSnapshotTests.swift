@@ -50,9 +50,9 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false, coverage: .iPad)
     }
 
-    @Test("Search tab, with results")
-    func searchTab() {
-        assertPageSnapshots(of: RootView(tab: .search, searchQuery: "tomato"), inNavigationStack: false)
+    @Test("Home, searched from its header")
+    func homeSearch() {
+        assertPageSnapshots(of: RootView(tab: .recipes, searchQuery: "tomato"), inNavigationStack: false)
     }
 
     @Test("Plan tab: Up Next queue")
