@@ -128,6 +128,12 @@ enum AppSettings {
         tabs.map(\.rawValue).sorted().joined(separator: ",")
     }
 
+    static func showing(_ tab: MainTab, _ shown: Bool, hidden raw: String) -> String {
+        var hidden = hiddenTabs(raw)
+        if shown { hidden.remove(tab) } else { hidden.insert(tab) }
+        return encode(hidden)
+    }
+
     static var keepsScreenAwake: Bool {
         UserDefaults.standard.register(defaults: [Key.keepAwake: true])
         return UserDefaults.standard.bool(forKey: Key.keepAwake)

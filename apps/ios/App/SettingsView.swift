@@ -266,12 +266,7 @@ struct HomeSettingsPage: View {
                 ForEach(listed) { section in
                     Toggle(isOn: Binding(
                         get: { !hidden.contains(section) },
-                        set: { shown in
-                            var hidden = hidden
-                            if shown { hidden.remove(section) } else { hidden.insert(section) }
-                            hiddenRaw = HomeSection.raw(HomeSection.allCases.filter(hidden.contains))
-                            orderRaw = HomeSection.raw(HomeSection.order(orderRaw))
-                        }
+                        set: { (orderRaw, hiddenRaw) = HomeSection.showing(section, $0, order: orderRaw, hidden: hiddenRaw) }
                     )) {
                         Label {
                             VStack(alignment: .leading, spacing: 2) {
@@ -741,7 +736,7 @@ struct FontSettingsPage: View {
 }
 
 /// Picture tiles three to a row, like the system's own appearance picker.
-private struct ThemeTileRow<Content: View>: View {
+struct ThemeTileRow<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -791,7 +786,7 @@ struct ThemeThumbnail: View {
     }
 }
 
-private struct ThemeTile<Thumbnail: View>: View {
+struct ThemeTile<Thumbnail: View>: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -822,7 +817,7 @@ private struct ThemeTile<Thumbnail: View>: View {
     }
 }
 
-private struct DiagonalHalf: Shape {
+struct DiagonalHalf: Shape {
     func path(in rect: CGRect) -> Path {
         Path { path in
             path.move(to: CGPoint(x: rect.maxX * 0.6, y: rect.minY))
@@ -834,7 +829,7 @@ private struct DiagonalHalf: Shape {
     }
 }
 
-private struct ThemePreview: View {
+struct ThemePreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Sunday Sauce").appFont(.title2, weight: .bold)
@@ -1176,11 +1171,7 @@ struct TabVisibilitySection: View {
         Section {
             Toggle(isOn: Binding(
                 get: { !AppSettings.hiddenTabs(hiddenRaw).contains(tab) },
-                set: { shown in
-                    var hidden = AppSettings.hiddenTabs(hiddenRaw)
-                    if shown { hidden.remove(tab) } else { hidden.insert(tab) }
-                    hiddenRaw = AppSettings.encode(hidden)
-                }
+                set: { hiddenRaw = AppSettings.showing(tab, $0, hidden: hiddenRaw) }
             )) {
                 Label("Show \(tab.title) Tab", systemImage: tab.symbol)
             }
