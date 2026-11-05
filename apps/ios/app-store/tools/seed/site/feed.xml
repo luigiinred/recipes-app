@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>Weeknight Table</title>
+<link>http://localhost:8765/</link>
+<description>A fictional recipe blog for the App Store screenshots.</description>
+<item>
+<title>Galaxy Smoothie Bowl</title>
+<link>http://localhost:8765/lemon-herb-gnocchi.html#galaxy-smoothie-bowl</link>
+<description>Blueberries, banana and coconut blended thick enough to eat with a spoon.</description>
+<enclosure url="feed/galaxy-smoothie-bowl.jpg" type="image/jpeg" length="0"/>
+</item>
+<item>
+<title>Arugula and Olive Flatbread</title>
+<link>http://localhost:8765/lemon-herb-gnocchi.html#arugula-flatbread</link>
+<description>A blistered crust, a thin tomato sauce and a big handful of peppery greens.</description>
+<enclosure url="feed/arugula-flatbread.jpg" type="image/jpeg" length="0"/>
+</item>
+<item>
+<title>Sunday Brunch Bowl</title>
+<link>http://localhost:8765/lemon-herb-gnocchi.html#brunch-bowl</link>
+<description>Chia, berries, kiwi and banana, ready in ten minutes.</description>
+<enclosure url="feed/brunch-bowl.jpg" type="image/jpeg" length="0"/>
+</item>
+<item>
+<title>Spring Greens with Lemon Vinaigrette</title>
+<link>http://localhost:8765/lemon-herb-gnocchi.html#spring-greens</link>
+<description>Tender leaves, a sharp lemon dressing and plenty of black pepper.</description>
+<enclosure url="feed/spring-greens.jpg" type="image/jpeg" length="0"/>
+</item>
+</channel>
+</rss>

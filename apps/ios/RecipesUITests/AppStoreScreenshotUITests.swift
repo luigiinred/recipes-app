@@ -17,23 +17,33 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
         if dark { app.launchArguments += ["-AppleInterfaceStyle", "Dark"] }
+        if scene == "home" {
+            app.launchArguments += ["-homeSections", "feeds,tags,recipes,today,upNext,favorites,discover", "-hiddenHomeSections", "today,upNext,favorites,discover"]
+        }
+        if scene == "discover" {
+            app.launchArguments += ["-homeSections", "discover,today,upNext,favorites,tags,feeds,recipes", "-hiddenHomeSections", ""]
+        }
+        if let link = env["APP_STORE_OPEN_URL"], !link.isEmpty { app.launchEnvironment["RECIPES_OPEN_URL"] = link }
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
 
-        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '19 recipes'")
+        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == 'Today' OR label == 'Tags' OR label == '19' OR label == '19 recipes'")
         XCTAssertTrue(app.staticTexts.matching(loaded).firstMatch.waitForExistence(timeout: 40), "library should load")
         sleep(3)
         let regular = app.windows.firstMatch.frame.width > 700
-        if regular { showTopTabBar() }
+        // Hiding the sidebar would also dismiss the popover asking to open a link.
+        if regular, env["APP_STORE_OPEN_URL"]?.isEmpty ?? true { showTopTabBar() }
 
         switch scene {
         case "home":
             break
         case "library":
-            showAllRecipes()
-            if regular, env["APP_STORE_STYLE"] == "list" { openRecipe(hero) }
+            if regular, env["APP_STORE_STYLE"] == "list" {
+                showAllRecipes()
+                openRecipe(hero)
+            }
         case "list":
             break
         case "recipe":
@@ -53,11 +63,9 @@ final class AppStoreScreenshotUITests: XCTestCase {
             sleep(1)
             app.swipeLeft()
         case "plan":
-            tab("Plan")
-            tapButton("My Week")
-            if regular { openRecipe("Thai Red Curry") }
+            openWeek()
         case "upnext":
-            tab("Plan")
+            tab("Up Next")
             if regular { openRecipe("Slow-Braised Beef") }
         case "groceries":
             tab("Groceries")
@@ -73,16 +81,18 @@ final class AppStoreScreenshotUITests: XCTestCase {
             tapButton("Import from Web or YouTube…")
             let field = app.textFields.firstMatch
             XCTAssertTrue(field.waitForExistence(timeout: 15))
-            field.tap()
-            sleep(1)
+            // On iPad the sheet is still settling after the first tap, which can leave the field without focus.
+            for attempt in 0..<4 where !((field.value(forKey: "hasKeyboardFocus") as? Bool) ?? false) {
+                if attempt % 2 == 0 { field.tap() } else { field.press(forDuration: 0.6) }
+                sleep(2)
+            }
             field.typeText("http://localhost:8765/lemon-herb-gnocchi.html")
             tapButton("Import")
             let previewed = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Lemon Herb Gnocchi' OR value == 'Lemon Herb Gnocchi'")).firstMatch.waitForExistence(timeout: 40)
             try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "\(out)/\(named).png"))
             XCTAssertTrue(previewed, "the import should open a preview")
         case "idea":
-            tab("Plan")
-            tapButton("My Week")
+            openWeek()
             let add = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Add meal on'")).allElementsBoundByIndex.first(where: \.isHittable)
             XCTAssertNotNil(add, "No Add meal button")
             add?.tap()
@@ -92,7 +102,6 @@ final class AppStoreScreenshotUITests: XCTestCase {
             field.typeText("Taco night")
             tapIdeaAdd()
             XCTAssertTrue(app.staticTexts["Taco night"].firstMatch.waitForExistence(timeout: 8), "the idea should join the week")
-            if regular { openRecipe("Thai Red Curry") }
         case "cleanup":
             showAllRecipes()
             openRecipe(hero)
@@ -102,10 +111,37 @@ final class AppStoreScreenshotUITests: XCTestCase {
             for _ in 0..<8 where !cleanUp.exists || !cleanUp.isHittable { app.swipeUp() }
             XCTAssertTrue(cleanUp.exists, "No Clean Up button")
         case "smartplan":
-            tab("Plan")
-            tapButton("My Week")
+            openWeek()
             tapButton("Smart Plan")
             sleep(8)
+        case "discover":
+            _ = app.buttons["Add to Discover"].firstMatch.waitForExistence(timeout: 20)
+            tapButton("Add to Discover")
+            let browse = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Browse Shared Recipes'")).firstMatch
+            let entry = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Discover' OR label BEGINSWITH 'Browse Shared Recipes'")).firstMatch
+            XCTAssertTrue(entry.waitForExistence(timeout: 20), "Discover should appear once the server is added")
+            sleep(2)
+            if regular, !browse.exists {
+                tab("Discover")
+            } else {
+                for _ in 0..<12 where !(browse.exists && browse.isHittable) { app.swipeUp(velocity: .default); usleep(400_000) }
+                XCTAssertTrue(browse.exists, "No Discover entry")
+                browse.tap()
+            }
+            sleep(3)
+            open("All Recipes")
+            sleep(6)
+        case "mealie":
+            _ = app.buttons["Connect"].firstMatch.waitForExistence(timeout: 20)
+            tapButton("Connect")
+            sleep(6)
+            if app.buttons["Settings"].firstMatch.exists { tapButton("Settings") } else { tab("Settings") }
+            sleep(1)
+            let row = app.buttons["Mealie"].firstMatch
+            for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp(velocity: .default); usleep(400_000) }
+            row.tap()
+            let synced = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Synced'")).firstMatch
+            XCTAssertTrue(synced.waitForExistence(timeout: 90), "Mealie should finish a sync")
         default:
             XCTFail("Unknown scene \(scene)")
         }
@@ -128,13 +164,13 @@ final class AppStoreScreenshotUITests: XCTestCase {
             // First launch on a fresh install: let the system's one-time questions get answered, so they never appear in a recording.
             let first = XCUIApplication()
             first.launchEnvironment["RECIPES_DIR"] = library
-            first.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
+            first.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
             first.launch()
             sleep(6)
             if ProcessInfo.processInfo.environment["APP_PREVIEW_PRIME"] == "1" {
                 // Start one timer so the system's one-time alarm question is answered before anything is recorded, then cancel it.
                 let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-                first.staticTexts.matching(NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes'")).firstMatch.waitForExistence(timeout: 30)
+                first.staticTexts.matching(NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes' OR label == 'Today'")).firstMatch.waitForExistence(timeout: 30)
                 for _ in 0..<16 where !(first.staticTexts["World's Best Lasagna"].firstMatch.exists && first.staticTexts["World's Best Lasagna"].firstMatch.isHittable) { first.swipeUp(); usleep(400_000) }
                 first.staticTexts["World's Best Lasagna"].firstMatch.tap(); sleep(2)
                 first.buttons["Cook"].firstMatch.tap(); sleep(3)
@@ -158,11 +194,11 @@ final class AppStoreScreenshotUITests: XCTestCase {
         if scene == "share" { try shareFromSafari(landscape: env["APP_STORE_LANDSCAPE"] == "1"); return }
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? "cards", "-onboardingCompleted", "YES", "-defaultMeal", "dinner", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? "cards", "-onboardingCompleted", "YES", "-defaultMeal", "dinner", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
 
-        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes'")
+        let loaded = NSPredicate(format: "label == 'Brown Butter Chocolate Chip Cookies' OR label == '19' OR label == '20' OR label == '21' OR label == 'My Recipes' OR label == 'Today'")
         // System questions (Reminders, alarms) can cover the app on a fresh install: answer them until the library shows.
         let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         var ready = false
@@ -215,8 +251,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             glide(by: 0.45)
             sleep(2)
         case "plan":
-            tab("Plan")
-            tapButton("My Week")
+            openWeek()
             sleep(2)
             mark("week")
             // The lasagna goes on Sunday, picked from Up Next. Then an idea joins the week on Monday.
@@ -232,15 +267,10 @@ final class AppStoreScreenshotUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts[lasagna].firstMatch.waitForExistence(timeout: 8))
             sleep(3)
             mark("lasagna")
-            if regular {
-                let monday = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Add meal on Monday'")).firstMatch
-                XCTAssertTrue(monday.waitForExistence(timeout: 8), "No Monday add button")
-                let frame = monday.frame
-                app.windows.firstMatch.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.minX + 60, dy: frame.midY)).tap()
-            } else {
-                // Monday's "Add meal" sits at the same place on the week every time.
-                app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.09, dy: 0.755)).tap()
-            }
+            let monday = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Add meal on Monday'")).firstMatch
+            XCTAssertTrue(monday.waitForExistence(timeout: 8), "No Monday add button")
+            let frame = monday.frame
+            app.windows.firstMatch.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.minX + 60, dy: frame.midY)).tap()
             let field = app.textFields.firstMatch
             XCTAssertTrue(field.waitForExistence(timeout: 8))
             sleep(1)
@@ -259,8 +289,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             mark("idea")
             sleep(3)
         case "smartplan":
-            tab("Plan")
-            tapButton("My Week")
+            openWeek()
             sleep(2)
             mark("week")
             tapButton("Smart Plan")
@@ -420,7 +449,9 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
     /// Some layouts start on the recipe cards; the others list collections first.
     private func showAllRecipes() {
-        XCTAssertTrue(app.staticTexts[hero].firstMatch.waitForExistence(timeout: 10), "No \(hero)")
+        let row = app.staticTexts[hero].firstMatch
+        for _ in 0..<16 where !(row.exists && row.isHittable) { app.swipeUp(velocity: .default); usleep(400_000) }
+        XCTAssertTrue(row.exists, "No \(hero)")
     }
 
     private func open(_ title: String) {
@@ -453,11 +484,14 @@ final class AppStoreScreenshotUITests: XCTestCase {
         XCTFail("No tab \(name)")
     }
 
-    /// The tab bar has its own Add button (identifier "plus"), so pick the meal sheet's.
+    private func openWeek() {
+        tab("Plan")
+        if app.buttons["My Week"].firstMatch.waitForExistence(timeout: 2) { tapButton("My Week") }
+    }
+
+    /// Submits the meal sheet's idea field; the tab bar and the Plan toolbar have Add buttons of their own.
     private func tapIdeaAdd() {
-        let add = app.buttons.matching(NSPredicate(format: "label == 'Add' AND identifier != 'plus'")).firstMatch
-        XCTAssertTrue(add.waitForExistence(timeout: 8), "No Add button for the idea")
-        add.tap()
+        app.textFields.firstMatch.typeText("\n")
     }
 
     private func tapButton(_ name: String) {

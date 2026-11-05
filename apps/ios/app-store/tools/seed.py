@@ -16,6 +16,10 @@ def run(*args):
     return subprocess.run([CLI, *args, "--dir", lib], check=True, capture_output=True, text=True).stdout
 
 
+# Ideas first, so the newest items on Home are recipes with photos.
+for title in ["Leftovers", "Sandwiches", "Pizza night"]:
+    run("add", "--title", title)
+
 recipes = json.load(open(f"{HERE}/seed/recipes.json"))
 # Added oldest first, so the first recipes in the file are the newest in "Most Recent".
 for recipe in reversed(recipes):
@@ -24,9 +28,6 @@ for recipe in reversed(recipes):
     json.dump(recipe, open(path, "w"))
     run("add", "--from", path, "--image", f"{HERE}/seed/photos/{slug}.jpg")
     os.remove(path)
-
-for title in ["Leftovers", "Sandwiches", "Pizza night"]:
-    run("add", "--title", title)
 
 today = datetime.date.today()
 sunday = today - datetime.timedelta(days=(today.weekday() + 1) % 7)
@@ -41,6 +42,12 @@ for offset, title, meal in plan:
     if os.environ.get("APP_PREVIEW_SPARSE") and meal == "dinner" and offset < 5:
         continue
     run("plan", "add", title, "--date", str(sunday + datetime.timedelta(days=offset)), "--meal", meal)
+
+# A fictional blog served from seed/site by capture.sh, so Feeds shows no real site. Skipped when nothing serves it.
+try:
+    run("feeds", "add", "http://localhost:8765/feed.xml")
+except subprocess.CalledProcessError:
+    pass
 
 items = ["12 oz Farfalle", "1 cup Basil pesto", "1 pint Cherry tomatoes", "2 cups Arugula", "1 Lemon", "Parmesan", "6 Eggs",
          "1 Sourdough loaf", "2 cups Milk", "1 lb Mushrooms", "Olive oil"]

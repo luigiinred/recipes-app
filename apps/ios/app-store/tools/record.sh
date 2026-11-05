@@ -13,11 +13,19 @@ xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b >/dev/null
 [ "${KEEP_APP:-}" ] || [ "$1" = share ] || xcrun simctl uninstall "$udid" "$RECIPES_BUNDLE_ID" 2>/dev/null || true
 xcrun simctl spawn "$udid" launchctl unsetenv RECIPES_DIR 2>/dev/null || true
+xcrun simctl keychain "$udid" reset
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularMode active --cellularBars 4 --wifiBars 3 --operatorName ""
 xcrun simctl ui "$udid" appearance light
 
-# Safari on the recipe page: close the site's banner, share to "Save to Recipes" from the toolbar, review, save, and open the recipe.
-SHARE_TAPS="w:1;t:0.926,0.167;w:2;m:page;t:0.495,0.946;w:2.5;m:sheet;t:0.61,0.76;w:15;m:review;t:0.905,0.12;w:4;m:saved;t:0.5,0.634;w:6;m:opened;d:0.5,0.8,0.5,0.3;w:0.6;d:0.5,0.8,0.5,0.3;w:0.6;d:0.5,0.8,0.5,0.35;w:2.5;m:scrolled;w:1"
+# The demo feed and import page, as in capture.sh.
+(cd "$HERE/seed/site" && exec python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1) &
+server=$!
+(cd "$HERE/seed/site" && exec python3 -m http.server 8765 --bind ::1 >/dev/null 2>&1) &
+server6=$!
+trap 'kill $server $server6 2>/dev/null' EXIT
+
+# Safari on the recipe page: open the toolbar's menu, Share, "Save to Recipes" in the share sheet, review, save, and open the recipe.
+SHARE_TAPS="w:2;m:page;t:0.21,0.946;w:2.5;m:menu;t:0.38,0.519;w:5;m:sheet;t:0.825,0.785;w:15;m:review;t:0.905,0.12;w:4;m:saved;t:0.5,0.634;w:6;m:opened;d:0.5,0.8,0.5,0.3;w:0.6;d:0.5,0.8,0.5,0.3;w:0.6;d:0.5,0.8,0.5,0.35;w:2.5;m:scrolled;w:1"
 
 for scene in "$@"; do
   echo "== $device $scene"
@@ -62,7 +70,7 @@ for scene in "$@"; do
       ln -s "$extdata/Library/Application Support/Recipes" "$appdata/Library/Application Support/Recipes"
     fi
     # What the UI tests pass as launch arguments, for an app the system opens. Written through the simulator's own preferences daemon.
-    for kv in "onboardingCompleted -bool true" "reviewPromptDismissed -bool true" "syncGroceriesWithReminders -bool false" "recipeListStyle -string cards" "defaultMeal -string dinner"; do
+    for kv in "onboardingCompleted -bool true" "reviewPromptDismissed -bool true" "syncGroceriesWithReminders -bool false" "recipeListStyle -string cards" "defaultMeal -string dinner" "homeCustomizeTipDismissed -bool true" "hiddenTabs -string feeds"; do
       xcrun simctl spawn "$udid" defaults write "$RECIPES_BUNDLE_ID" $kv
     done
     xcrun simctl openurl "$udid" "${APP_PREVIEW_PAGE:-https://www.allrecipes.com/recipe/23600/worlds-best-lasagna/}"; sleep 6
