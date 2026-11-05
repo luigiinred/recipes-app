@@ -17,11 +17,13 @@ Design decisions for the artwork (fonts, colors) are in [`design.markdown`](../.
 
 ## Positioning
 
-**The free, open-source recipe manager built for iPhone, iPad and Mac.** Three pillars carry the listing, the screenshots and the marketing:
+**The free, open-source recipe manager built for iPhone, iPad and Mac.** Three pillars carry the listing, the screenshots and the marketing, and a fourth line covers where recipes come from beyond your own library:
 
 1. **Save recipes from anywhere on the web.** Safari's Share sheet, a pasted link, a YouTube video or a scanned page. The importer reads the page and you review it before anything is saved.
 2. **Plan with recipes or ideas.** My Week takes a recipe or a free-text idea such as "Taco night".
 3. **Apple Intelligence that stays out of your way.** It helps you *add* (video captions to a recipe, splitting steps pasted as one block), *organize* (grouping a long ingredient list into sections) and *plan* (Smart Plan fills the empty slots). It runs on the device and you review the result.
+
+Beyond the pillars: **follow and share.** Feeds follows recipe blogs and YouTube channels on Home, Discover browses a friend's shared Mealie server and copies the recipes you like, and the whole library can sync both ways with your own Mealie server.
 
 Claims were checked against the code before they went into the copy:
 
@@ -33,10 +35,13 @@ Claims were checked against the code before they went into the copy:
 | Plan with recipes or ideas | Yes. The Add Meal sheet takes free text (`NewIdeaSheet`); the plan model already allowed an entry with no recipe |
 | Apple Intelligence for add, organize and plan | Yes, and no wider than that. Image Playground photos are separate |
 | iPhone, iPad and Mac | Yes, and each has its own screenshot set |
+| Follow recipe blogs and YouTube channels | Yes. Feeds reads RSS and Atom, saves the newest posts for offline reading, and shows them on Home and in their own tab |
+| Browse a shared Mealie server | Yes. Discover is read-only; Add to My Recipes copies a recipe and its photo (`DiscoverController`) |
+| Sync with Mealie | Yes. Recipes, photos, timelines, planned meals and groceries, both ways (`MealieSync`, [`docs/mealie.md`](../../../docs/mealie.md)) |
 
-**One Apple rule shapes the wording.** Price words such as "free" can't appear in the app name, subtitle or screenshots (App Review Guideline 2.3.7; worth re-reading before each submission). So "free and open source" lives in the description and promotional text, the subtitle says "Open source recipe manager", and the screenshots show the product, not the price. Competitor names also can't appear in any metadata. A competing listing was used for structure only (short ALL-CAPS feature sections), never its wording.
+**One Apple rule shapes the wording.** Price words such as "free" can't appear in the app name, subtitle or screenshots (App Review Guideline 2.3.7; worth re-reading before each submission). So "free and open source" lives in the description and promotional text, the subtitle says "Open source recipe manager", and the screenshots show the product, not the price. Competitor names also can't appear in any metadata. **Mealie is in the keywords anyway**, by choice: the app syncs with it, so people searching for a Mealie client should find it. Apple discourages other apps' names in keywords, so a reviewer may ask for it to come out; if they do, drop it from the keywords and keep "Works with Mealie" in the description, where naming an integration is allowed. A competing listing was used for structure only (short ALL-CAPS feature sections), never its wording.
 
-Marketing ideas not yet done: an **app preview video** (cook mode with a timer, then Share-sheet import), and a light-background variant of each set for product page optimization tests.
+Marketing ideas not yet done: a light-background variant of each set for product page optimization tests.
 
 ## Asset index
 
@@ -44,10 +49,10 @@ Marketing ideas not yet done: an **app preview video** (cook mode with a timer, 
 |---|---|---|---|
 | App icon | [`images/icon/app-icon-1024.png`](images/icon/app-icon-1024.png) | 1024 × 1024, opaque | Approximate flat copy, cropped slightly to drop the rounded bevel. The shipping icon comes from the binary (`App/AppIcon.icon`). [`app-icon.png`](images/icon/app-icon.png) is the rendered Home Screen icon that the card and creative images use |
 | iPhone screenshots (10) | [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" display |
-| iPad screenshots (9) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
-| Mac screenshots (9) | [`images/mac/`](images/mac/) | 2880 × 1800 | Mac |
+| iPad screenshots (10) | [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" display |
+| Mac screenshots (10) | [`images/mac/`](images/mac/) | 2880 × 1800 | Mac |
 | iPhone Duo screenshots, open (6) | [`images/iphone-duo-open/`](images/iphone-duo-open/) | 2853 × 2007 | iPhone Duo |
-| iPhone Duo screenshots, closed (9) | [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034 | iPhone Duo, if the open set isn't used |
+| iPhone Duo screenshots, closed (10) | [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034 | iPhone Duo, if the open set isn't used |
 | Product page header | [`images/creative/header.png`](images/creative/header.png) | 3840 × 1646 (21:9) | Product page header |
 | Search result image | [`images/creative/search.png`](images/creative/search.png) | 3840 × 2560 (3:2) | Search results |
 | Universal creative | [`images/creative/universal.png`](images/creative/universal.png) | 5244 × 2950 (16:9) | Header and search from one file |
@@ -80,7 +85,7 @@ Open source recipe manager
 Editable any time without a new release. This is where "free" can be said.
 
 ```
-A free, open-source recipe manager for iPhone, iPad and Mac. Save recipes from any website, plan your week, and get help from Apple Intelligence. No account, no ads.
+A free, open-source recipe manager for iPhone, iPad and Mac. Save recipes from any website, follow your favorite cooks, plan your week, and sync with Mealie. No ads.
 ```
 
 165 characters.
@@ -96,7 +101,7 @@ SAVE FROM ANYWHERE ON THE WEB
 Send a recipe from Safari with the Share sheet, paste a link, or import a YouTube video. Recipes reads the ingredients, steps and photo, and you review them before anything is saved. The video stays pinned above the recipe, and tapping a step's time jumps to that moment. Cooking from a book? Scan the page with your camera. Or type one in yourself.
 
 PLAN YOUR WEEK, WITH RECIPES OR IDEAS
-Line up what you'll cook next in Up Next, then place recipes on days in My Week. Not every meal is a recipe, so you can add an idea too, like "Taco night" or "Leftovers".
+Line up what you'll cook next in Up Next, then place recipes on days in your week. Not every meal is a recipe, so you can add an idea too, like "Taco night" or "Leftovers".
 
 APPLE INTELLIGENCE, WHEN YOU WANT IT
 On devices that support it, Apple Intelligence helps you add, organize and plan, and it runs on your device. It turns a video's captions into a recipe and splits steps that were pasted as one block. It sorts a long ingredient list into sections such as "For the sauce", and Smart Plan fills the empty slots in your week. You review everything before it's saved.
@@ -110,8 +115,17 @@ Cook mode shows one step at a time in large type, keeps your screen awake, and l
 SHOPPING THAT KEEPS UP
 Add a recipe's ingredients to your grocery list in one tap. The list syncs both ways with the Reminders app.
 
+A HOME THAT'S YOURS
+Home shows today's meals, what's up next, your favorites, your tags and your newest recipes. Reorder the sections, hide the ones you don't use, and pick a cookbook color theme.
+
+FOLLOW YOUR FAVORITE COOKS
+Follow recipe blogs and YouTube channels and see their newest posts on Home, saved for reading offline. Swipe through them one at a time and save the ones you want to cook.
+
+DISCOVER AND MEALIE
+Works with Mealie. Browse a friend's shared Mealie recipes in Discover and add the ones you like to your own. Or sync your whole library with your own Mealie server: recipes, photos, planned meals and groceries, both ways.
+
 STAYS ORGANIZED
-Favorites or star ratings, nested categories like Dinner > Pasta, and quick search across titles, ingredients and tags. Give any recipe a photo from your library or Image Playground.
+Favorites or star ratings, tags you can nest like Dinner > Pasta, and quick search across titles, ingredients and tags. Give any recipe a photo from your library or Image Playground.
 
 YOURS
 Your recipes live in your own iCloud Drive and sync across iPhone, iPad and Mac. Print or share any recipe, and ask Siri to save a recipe, find one, or start cooking.
@@ -124,7 +138,7 @@ Some features, such as Smart Plan, ingredient sections and Image Playground phot
 Words already in the name and subtitle aren't repeated, since the store indexes those anyway.
 
 ```
-meal planner,grocery list,cookbook,cooking,kitchen,timer,import,scan,video,dinner,food,organizer
+mealie,meal planner,grocery list,cookbook,cooking,kitchen,timer,import,scan,video,dinner,organizer
 ```
 
 ### What's New (version 1.0)
@@ -150,12 +164,16 @@ Every set tells the same story as the [preview videos](preview/), in the same lo
 
 1. **The hook.** *Every recipe you find, in one place.* Recipes live in browser tabs, screenshots, videos and cookbooks. The first frame shows them gathered in one library, on every device.
 2. **Save.** *Save recipes from anywhere on the web.* The review screen after importing a fictional page served from this machine (`tools/seed/site`), so no third-party brand, photo or URL appears.
-3. **Plan.** *Plan your week with recipes or ideas.* "Taco night" sits in the week beside real recipes.
-4. **Apple Intelligence.** *Apple Intelligence plans the gaps*, and *tidies a messy recipe in one tap.* The Smart Plan sheet and the editor's Clean Up button (see the notes below).
-5. **Keep.** The library and a recipe page that reads like a cookbook.
-6. **Cook.** *Turn the page, start the timer.* Cook mode turns its steps like the pages of a cookbook, and every time in a step is a timer.
-7. **Shop.** *Shopping lists that stay in sync* with Reminders.
-8. **The close.** *Open source. No account. No ads.* The paper gives way to the dark card with the icon and the OpenRecipes wordmark.
+3. **Follow.** *Follow your favorite cooks, right on Home.* Home with Feeds on top, then the tags and the first recipes. The feed is a fictional blog, "Weeknight Table", served from this machine (`tools/seed/site/feed.xml`), with its own CC0 photos.
+4. **Discover.** *Browse a friend's recipes, keep the ones you like.* A shared Mealie server under Discover. It is a local demo server (`tools/mealie-demo.sh`) holding the demo recipes.
+5. **Sync.** *Sync with your own Mealie server.* Settings, Mealie, after a sync with an empty demo server.
+6. **Plan.** *Plan your week with recipes or ideas.* "Taco night" sits in the week beside real recipes.
+7. **Apple Intelligence.** *Apple Intelligence plans the gaps.* The Smart Plan sheet (see the notes below).
+8. **Cook.** *Turn the page, start the timer.* Cook mode turns its steps like the pages of a cookbook, and every time in a step is a timer.
+9. **Shop.** *Shopping lists that stay in sync* with Reminders.
+10. **The close.** *Open source. No account. No ads.* The paper gives way to the dark card with the icon and the OpenRecipes wordmark.
+
+Apple takes at most 10 screenshots per set, so the library, recipe page and Clean Up frames made way for Feeds, Discover and Mealie. Their captures (`library`, `recipe`, `cleanup`) still work if a set needs them back.
 
 For marketing beyond the store, the same arc in one line: *every recipe you find, saved, planned and cooked from one place, open source and yours.* The pillars and their wording come from [Positioning](#positioning).
 
@@ -174,11 +192,11 @@ For marketing beyond the store, the same arc in one line: *every recipe you find
 
 | Set | Size | Upload to | Frames |
 |---|---|---|---|
-| [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" | hook (all devices), save, plan, Smart Plan, Clean Up, library, recipe, cook, groceries, card |
-| [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" | hook, save, plan, Smart Plan, Clean Up, library, cook, groceries, card |
-| [`images/mac/`](images/mac/) | 2880 × 1800 | Mac | hook, save, plan, Smart Plan, Clean Up, library, cook, groceries, card |
+| [`images/iphone/`](images/iphone/) | 1320 × 2868 | iPhone 6.9" | hook (all devices), save, Home with Feeds, Discover, Mealie, plan, Smart Plan, cook, groceries, card |
+| [`images/ipad/`](images/ipad/) | 2752 × 2064, landscape | iPad 13" | the same ten |
+| [`images/mac/`](images/mac/) | 2880 × 1800 | Mac | the same ten |
 | [`images/iphone-duo-open/`](images/iphone-duo-open/) | 2853 × 2007, inner display, book posture | iPhone Duo | recipe across both pages, cook mode as a two-page spread, Up Next beside My Week, groceries, home, card |
-| [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034, outer display | iPhone Duo (alternative) | the iPhone story on the closed device |
+| [`images/iphone-duo/`](images/iphone-duo/) | 1398 × 2034, outer display | iPhone Duo (alternative) | the iPhone story on the closed device, opening on Home instead of the device lineup |
 
 App Store Connect takes one iPhone Duo set per language at either display size. The open, book-posture set is the one to upload: it is what the Duo does that no other iPhone can. Its captions tell the folding version of the story: *Open it like a cookbook*, *Ingredients on one page, steps on the other*, *Your queue and your week, side by side*, *What to buy and what's in the basket*.
 
@@ -190,9 +208,10 @@ The header, search and universal images use a mosaic of the demo recipe photos b
 
 ### Notes on the screenshots
 
-- The app UI is the real app. The recipes, plan and grocery list are fictional, and the photos are CC0 images credited [below](#photo-credits).
+- The app UI is the real app. The recipes, plan, grocery list, feed and Mealie server are fictional, and the photos are CC0 images credited [below](#photo-credits).
+- The Feeds tab is hidden in the captures (`-hiddenTabs feeds`) so the tab bar shows Home, Up Next, Plan and Groceries; Feeds still shows on Home.
 - The iPhone and iPad status bar is set to 9:41 with full battery and signal.
-- **Smart Plan and Clean Up show the screen, not a result.** The simulator has no on-device model, so running them would show the fallback (a simple rotation) instead of Apple Intelligence. The sheet and the button text are what the caption claims. To show a result, capture on a Mac or iPhone with Apple Intelligence turned on.
+- **Smart Plan shows the screen, not a result.** The simulator has no on-device model, so running it would show the fallback (a simple rotation) instead of Apple Intelligence. The sheet and the button text are what the caption claims. To show a result, capture on a Mac or iPhone with Apple Intelligence turned on.
 - The page turn, timers and Live Activity don't come across in stills; the [preview videos](preview/) show them.
 - **The wordmark says OpenRecipes**, like the videos, while the listing name is "Recipes: Cook, Plan & Shop". Settle on one before submitting.
 - The captions never use price words ("free"), see [Positioning](#positioning).
@@ -246,6 +265,9 @@ Verify the Developer Tools path on the final build, and decide whether you want 
 
 ## Before you submit
 
+- [ ] **Recapture the Mac set** with the new lineup (`capture-mac.sh`, see [Regenerating the assets](#regenerating-the-assets)); `images/mac/` and the Mac screen in each set's first frame still show the older UI. The first run on a machine asks to allow UI automation; approve it, or the run times out with "Timed out while enabling automation mode".
+- [ ] **Recapture the open iPhone Duo set** (`images/iphone-duo-open/`), which needs the simulator unfolded in DeviceHub.
+- [ ] **Decide on the Mealie frame's server row.** It reads `http://localhost:9926`, from the local demo server.
 - [ ] **Support and privacy policy URLs.** Required, and neither exists in the repo.
 - [ ] **Reserve the app name** (see alternates above).
 - [x] **Set the Apple ID** in `App/AppStoreLink.swift`. Without it Settings hides the "Help Support Us" section, and the "Rate us" banner falls back to the in-app rating dialog, which iOS may not show.
@@ -274,12 +296,15 @@ xcrun simctl create "Recipes Shots iPad" com.apple.CoreSimulator.SimDeviceType.i
 xcrun simctl create "Recipes Shots Duo" com.apple.CoreSimulator.SimDeviceType.iPhone-Duo com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4
 xcodebuild build-for-testing -project Recipes.xcodeproj -scheme Recipes -destination "id=<sim id>" -derivedDataPath /tmp/shots
 # See the widget note below, then:
-app-store/tools/capture.sh iphone <iphone sim id> /tmp/shots import idea smartplan cleanup library recipe cook groceries
-app-store/tools/capture.sh ipad <ipad sim id> /tmp/shots import idea smartplan cleanup library cook groceries
-app-store/tools/capture.sh iphone-duo <duo sim id> /tmp/shots import idea smartplan cleanup library recipe cook groceries   # folded
+eval "$(app-store/tools/mealie-demo.sh)"   # the demo Mealie server for discover and mealie; needs Docker
+app-store/tools/capture.sh iphone <iphone sim id> /tmp/shots library import home discover idea smartplan cook groceries mealie
+app-store/tools/capture.sh ipad <ipad sim id> /tmp/shots library import home discover idea smartplan cook groceries mealie
+app-store/tools/capture.sh iphone-duo <duo sim id> /tmp/shots library import home discover idea smartplan cook groceries mealie   # folded
 ```
 
-Scenes are named in [`AppStoreScreenshotUITests.swift`](../RecipesUITests/AppStoreScreenshotUITests.swift): `home library list recipe ingredients cook plan upnext groceries settings search import idea smartplan cleanup` (add `-dark` to any for dark mode). A scene that fails prints its log path. Build for the simulator you capture on: the iPhone and iPad runs share one derived-data folder, so rebuild when you switch.
+Scenes are named in [`AppStoreScreenshotUITests.swift`](../RecipesUITests/AppStoreScreenshotUITests.swift): `home library list recipe ingredients cook plan upnext groceries settings search import idea smartplan cleanup discover mealie` (add `-dark` to any for dark mode). `home` puts Feeds, Tags and Recipes first; `library` is the top of the default Home.
+
+`mealie-demo.sh` starts two servers: one holding the demo recipes for `discover`, and an empty one for `mealie`, which would otherwise report every recipe as already there. Re-run it for clean servers. A scene that fails prints its log path. Build for the simulator you capture on: the iPhone and iPad runs share one derived-data folder, so rebuild when you switch.
 
 ### iPhone Duo, open
 
@@ -291,7 +316,7 @@ inner=$(xcrun simctl io <duo sim id> enumerate | awk '/Port:/{p=""} /UUID:/{if(p
 shot() {   # shot <name> <recipes:// link or "">
   xcrun simctl terminate <duo sim id> "$RECIPES_BUNDLE_ID"
   SIMCTL_CHILD_RECIPES_DIR="$lib" SIMCTL_CHILD_RECIPES_OPEN_URL="$2" xcrun simctl launch <duo sim id> "$RECIPES_BUNDLE_ID" \
-    -onboardingCompleted YES -syncGroceriesWithReminders NO -recipeListStyle cards -reviewPromptDismissed YES
+    -onboardingCompleted YES -syncGroceriesWithReminders NO -recipeListStyle cards -reviewPromptDismissed YES -homeCustomizeTipDismissed YES -hiddenTabs feeds
   sleep 9; xcrun simctl io <duo sim id> screenshot --display="$inner" "app-store/tools/raw/iphone-duo-open/$1.png"
 }
 shot home ""; shot recipe "recipes://recipe/<id>"; shot cook "recipes://cook/<id>"; shot plan recipes://plan; shot groceries recipes://groceries
@@ -301,12 +326,14 @@ shot home ""; shot recipe "recipes://recipe/<id>"; shot cook "recipes://cook/<id
 
 ### Mac
 
+Discover and Mealie aren't captured on the Mac: there the app keeps servers in the signed-in iCloud Keychain, so the demo server would be added to every device on that account. The Mac set keeps the library and Clean Up frames instead.
+
 The Mac app needs a window server, so run this **from a Terminal tab in your desktop session**, not from a headless shell, and don't touch the mouse: the UI test drives it for about a minute per scene.
 
 ```bash
 xcodebuild build-for-testing -project Recipes.xcodeproj -scheme Recipes -destination "platform=macOS" -derivedDataPath /tmp/shots-mac -quiet \
   DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= PROVISIONING_PROFILE_SPECIFIER= ENABLE_APP_SANDBOX=NO
-app-store/tools/capture-mac.sh /tmp/shots-mac                    # library import idea smartplan cleanup cook groceries
+app-store/tools/capture-mac.sh /tmp/shots-mac                    # library import home idea smartplan cleanup cook groceries
 ```
 
 Why it is built this way:
@@ -366,5 +393,9 @@ The demo recipes use photos released under CC0 (no attribution required), found 
 | egg-salad | Salad for dinner (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Salad_for_dinner_(Unsplash).jpg> |
 | pancakes | Slicing Pancakes with Fork 374819.jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Slicing_Pancakes_with_Fork_374819.jpg> |
 | fried-rice | Fried rice (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Fried_rice_(Unsplash).jpg> |
+| feed: spring-greens | Fresh Salad (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Fresh_Salad_(Unsplash).jpg> |
+| feed: galaxy-smoothie-bowl | Galaxy Smoothie Bowl (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Galaxy_Smoothie_Bowl_(Unsplash).jpg> |
+| feed: brunch-bowl | Healthy Trendy Brunch (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:Healthy_Trendy_Brunch_(Unsplash).jpg> |
+| feed: arugula-flatbread | A well garnished pizza (Unsplash).jpg | CC0 | <https://commons.wikimedia.org/wiki/File:A_well_garnished_pizza_(Unsplash).jpg> |
 
 The photos are captured as shown on Commons at the time of download. Licensing was read from each file's Commons metadata, not independently verified.

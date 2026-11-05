@@ -17,16 +17,24 @@ final class AppStoreScreenshotMacUITests: XCTestCase {
         app.launchEnvironment["RECIPES_DIR"] = library
         app.launchEnvironment["RECIPES_WINDOW_SIZE"] = "1280x800"
         app.launchEnvironment["RECIPES_APPEARANCE"] = "light"
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-ApplePersistenceIgnoreState", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
+        if scene == "home" {
+            app.launchArguments += ["-homeSections", "feeds,tags,recipes,today,upNext,favorites,discover", "-hiddenHomeSections", "today,upNext,favorites,discover"]
+        }
         app.launch()
 
-        XCTAssertTrue(app.staticTexts[hero].firstMatch.waitForExistence(timeout: 40), "library should load")
+        let loaded = NSPredicate(format: "label == %@ OR label == 'Today' OR label == 'Tags'", hero)
+        XCTAssertTrue(app.staticTexts.matching(loaded).firstMatch.waitForExistence(timeout: 40), "library should load")
         print("APP_STORE_WINDOW \(app.windows.firstMatch.frame)")
         // Folded category groups keep the sidebar from running into its footer.
         for triangle in app.disclosureTriangles.allElementsBoundByIndex.reversed() where triangle.isHittable { triangle.click() }
         sleep(3)
 
         switch scene {
+        case "home":
+            let home = app.staticTexts["Home"].firstMatch
+            if home.exists { home.click() }
+            sleep(4)
         case "library":
             app.staticTexts[hero].firstMatch.click()
         case "plan":

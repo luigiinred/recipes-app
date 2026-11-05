@@ -8,7 +8,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 derived=$1; shift
 scenes=("$@")
-[ ${#scenes[@]} -eq 0 ] && scenes=(library import idea smartplan cleanup cook groceries)
+[ ${#scenes[@]} -eq 0 ] && scenes=(library import home idea smartplan cleanup cook groceries)
 
 set -a; source "$HERE/../../.env"; set +a
 # The app remembers split-view widths and its window frame between runs. Forget the widths, and set the saved frame
@@ -34,9 +34,12 @@ raw="$HERE/raw/mac"; mkdir -p "$raw"
 lib="$(mktemp -d)/library"
 
 # The import scene reads a fictional recipe page served from this machine.
-(cd "$HERE/seed/site" && exec python3 -m http.server 8765 >/dev/null 2>&1) &
+# Bound to the loopback addresses, which win over another process listening on *:8765.
+(cd "$HERE/seed/site" && exec python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1) &
 server=$!
-trap 'kill $server 2>/dev/null' EXIT
+(cd "$HERE/seed/site" && exec python3 -m http.server 8765 --bind ::1 >/dev/null 2>&1) &
+server6=$!
+trap 'kill $server $server6 2>/dev/null' EXIT
 
 for scene in "${scenes[@]}"; do
   echo "== mac $scene"

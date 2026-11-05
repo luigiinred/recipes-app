@@ -46,21 +46,21 @@ def build():
     MOVES = [(62, 82), (206, 226), (350, 370), (422, 442), (494, 514), (638, 658)]   # the camera travels to the next screen, on bar lines
 
     # hook: the library, a scroll through every recipe
-    fit("hero", 56.2, 66.0, 0, 72)
+    fit("hero", 24.89, 31.72, 0, 72)
     # save: Safari, the Share sheet, Save to Recipes, review, saved, the recipe opens and scrolls
-    fit("share", 29.6, 68.0, 72, 216, holds=[33.9, 47.6, 53.0])
+    fit("share", 25.55, 63.29, 72, 216, holds=[29.85, 43.63, 49.09])
     # plan: the lasagna into the week from Up Next, then an idea typed in
-    fit("plan", 52.4, 81.0, 216, 360, holds=[53.3, 62.3, 78.3])
+    fit("plan", 29.15, 55.89, 216, 360, holds=[30.19, 38.75, 53.19])
     # apple intelligence: smart plan fills the empty dinners
-    fit("smartplan", 38.8, 59.4, 360, 420, holds=[42.0, 46.0, 51.3])
+    fit("smartplan", 40.32, 63.5, 360, 420, holds=[43.31, 47.39, 57.51])
     # tidy: the messy ingredient list, one tap on Clean Up, the sections
     # The page is flung down to the Clean Up button and back up again, in under three seconds: the flings play as quick whooshes and the
     # taps and the finished list play near natural speed.
-    clip("cleanup", retime.keys([(420, 78.8), (438, 79.2), (444, 79.9), (456, 81.7), (460, 82.6), (468, 83.7), (472, 88.0), (478, 89.3), (484, 91.6),
-                                 (496, 94.9), (500, 96.4), (512, 97.6), (530, 98.2)]))
+    clip("cleanup", retime.keys([(420, 51.32), (438, 51.72), (444, 52.42), (456, 54.31), (460, 55.21), (468, 56.31), (472, 60.21), (478, 61.5), (484, 63.8),
+                                 (496, 66.92), (500, 68.42), (512, 70.17), (530, 70.77)]))
     # cook: the recipe, cook mode one step at a time, a timer
-    clip("cook", retime.keys([(504, 65.0), (512, 66.0), (522, 67.3), (534, 68.9), (540, 70.8), (552, 71.8), (556, 72.6), (568, 73.4), (572, 74.6),
-                              (584, 75.4), (592, 77.2), (604, 78.4), (612, 79.0), (648, 81.4)]))
+    clip("cook", retime.keys([(504, 32.17), (512, 33.17), (522, 35.17), (534, 36.77), (540, 38.46), (552, 39.46), (556, 40.26), (568, 40.9), (572, 42.1),
+                              (584, 42.43), (592, 44.22), (604, 45.41), (612, 46.01), (648, 48.41)]))
 
     stations = [{"id": "hook", "clip": "hero"}, {"id": "save", "clip": "share"}, {"id": "plan", "clip": "plan"},
                 {"id": "ai", "clip": "smartplan"}, {"id": "tidy", "clip": "cleanup"}, {"id": "cook", "clip": "cook"}, {"id": "close", "clip": "cook"}]
@@ -100,21 +100,21 @@ def build():
              "wordX": 0, "wordY": -250, "ghost": {"clip": "cook", "w": 640, "h": 1391, "dy": 900, "z": -200, "opacity": 0.75}}
 
     ev = []
-    for n, t in enumerate([67.533, 68.1, 68.783, 69.45, 70.27, 71.083, 72.233, 72.883, 73.567, 74.183]):
+    for n, t in enumerate([45.468, 46.019, 46.568, 47.123, 47.659, 48.202, 48.786, 49.345, 49.906, 50.45]):
         ev.append({"type": "key", "f": at("plan", t), "n": n})
     ev += [
-        {"type": "land", "f": at("share", 31.2), "kind": "card"},        # the share sheet settles
-        {"type": "land", "f": at("share", 35.0), "kind": "card"},        # the review appears
-        {"type": "land", "f": at("share", 48.4), "kind": "card"},        # "Recipe added!"
-        {"type": "land", "f": at("share", 53.4), "kind": "card"},        # the recipe opens
-        {"type": "land", "f": at("plan", 62.4), "kind": "ingredient"},   # the lasagna lands in Sunday dinner
-        {"type": "land", "f": at("plan", 78.3), "kind": "idea"},         # "Taco night" joins the week
-        {"type": "slot", "f": at("smartplan", 47.4), "i": 0},            # the review fills with Tuesday's dinner
-        {"type": "slot", "f": at("smartplan", 47.4) + 5, "i": 1},        # Wednesday's
-        {"type": "slot", "f": at("smartplan", 47.4) + 10, "i": 2},       # Thursday's
-        {"type": "snap", "f": at("cleanup", 92.6), "i": 0},              # "For The Layers" is a section now
-        {"type": "snap", "f": at("cleanup", 96.9), "i": 1},              # and "For The Sauce"
-        {"type": "chime", "f": at("cook", 77.9)},                          # the timer starts
+        {"type": "land", "f": at("share", 27.15), "kind": "card"},        # the share sheet settles
+        {"type": "land", "f": at("share", 30.95), "kind": "card"},        # the review appears
+        {"type": "land", "f": at("share", 44.43), "kind": "card"},        # "Recipe added!"
+        {"type": "land", "f": at("share", 49.49), "kind": "card"},        # the recipe opens
+        {"type": "land", "f": at("plan", 38.85), "kind": "ingredient"},   # the lasagna lands in Sunday dinner
+        {"type": "land", "f": at("plan", 53.19), "kind": "idea"},         # "Taco night" joins the week
+        {"type": "slot", "f": at("smartplan", 54.8), "i": 0},            # the review fills with Tuesday's dinner
+        {"type": "slot", "f": at("smartplan", 54.8) + 5, "i": 1},        # Wednesday's
+        {"type": "slot", "f": at("smartplan", 54.8) + 10, "i": 2},       # Thursday's
+        {"type": "snap", "f": at("cleanup", 64.75), "i": 0},              # "For The Layers" is a section now
+        {"type": "snap", "f": at("cleanup", 68.92), "i": 1},              # and "For The Sauce"
+        {"type": "chime", "f": at("cook", 44.92)},                          # the timer starts
         {"type": "snap", "f": 672, "i": 2},                              # the book's pages swing open
         {"type": "land", "f": 700, "kind": "ingredient"},                # the fork lands
         {"type": "land", "f": 706, "kind": "ingredient"},                # the spoon lands

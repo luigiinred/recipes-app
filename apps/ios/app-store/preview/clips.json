@@ -2,38 +2,38 @@
  "iphone": {
   "hero": {
    "src": "hero",
-   "from": 56.0,
-   "to": 66.5,
+   "from": 24.69,
+   "to": 32.22,
    "width": 1000
   },
   "smartplan": {
    "src": "smartplan",
-   "from": 38.0,
-   "to": 62.4,
+   "from": 39.52,
+   "to": 68.66,
    "width": 1000
   },
   "share": {
    "src": "share",
-   "from": 28.0,
-   "to": 68.6,
+   "from": 18.28,
+   "to": 63.89,
    "width": 1000
   },
   "plan": {
    "src": "plan",
-   "from": 47.5,
-   "to": 83.0,
+   "from": 24.36,
+   "to": 57.89,
    "width": 1000
   },
   "cook": {
    "src": "cook",
-   "from": 64.0,
-   "to": 82.5,
+   "from": 31.17,
+   "to": 49.39,
    "width": 1000
   },
   "cleanup": {
    "src": "cleanup",
-   "from": 78.0,
-   "to": 100.5,
+   "from": 51.01,
+   "to": 73.07,
    "width": 1000
   }
  }

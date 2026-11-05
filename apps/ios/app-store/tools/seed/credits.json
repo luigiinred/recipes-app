@@ -78,5 +78,25 @@
   "file": "Fried rice (Unsplash).jpg",
   "license": "CC0",
   "page": "https://commons.wikimedia.org/wiki/File:Fried_rice_(Unsplash).jpg"
+ },
+ "feed/spring-greens": {
+  "file": "Fresh Salad (Unsplash).jpg",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Fresh_Salad_(Unsplash).jpg"
+ },
+ "feed/galaxy-smoothie-bowl": {
+  "file": "Galaxy Smoothie Bowl (Unsplash).jpg",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Galaxy_Smoothie_Bowl_(Unsplash).jpg"
+ },
+ "feed/brunch-bowl": {
+  "file": "Healthy Trendy Brunch (Unsplash).jpg",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Healthy_Trendy_Brunch_(Unsplash).jpg"
+ },
+ "feed/arugula-flatbread": {
+  "file": "A well garnished pizza (Unsplash).jpg",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:A_well_garnished_pizza_(Unsplash).jpg"
  }
 }
