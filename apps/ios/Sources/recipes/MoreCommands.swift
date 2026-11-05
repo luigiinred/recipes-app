@@ -141,10 +141,11 @@ struct FeedList: ParsableCommand {
 struct FeedAdd: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "add", abstract: "Subscribe to a feed or a site that has one.")
     @OptionGroup var library: LibraryOptions
-    @Argument(help: "Feed or site URL.") var url: String
+    @Argument(help: "Feed or site URL, or a subreddit like r/recipes.") var url: String
 
     func run() async throws {
-        guard let parsed = URL(string: url), parsed.scheme?.hasPrefix("http") == true else {
+        let address = FeedService.subreddit(url)?.url.absoluteString ?? url
+        guard let parsed = URL(string: address), parsed.scheme?.hasPrefix("http") == true else {
             throw ValidationError("Not a web URL: \(url)")
         }
         let found = try await FeedService.discover(from: parsed)

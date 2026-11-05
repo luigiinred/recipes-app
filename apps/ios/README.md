@@ -112,7 +112,7 @@ recipes mark "Soup" --favorite true --rating 4 --want-to-cook true   # want-to-c
 recipes scan page.jpg [--save]            # text recognition on a photo or PDF
 recipes plan [add|remove|list] ...        # meal calendar
 recipes groceries [add|add-recipe|check|remove|clear|list] ...   # the app mirrors these into Reminders
-recipes feeds [add|remove|entries|list] ...
+recipes feeds [add|remove|entries|list] ...   # add takes a site, a feed, or a subreddit (r/recipes)
 recipes sections "Soup" [--save]            # group ingredients into sections (on-device model)
 recipes ai-check                          # is Apple Intelligence ready? tries the recipe-writing model
 recipes export [-o all.json]              # everything as one JSON document

@@ -111,8 +111,39 @@ final class FeaturesTests: XCTestCase {
     func testSinglePostsAreNotFollowable() async {
         let video = await FeedService.followable(URL(string: "https://www.youtube.com/watch?v=abc")!)
         let post = await FeedService.followable(URL(string: "https://example.com/2026/10/soup/")!)
+        let thread = await FeedService.followable(URL(string: "https://www.reddit.com/r/recipes/comments/abc/soup/")!)
         XCTAssertNil(video)
         XCTAssertNil(post)
+        XCTAssertNil(thread)
+    }
+
+    func testSubredditsFromNamesAndLinks() {
+        let feed = "https://www.reddit.com/r/recipes/.rss"
+        for text in ["r/recipes", "/r/recipes", " r/recipes/ ", "reddit.com/r/recipes", "https://www.reddit.com/r/recipes/",
+                     "https://old.reddit.com/r/recipes/top/?t=week", "https://m.reddit.com/r/recipes/comments/abc/soup/"] {
+            XCTAssertEqual(FeedService.subreddit(text)?.url.absoluteString, feed, text)
+            XCTAssertEqual(FeedService.subreddit(text)?.name, "recipes", text)
+        }
+        for text in ["recipes", "https://example.com/r/recipes", "r/", "https://www.reddit.com/user/someone"] {
+            XCTAssertNil(FeedService.subreddit(text), text)
+        }
+    }
+
+    func testRedditAtomEntriesKeepTheirThumbnails() throws {
+        let atom = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"><title>Recipes</title>
+        <entry><author><name>/u/cook</name></author><content type="html">&lt;p&gt;Soup&lt;/p&gt;</content>
+        <id>t3_abc</id><media:thumbnail url="https://b.thumbs.redditmedia.com/soup.jpg" />
+        <link href="https://www.reddit.com/r/recipes/comments/abc/tomato_soup/" /><updated>2026-11-04T18:00:00+00:00</updated>
+        <title>Tomato Soup</title></entry>
+        </feed>
+        """
+        let entry = try XCTUnwrap(FeedParser.parse(Data(atom.utf8)).entries.first)
+        XCTAssertEqual(entry.title, "Tomato Soup")
+        XCTAssertEqual(entry.link.absoluteString, "https://www.reddit.com/r/recipes/comments/abc/tomato_soup/")
+        XCTAssertEqual(entry.imageURL?.absoluteString, "https://b.thumbs.redditmedia.com/soup.jpg")
+        XCTAssertNotNil(entry.published)
     }
 
     func testFeedPageURL() {
