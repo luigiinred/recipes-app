@@ -18,6 +18,8 @@ struct SettingsView: View {
     var writeReview = AppStoreLink.writeReview
 
     @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
+    @AppStorage(AppSettings.Key.firstTab) private var firstTab = FirstTab.home
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -74,7 +76,14 @@ struct SettingsView: View {
     private var rows: some View {
         Section {
             #if os(iOS)
-            NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
+            Picker(selection: $firstTab) {
+                ForEach(FirstTab.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+            } label: {
+                Label("First Tab", systemImage: firstTab.symbol)
+            }
+            if firstTab == .home {
+                NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
+            }
             #endif
             NavigationLink(value: SettingsPage.feeds) { TabRowLabel(tab: .feeds) }
             NavigationLink(value: SettingsPage.upNext) { TabRowLabel(tab: .upNext) }
@@ -83,13 +92,14 @@ struct SettingsView: View {
             #if os(iOS)
             if !splitsPages {
                 Toggle(isOn: $settingsInTabBar) { Label("Settings in Tab Bar", systemImage: "gearshape") }
+                    .disabled(!settingsInTabBar && AppSettings.hiddenTabs(hiddenTabsRaw).isEmpty)
             }
             #endif
         } header: {
             Text("Tabs")
         } footer: {
             Text(splitsPages ? "Open a tab to change how it works, or hide it if you don't use it." :
-                "Open a tab to change how it works, or hide it if you don't use it. Settings sits in the tab bar, or behind the gear on Home.")
+                "Open a tab to change how it works, or hide it if you don't use it. The tab bar holds five tabs, so Settings can sit there once another tab is hidden; otherwise it's behind the gear on \(firstTab.title).")
         }
         Section {
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
@@ -1165,7 +1175,20 @@ private struct TabRowLabel: View {
 /// The switch that shows or hides a tab, at the top of its settings page.
 struct TabVisibilitySection: View {
     @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
+    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let tab: MainTab
+
+    /// Showing this tab would push the iPhone tab bar past five.
+    private var isFull: Bool {
+        #if os(iOS)
+        let hidden = AppSettings.hiddenTabs(hiddenRaw)
+        guard sizeClass != .regular, settingsInTabBar, hidden.contains(tab) else { return false }
+        return MainTab.allCases.count - hidden.count >= AppSettings.tabBarLimit - 2
+        #else
+        false
+        #endif
+    }
 
     var body: some View {
         Section {
@@ -1175,8 +1198,10 @@ struct TabVisibilitySection: View {
             )) {
                 Label("Show \(tab.title) Tab", systemImage: tab.symbol)
             }
+            .disabled(isFull)
         } footer: {
-            Text("Hiding a tab keeps everything in it. Turn it back on any time.")
+            Text(isFull ? "The tab bar holds five tabs. Hide another tab, or take Settings out of the tab bar, to show this one." :
+                "Hiding a tab keeps everything in it. Turn it back on any time.")
         }
     }
 }
