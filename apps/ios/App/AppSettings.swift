@@ -25,6 +25,19 @@ enum MainTab: String, CaseIterable {
     }
 }
 
+/// When a feed post counts as viewed.
+enum FeedMarkMode: String, CaseIterable {
+    case onClose, onOpen, manual
+
+    var title: String {
+        switch self {
+        case .onClose: "When I Go Back"
+        case .onOpen: "When I Open It"
+        case .manual: "Only When I Mark It"
+        }
+    }
+}
+
 /// What the first tab opens on: the Home sections, or every recipe.
 enum FirstTab: String, CaseIterable {
     case home, recipes
@@ -83,6 +96,12 @@ enum AppSettings {
         static let hiddenTabs = "hiddenTabs"
         static let feedsOffline = "saveFeedsOffline"
         static let feedLayout = "feedLayout"
+        static let feedShowViewed = "feedShowViewed"
+        static let feedMarkViewed = "feedMarkViewed"
+        static let feedReader = "feedOpensInReader"
+        static let readerTextSize = "readerTextSize"
+        static let readerFont = "readerFont"
+        static let readerTheme = "readerTheme"
         static let settingsInTabBar = "settingsInTabBar"
         static let firstTab = "firstTab"
 
