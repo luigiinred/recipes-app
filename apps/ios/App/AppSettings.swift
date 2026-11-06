@@ -25,6 +25,38 @@ enum MainTab: String, CaseIterable {
     }
 }
 
+/// When a feed post counts as viewed.
+enum FeedMarkMode: String, CaseIterable {
+    case onClose, onOpen, manual
+
+    var title: String {
+        switch self {
+        case .onClose: "When I Go Back"
+        case .onOpen: "When I Open It"
+        case .manual: "Only When I Mark It"
+        }
+    }
+}
+
+/// What the first tab opens on: the Home sections, or every recipe.
+enum FirstTab: String, CaseIterable {
+    case home, recipes
+
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .recipes: "Recipes"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home: "house"
+        case .recipes: "book.closed"
+        }
+    }
+}
+
 enum AppSettings {
     enum Key {
         static let defaultMeal = "defaultMeal"
@@ -64,7 +96,14 @@ enum AppSettings {
         static let hiddenTabs = "hiddenTabs"
         static let feedsOffline = "saveFeedsOffline"
         static let feedLayout = "feedLayout"
+        static let feedShowViewed = "feedShowViewed"
+        static let feedMarkViewed = "feedMarkViewed"
+        static let feedReader = "feedOpensInReader"
+        static let readerTextSize = "readerTextSize"
+        static let readerFont = "readerFont"
+        static let readerTheme = "readerTheme"
         static let settingsInTabBar = "settingsInTabBar"
+        static let firstTab = "firstTab"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }
@@ -126,6 +165,14 @@ enum AppSettings {
 
     static func encode(_ tabs: Set<MainTab>) -> String {
         tabs.map(\.rawValue).sorted().joined(separator: ",")
+    }
+
+    static let tabBarLimit = 5
+
+    /// The optional tabs that fit in the iPhone tab bar beside the first tab, and Settings when it sits there.
+    static func barTabs(hidden raw: String, settingsInTabBar: Bool) -> [MainTab] {
+        let room = tabBarLimit - 1 - (settingsInTabBar ? 1 : 0)
+        return Array(MainTab.allCases.filter { !hiddenTabs(raw).contains($0) }.prefix(room))
     }
 
     static func showing(_ tab: MainTab, _ shown: Bool, hidden raw: String) -> String {

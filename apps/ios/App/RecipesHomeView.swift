@@ -299,6 +299,8 @@ struct RecipesHomeView: View {
     var tag: String?
     /// Lists every recipe instead of the home's first few.
     var showsAllRecipes = false
+    /// The first tab's own page, which carries the Settings gear on iPhone.
+    var isTabRoot = false
     var onScroll: (() -> Void)?
 
     private var filter: HomeFilter {
@@ -408,7 +410,7 @@ struct RecipesHomeView: View {
         .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
         .toolbar {
             #if os(iOS)
-            if isHome, !isRegular, !settingsInTabBar {
+            if isTabRoot, query.isEmpty, !isRegular, !settingsInTabBar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }

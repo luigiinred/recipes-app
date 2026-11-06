@@ -140,11 +140,29 @@ struct FeedStreamView: View {
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.appAccent) private var accent
     @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
+    @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
+    /// Viewed posts taken out of the list, updated only while the list is on screen so an open post's link never disappears under it.
+    @State private var hidden: Set<String> = []
+    @State private var isVisible = false
 
     var body: some View {
         content
             .themedCanvas()
             .navigationTitle("Feeds")
+            #if os(iOS)
+            .navigationSubtitle(subtitle)
+            #endif
+            .onAppear {
+                isVisible = true
+                refreshHidden()
+            }
+            .onDisappear { isVisible = false }
+            .onChange(of: loader.viewed) {
+                // Swiping marks pages viewed as they scroll by; dropping them mid-scroll would jump the stack.
+                if isVisible, layout != .swipe { refreshHidden() }
+            }
+            .onChange(of: showViewed) { refreshHidden() }
+            .onChange(of: layout) { refreshHidden() }
             .toolbar {
                 if layout == .swipe {
                     ToolbarItem(placement: .navigation) {
@@ -155,6 +173,11 @@ struct FeedStreamView: View {
                     Menu {
                         Picker("View", selection: $layout) {
                             ForEach(FeedLayout.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                        }
+                        Section {
+                            Toggle(isOn: $showViewed) { Label("Show Viewed", systemImage: "eye") }
+                            Button(action: markAllViewed) { Label("Mark All as Viewed", systemImage: "checkmark.circle") }
+                                .disabled(newIDs.isEmpty)
                         }
                     } label: {
                         Label("View", systemImage: layout.symbol)
@@ -175,7 +198,7 @@ struct FeedStreamView: View {
     @ViewBuilder
     private var content: some View {
         if layout == .swipe, !library.feeds.isEmpty {
-            FeedSwipeStream()
+            FeedSwipeStream(hidden: hidden)
         } else {
             list
         }
@@ -197,9 +220,9 @@ struct FeedStreamView: View {
                         .padding(.horizontal)
                         .padding(.bottom, -20)
                     if layout == .grouped {
-                        ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title) }
+                        ForEach(library.feeds) { FeedRow(url: $0.url, title: $0.title, hidden: hidden) }
                     } else {
-                        FeedStream().padding(.horizontal)
+                        FeedStream(hidden: hidden).padding(.horizontal)
                     }
                 }
             }
@@ -225,6 +248,29 @@ struct FeedStreamView: View {
         .buttonStyle(.plain)
         .padding(.horizontal)
     }
+
+    private var newIDs: [String] {
+        loader.items(for: library.feeds).map(\.id).filter { !loader.viewed.contains($0) }
+    }
+
+    private var subtitle: String {
+        guard !library.feeds.isEmpty, !loader.items(for: library.feeds).isEmpty else { return "" }
+        let count = newIDs.count
+        return count == 0 ? "All caught up" : "\(count) new"
+    }
+
+    private func refreshHidden() {
+        let next = showViewed ? [] : loader.viewed.ids
+        guard next != hidden else { return }
+        withAnimation(.snappy) { hidden = next }
+    }
+
+    private func markAllViewed() {
+        let ids = newIDs
+        loader.markViewed(ids)
+        refreshHidden()
+        ToastCenter.shared.show("Marked \(ids.count) \(ids.count == 1 ? "post" : "posts") as viewed") { loader.markNew(ids) }
+    }
 }
 
 /// Popular feeds a kind of cooking at a time: tap a tab or swipe between them.
@@ -235,6 +281,7 @@ struct FeedDiscoverPage: View {
 
     var body: some View {
         pages
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .safeAreaBar(edge: .top) { tabs }
             .themedCanvas()
             .navigationTitle("Discover")
@@ -246,24 +293,32 @@ struct FeedDiscoverPage: View {
     @ViewBuilder
     private var pages: some View {
         #if os(iOS)
-        TabView(selection: $kind) {
-            ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
-                page(kind).tag(kind)
+        // A paged TabView stops its pages at the bars, so it fills the screen and each page insets its own content to scroll under the glass.
+        GeometryReader { proxy in
+            TabView(selection: $kind) {
+                ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
+                    page(kind, insets: proxy.safeAreaInsets).tag(kind)
+                }
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
         #else
-        page(kind).id(kind)
+        page(kind, insets: EdgeInsets()).id(kind)
         #endif
     }
 
-    private func page(_ kind: PopularFeed.Kind) -> some View {
+    private func page(_ kind: PopularFeed.Kind, insets: EdgeInsets) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 36) {
                 ForEach(PopularFeed.all.filter { $0.kind == kind }) { FeedRow(url: $0.url, title: $0.name, detail: $0.detail) }
             }
             .padding(.vertical)
         }
+        .contentMargins(.top, insets.top, for: .scrollContent)
+        .contentMargins(.bottom, insets.bottom, for: .scrollContent)
+        .contentMargins(.top, insets.top, for: .scrollIndicators)
+        .contentMargins(.bottom, insets.bottom, for: .scrollIndicators)
     }
 
     private var tabs: some View {
@@ -300,71 +355,116 @@ struct FeedDiscoverPage: View {
 private struct FeedStream: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
+    let hidden: Set<String>
 
     var body: some View {
-        let items = loader.items(for: library.feeds)
+        let all = loader.items(for: library.feeds)
+        let items = all.filter { !hidden.contains($0.id) }
         GridSection(title: nil, minimum: 300, spacing: 20) {
             ForEach(items) { item in
                 NavigationLink { FeedEntryPreview(entry: item.entry) } label: {
-                    FeedCard(entry: item.entry, source: item.source)
+                    FeedCard(entry: item.entry, source: item.source, viewed: loader.isViewed(item.entry))
                 }
                 .buttonStyle(.plain)
+                .feedPostActions(item.entry)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            if items.isEmpty ? loader.isLoading(library.feeds) : loader.hasMore(library.feeds) {
+            if all.isEmpty ? loader.isLoading(library.feeds) : !items.isEmpty && loader.hasMore(library.feeds) {
                 ForEach(0..<2, id: \.self) { FeedCard(entry: .placeholder($0), source: "Recipe site").loadingPlaceholder() }
                     .onAppear {
                         guard !items.isEmpty else { return }
                         Task { await loader.loadMore(library.feeds) }
                     }
                     .id(items.count)
-            } else if items.isEmpty {
+            } else if all.isEmpty {
                 Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
             }
         }
+        .overlay(alignment: .top) {
+            if !all.isEmpty, items.isEmpty { FeedCaughtUp().padding(.top, 24) }
+        }
+        .frame(minHeight: !all.isEmpty && items.isEmpty ? 320 : nil, alignment: .top)
         .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
+    }
+}
+
+/// The end of the unread posts, with a way to bring the viewed ones back.
+struct FeedCaughtUp: View {
+    @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("You're All Caught Up", systemImage: "checkmark.circle")
+        } description: {
+            Text("New posts from the feeds you follow show up here.")
+        } actions: {
+            if !showViewed {
+                Button("Show Viewed Posts") { showViewed = true }
+                    .buttonStyle(.bordered)
+            }
+        }
     }
 }
 
 /// Followed posts newest first, a full page each, swiped up and down; tap one to open it.
 private struct FeedSwipeStream: View {
+    private static let endID = "caught-up"
+
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
+    @AppStorage(AppSettings.Key.feedMarkViewed) private var markMode = FeedMarkMode.onClose
+    let hidden: Set<String>
+    @State private var position: String?
 
     var body: some View {
-        let items = loader.items(for: library.feeds)
+        let items = loader.items(for: library.feeds).filter { !hidden.contains($0.id) }
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(items) { item in
-                    NavigationLink { FeedEntryPreview(entry: item.entry) } label: { FeedSwipePage(item: item) }
-                        .buttonStyle(.plain)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .onAppear {
-                            guard items.suffix(3).contains(where: { $0.id == item.id }), loader.hasMore(library.feeds) else { return }
-                            Task { await loader.loadMore(library.feeds) }
-                        }
-                }
-                if items.isEmpty {
-                    Group {
-                        if loader.isLoading(library.feeds) {
-                            FeedSwipePage(item: FeedStreamItem(entry: .placeholder(0), source: "Recipe site")).loadingPlaceholder()
-                        } else {
-                            ContentUnavailableView("No Posts Yet", systemImage: "dot.radiowaves.up.forward",
-                                                   description: Text("New posts from the feeds you follow show up here."))
-                        }
+                    NavigationLink { FeedEntryPreview(entry: item.entry) } label: {
+                        FeedSwipePage(item: item, viewed: loader.isViewed(item.entry))
                     }
+                    .buttonStyle(.plain)
+                    .feedPostActions(item.entry, swipes: false)
                     .containerRelativeFrame([.horizontal, .vertical])
+                    .onAppear {
+                        guard items.suffix(3).contains(where: { $0.id == item.id }), loader.hasMore(library.feeds) else { return }
+                        Task { await loader.loadMore(library.feeds) }
+                    }
+                }
+                if items.isEmpty, loader.isLoading(library.feeds) {
+                    FeedSwipePage(item: FeedStreamItem(entry: .placeholder(0), source: "Recipe site"), viewed: false)
+                        .loadingPlaceholder()
+                        .containerRelativeFrame([.horizontal, .vertical])
+                } else if items.isEmpty && loader.items(for: library.feeds).isEmpty {
+                    ContentUnavailableView("No Posts Yet", systemImage: "dot.radiowaves.up.forward",
+                                           description: Text("New posts from the feeds you follow show up here."))
+                        .containerRelativeFrame([.horizontal, .vertical])
+                } else if !loader.hasMore(library.feeds) || items.isEmpty {
+                    FeedCaughtUp()
+                        .containerRelativeFrame([.horizontal, .vertical])
+                        .id(Self.endID)
                 }
             }
             .scrollTargetLayout()
         }
+        .scrollPosition(id: $position)
         .scrollTargetBehavior(.paging)
         .scrollIndicators(.hidden)
+        .onChange(of: position) { old, new in
+            // The position starts unset on the first page.
+            guard markMode != .manual, let old = old ?? items.first?.id, old != Self.endID, let new,
+                  let from = items.firstIndex(where: { $0.id == old }) else { return }
+            let to = items.firstIndex(where: { $0.id == new }) ?? items.count
+            if to > from { loader.markViewed([old]) }
+        }
         .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
     }
 }
 
 private struct FeedSwipePage: View {
     let item: FeedStreamItem
+    let viewed: Bool
 
     var body: some View {
         Color.clear
@@ -391,6 +491,9 @@ private struct FeedSwipePage: View {
                 }
                 .padding(24)
             }
+            .overlay(alignment: .topTrailing) {
+                if viewed { FeedViewedBadge().padding(16) }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -407,6 +510,7 @@ struct FeedRow: View {
     let url: String
     let title: String
     var detail: String?
+    var hidden: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -441,11 +545,12 @@ struct FeedRow: View {
     private var cards: some View {
         switch loader.states[url] {
         case .loaded(let entries):
-            ForEach(entries) { entry in
+            ForEach(entries.filter { !hidden.contains($0.id) }) { entry in
                 NavigationLink { FeedEntryPreview(entry: entry) } label: {
-                    FeedCard(entry: entry, source: "").frame(width: Self.cardWidth)
+                    FeedCard(entry: entry, source: "", viewed: loader.isViewed(entry)).frame(width: Self.cardWidth)
                 }
                 .buttonStyle(.plain)
+                .feedPostActions(entry, swipes: false)
             }
             if entries.isEmpty {
                 Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
@@ -521,23 +626,32 @@ struct FeedShelf: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.openRecipesRoute) private var openRoute
+    @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
     let margin: CGFloat
     var cardWidth: CGFloat = 260
 
     var body: some View {
-        let items = Array(loader.items(for: library.feeds).prefix(Self.limit))
+        let all = loader.items(for: library.feeds)
+        let items = Array(all.filter { showViewed || !loader.isViewed($0.entry) }.prefix(Self.limit))
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 16) {
-                if items.isEmpty {
+                if !all.isEmpty, items.isEmpty {
+                    Label("You're all caught up", systemImage: "checkmark.circle")
+                        .appFont(.subheadline, weight: .medium)
+                        .foregroundStyle(.secondary)
+                        .frame(width: cardWidth, height: cardWidth * 10 / 16)
+                        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                } else if items.isEmpty {
                     ForEach(0..<2, id: \.self) { index in
                         FeedCard(entry: .placeholder(index), source: "Recipe site").frame(width: cardWidth).loadingPlaceholder()
                     }
                 }
                 ForEach(items) { item in
                     Button { openRoute(.feedPost(item.entry)) } label: {
-                        FeedCard(entry: item.entry, source: item.source).frame(width: cardWidth)
+                        FeedCard(entry: item.entry, source: item.source, viewed: loader.isViewed(item.entry)).frame(width: cardWidth)
                     }
                     .buttonStyle(.plain)
+                    .feedPostActions(item.entry, swipes: false)
                 }
             }
             .scrollTargetLayout()
@@ -590,6 +704,7 @@ struct FeedPhoto: View {
 struct FeedCard: View {
     let entry: FeedEntry
     let source: String
+    var viewed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -599,7 +714,11 @@ struct FeedCard: View {
                 .overlay {
                     FeedPhoto(url: entry.imageURL)
                 }
+                .overlay(alignment: .topTrailing) {
+                    if viewed { FeedViewedBadge().padding(12) }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .saturation(viewed ? 0.4 : 1)
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.title).appFont(.title3, weight: .semibold).lineLimit(2)
                 HStack(spacing: 4) {
@@ -615,8 +734,22 @@ struct FeedCard: View {
             }
             .padding(.horizontal, 4)
         }
+        .opacity(viewed ? 0.6 : 1)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityValue(viewed ? "Viewed" : "")
+    }
+}
+
+struct FeedViewedBadge: View {
+    var body: some View {
+        Label("Viewed", systemImage: "checkmark.circle.fill")
+            .appFont(.caption, weight: .semibold)
+            .symbolRenderingMode(.multicolor)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.regularMaterial, in: Capsule())
+            .accessibilityHidden(true)
     }
 }
 
@@ -635,6 +768,7 @@ struct RecipeFeedsPage: View {
         List {
             if showsTabToggle {
                 TabVisibilitySection(tab: .feeds)
+                ReadingFeedsSection()
                 OfflineFeedsSection()
             }
             Section {
@@ -684,6 +818,41 @@ struct RecipeFeedsPage: View {
                 Spacer()
                 FollowFeedButton(url: popular.url, title: popular.name)
             }
+        }
+    }
+}
+
+/// How posts open, when they count as viewed, and a way to see them all again.
+private struct ReadingFeedsSection: View {
+    @EnvironmentObject private var loader: FeedLoader
+    @AppStorage(AppSettings.Key.feedReader) private var opensInReader = true
+    @AppStorage(AppSettings.Key.feedMarkViewed) private var markMode = FeedMarkMode.onClose
+    @State private var confirmingReset = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $opensInReader) { Label("Open Articles in Reader", systemImage: "doc.plaintext") }
+            Picker(selection: $markMode) {
+                ForEach(FeedMarkMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            } label: {
+                Label("Mark as Viewed", systemImage: "checkmark.circle")
+            }
+            if loader.viewed.count > 0 {
+                Button("Reset Viewed Posts (\(loader.viewed.count))", role: .destructive) { confirmingReset = true }
+            }
+        } header: {
+            Text("Reading")
+        } footer: {
+            Text("Posts with a recipe open as the recipe. Other posts open in Reader, without the site's ads, or as the full web page when Reader is off. Viewed posts leave Feeds until you turn on Show Viewed.")
+        }
+        .confirmationDialog("Reset viewed posts?", isPresented: $confirmingReset, titleVisibility: .visible) {
+            Button("Reset", role: .destructive) {
+                let before = loader.viewed.ids
+                loader.resetViewed()
+                ToastCenter.shared.show("Every post is new again") { loader.markViewed(before) }
+            }
+        } message: {
+            Text("Every post shows up in Feeds again.")
         }
     }
 }
@@ -806,7 +975,7 @@ struct FeedPreviewPage: View {
                 ScrollView {
                     GridSection(title: nil, minimum: 300, spacing: 20) {
                         ForEach(entries) { entry in
-                            NavigationLink { FeedEntryPreview(entry: entry) } label: { FeedCard(entry: entry, source: "") }
+                            NavigationLink { FeedEntryPreview(entry: entry) } label: { FeedCard(entry: entry, source: "", viewed: loader.isViewed(entry)) }
                                 .buttonStyle(.plain)
                         }
                     }

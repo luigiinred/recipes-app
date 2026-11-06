@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feeds — Reader view &amp; Viewed posts</title>
+<style>
+  :root {
+    --accent: #DB4738;
+    --accent-soft: rgba(219, 71, 56, .1);
+    --ink: #1c1c1e;
+    --secondary: #6e6e73;
+    --tertiary: #aeaeb2;
+    --canvas: #ffffff;
+    --grouped: #f2f2f7;
+    --sep: rgba(60, 60, 67, .18);
+    --green: #34c759;
+    --sepia-bg: #f8f1e3;
+    --sepia-ink: #5b4636;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    color: var(--ink);
+    background: #e9e7e3;
+  }
+  .page { max-width: 1500px; margin: 0 auto; padding: 48px 40px 80px; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 24px; margin: 56px 0 6px; letter-spacing: -.01em; }
+  .lede { color: var(--secondary); font-size: 17px; max-width: 820px; margin: 0; }
+  .grid { display: flex; flex-wrap: wrap; gap: 40px 36px; margin-top: 28px; align-items: flex-start; }
+  .frame { width: 300px; }
+  .frame figcaption { margin-top: 14px; font-size: 14px; color: var(--secondary); }
+  .frame figcaption b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
+  figure { margin: 0; }
+
+  .proto-row { display: flex; gap: 48px; margin-top: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .proto-notes { max-width: 520px; }
+  .proto-notes li { margin-bottom: 10px; }
+  .proto-notes kbd { font: 12px ui-monospace, monospace; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
+
+  table.research { border-collapse: collapse; margin-top: 20px; background: #fff; border-radius: 14px; overflow: hidden; font-size: 14px; width: 100%; }
+  table.research th, table.research td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  table.research th { background: #faf9f7; font-weight: 600; }
+  table.research td:last-child { color: var(--secondary); }
+
+  /* ── iPhone ───────────────────────────────────────── */
+  .phone {
+    position: relative; width: 300px; height: 640px; border-radius: 46px;
+    background: #111; padding: 9px; box-shadow: 0 20px 50px rgba(0,0,0,.18);
+  }
+  .phone.big { width: 375px; height: 800px; border-radius: 54px; padding: 10px; }
+  .screen {
+    position: relative; width: 100%; height: 100%; border-radius: 38px; overflow: hidden;
+    background: var(--canvas); display: flex; flex-direction: column;
+  }
+  .phone.big .screen { border-radius: 45px; }
+  .island { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 92px; height: 26px; background: #000; border-radius: 20px; z-index: 50; }
+  .status { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 6px 26px 0; font-weight: 600; font-size: 14px; }
+  .status .icons { letter-spacing: 2px; font-size: 11px; }
+
+  .navbar { flex: none; padding: 2px 14px 6px; display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .navbar .spacer { flex: 1; }
+  .glass {
+    height: 36px; min-width: 36px; padding: 0 10px; border-radius: 18px; border: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: rgba(255,255,255,.72); backdrop-filter: blur(16px);
+    box-shadow: 0 1px 4px rgba(0,0,0,.12), inset 0 0 0 .5px rgba(0,0,0,.06);
+    font: 600 14px -apple-system, system-ui; color: var(--ink); cursor: pointer;
+  }
+  .glass svg { width: 18px; height: 18px; }
+  .glass.on { color: var(--accent); }
+  .large-title { font-size: 30px; font-weight: 700; letter-spacing: -.02em; padding: 0 18px 6px; flex: none; }
+  .large-title small { display: block; font-size: 13px; font-weight: 500; color: var(--secondary); letter-spacing: 0; margin-top: -2px; }
+
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .pill-row { display: flex; gap: 8px; padding: 4px 16px 14px; }
+  .pill { border: 0; border-radius: 16px; padding: 6px 13px; font: 600 13px -apple-system, system-ui; background: var(--grouped); color: var(--ink); cursor: pointer; }
+  .pill.on { background: var(--ink); color: #fff; }
+  .pill .n { opacity: .6; margin-left: 4px; font-weight: 500; }
+
+  /* cards */
+  .card-wrap { position: relative; margin: 0 16px 22px; border-radius: 22px; }
+  .card-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; border-radius: 22px; overflow: hidden; }
+  .card-actions .act { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #fff; font: 600 12px -apple-system, system-ui; padding: 0 22px; }
+  .card-actions .act svg { width: 22px; height: 22px; }
+  .act.viewed { background: var(--green); }
+  .act.save { background: var(--accent); margin-left: auto; }
+  .card { position: relative; background: var(--canvas); transition: transform .25s ease, opacity .25s; cursor: pointer; touch-action: pan-y; user-select: none; }
+  .card.dragging { transition: none; }
+  .photo { position: relative; aspect-ratio: 16/10; border-radius: 22px; overflow: hidden; }
+  .photo .kind { position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,.5); color: #fff; backdrop-filter: blur(8px); border-radius: 10px; padding: 3px 8px; font: 600 11px -apple-system, system-ui; display: flex; gap: 4px; align-items: center; }
+  .photo .kind svg { width: 12px; height: 12px; }
+  .meta { padding: 10px 4px 0; }
+  .meta .title { font-size: 17px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
+  .meta .sub { color: var(--secondary); font-size: 13px; margin-top: 3px; display: flex; gap: 5px; align-items: center; }
+  .dot-new { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); flex: none; }
+  .card.is-viewed { opacity: .5; }
+  .card.is-viewed .photo { filter: grayscale(.45); }
+  .viewed-badge { position: absolute; right: 10px; top: 10px; background: rgba(255,255,255,.9); border-radius: 12px; padding: 3px 9px 3px 6px; font: 600 11px -apple-system, system-ui; display: flex; align-items: center; gap: 3px; color: var(--ink); }
+  .viewed-badge svg { width: 13px; height: 13px; color: var(--green); }
+  .card.leaving { transform: translateX(-110%) !important; opacity: 0; }
+  .collapse { transition: max-height .3s ease .2s, margin .3s ease .2s; overflow: hidden; }
+
+  /* section labels */
+  .section-label { font-size: 13px; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: .04em; padding: 6px 20px 10px; }
+
+  /* menu */
+  .menu-scrim { position: absolute; inset: 0; z-index: 40; background: rgba(0,0,0,.04); }
+  .menu {
+    position: absolute; right: 12px; top: 96px; width: 232px; z-index: 41;
+    background: rgba(250,250,250,.94); backdrop-filter: blur(30px); border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.22); overflow: hidden; font-size: 14px;
+  }
+  .menu .grp { border-bottom: 6px solid rgba(0,0,0,.06); }
+  .menu .grp:last-child { border-bottom: 0; }
+  .menu .hdr { font-size: 11.5px; color: var(--secondary); padding: 8px 14px 2px; }
+  .menu .it { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: .5px solid var(--sep); cursor: pointer; }
+  .menu .hdr + .it { border-top: 0; }
+  .menu .it .chk { width: 14px; color: var(--ink); font-weight: 700; }
+  .menu .it .lbl { flex: 1; }
+  .menu .it svg { width: 17px; height: 17px; }
+  .menu .it.toggle .sw { width: 36px; height: 22px; border-radius: 11px; background: #d1d1d6; position: relative; flex: none; transition: background .2s; }
+  .menu .it.toggle .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 9px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .2s; }
+  .menu .it.toggle.on .sw { background: var(--green); }
+  .menu .it.toggle.on .sw::after { left: 16px; }
+
+  /* toast */
+  .toast {
+    position: absolute; left: 14px; right: 14px; bottom: 30px; z-index: 45;
+    background: rgba(30,30,32,.92); color: #fff; border-radius: 18px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    animation: toastIn .25s ease;
+  }
+  .toast svg { width: 18px; height: 18px; color: var(--green); flex: none; }
+  .toast .lbl { flex: 1; }
+  .toast button { background: none; border: 0; color: #ff8a7d; font: 600 14px -apple-system, system-ui; cursor: pointer; }
+  @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } }
+  .frame .sheet, .frame .toast { animation: none; }
+
+  /* empty */
+  .empty { padding: 60px 30px; text-align: center; }
+  .empty .icon { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 32px; background: rgba(52,199,89,.14); color: var(--green); display: flex; align-items: center; justify-content: center; }
+  .empty .icon svg { width: 34px; height: 34px; }
+  .empty h3 { margin: 0 0 6px; font-size: 21px; }
+  .empty p { margin: 0 0 18px; color: var(--secondary); }
+  .btn { border: 0; border-radius: 20px; padding: 10px 18px; font: 600 15px -apple-system, system-ui; cursor: pointer; }
+  .btn.tinted { background: var(--accent-soft); color: var(--accent); }
+  .btn.filled { background: var(--accent); color: #fff; }
+
+  /* swipe (one at a time) */
+  .swipe-page { position: absolute; left: 12px; right: 12px; top: 0; bottom: 8px; border-radius: 28px; overflow: hidden; transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s; }
+  .swipe-page .shade { position: absolute; inset: 0; background: linear-gradient(transparent 40%, rgba(0,0,0,.78)); }
+  .swipe-page .txt { position: absolute; left: 22px; right: 22px; bottom: 26px; color: #fff; }
+  .swipe-page .src { font: 700 12px -apple-system, system-ui; opacity: .85; letter-spacing: .03em; }
+  .swipe-page .ttl { font-size: 27px; font-weight: 700; line-height: 1.12; margin: 6px 0; letter-spacing: -.02em; }
+  .swipe-page .when { font-size: 14px; opacity: .85; }
+  .swipe-stage { position: relative; flex: 1; overflow: hidden; }
+  .progress { display: flex; gap: 3px; padding: 0 22px 8px; flex: none; }
+  .progress i { flex: 1; height: 3px; border-radius: 2px; background: rgba(0,0,0,.12); }
+  .progress i.done { background: var(--green); }
+  .progress i.cur { background: var(--ink); }
+  .swipe-hint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.9); color: var(--ink); border-radius: 14px; padding: 4px 10px; font: 600 12px -apple-system, system-ui; display: flex; gap: 4px; align-items: center; z-index: 3; }
+  .swipe-hint svg { width: 13px; height: 13px; color: var(--green); }
+
+  /* reader */
+  .reader { background: var(--canvas); }
+  .reader.sepia { --canvas: var(--sepia-bg); --ink: var(--sepia-ink); --secondary: #8a7560; color: var(--sepia-ink); }
+  .reader.dark { --canvas: #1c1c1e; --ink: #f2f2f7; --secondary: #a1a1a6; --grouped: #2c2c2e; color: #f2f2f7; }
+  .reader.dark .glass { background: rgba(60,60,62,.7); color: #fff; }
+  .reader .glass.on { color: var(--accent); }
+  .reader-body { padding: 4px 22px 120px; }
+  .reader-body .site { display: flex; align-items: center; gap: 8px; font: 600 13px -apple-system, system-ui; color: var(--secondary); }
+  .reader-body .site .fav { width: 20px; height: 20px; border-radius: 5px; background: var(--accent); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .reader-body h1 { font-size: 27px; line-height: 1.15; margin: 10px 0 8px; letter-spacing: -.02em; }
+  .reader-body .byline { color: var(--secondary); font-size: 13px; margin-bottom: 16px; }
+  .reader-body .hero { aspect-ratio: 4/3; border-radius: 18px; margin: 0 -4px 18px; }
+  .reader-body p { margin: 0 0 14px; }
+  .reader-body.serif { font-family: "New York", ui-serif, Georgia, serif; }
+  .reader-body.serif h1 { font-family: "New York", ui-serif, Georgia, serif; }
+  .reader-body .pull { border-left: 3px solid var(--accent); padding-left: 12px; font-style: italic; color: var(--secondary); }
+  .reader-body .inline-img { aspect-ratio: 3/2; border-radius: 14px; margin: 4px 0 16px; }
+  .reader-body .cap { font-size: 12px; color: var(--secondary); margin: -10px 0 16px; }
+  .reader-body .recipe-callout { background: var(--accent-soft); border-radius: 16px; padding: 14px; display: flex; gap: 12px; align-items: center; margin: 18px 0; cursor: pointer; }
+  .reader-body .recipe-callout .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+  .reader-body .recipe-callout .ic svg { width: 22px; height: 22px; }
+  .reader-body .recipe-callout b { display: block; font-family: -apple-system, system-ui; font-size: 14px; }
+  .reader-body .recipe-callout span { font-family: -apple-system, system-ui; font-size: 12.5px; color: var(--secondary); }
+  .reader-body .end { margin-top: 24px; padding-top: 18px; border-top: .5px solid var(--sep); font-family: -apple-system, system-ui; text-align: center; color: var(--secondary); font-size: 13px; }
+  .reader-body .end .btn { margin-top: 10px; }
+
+  .seg { display: flex; background: rgba(118,118,128,.12); border-radius: 10px; padding: 2px; margin: 0 22px 14px; flex: none; }
+  .seg button { flex: 1; border: 0; background: none; padding: 6px 0; border-radius: 8px; font: 600 13px -apple-system, system-ui; color: var(--ink); cursor: pointer; }
+  .seg button.on { background: var(--canvas); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .reader.dark .seg button.on { background: #636366; }
+
+  .bottom-bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px 26px; display: flex; gap: 10px; justify-content: space-between; z-index: 20; background: linear-gradient(transparent, var(--canvas) 40%); }
+  .bottom-bar .grow { flex: 1; }
+
+  /* appearance sheet */
+  .sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 41; background: rgba(250,250,250,.96); backdrop-filter: blur(30px); border-radius: 32px; padding: 16px 18px 22px; box-shadow: 0 -6px 40px rgba(0,0,0,.2); color: #1c1c1e; animation: toastIn .25s ease; }
+  .sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 12px; }
+  .sheet h4 { margin: 0 0 12px; font-size: 16px; text-align: center; }
+  .sheet .row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sheet .chip { flex: 1; border: 0; border-radius: 14px; background: #fff; padding: 10px 0; font: 600 14px -apple-system, system-ui; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); color: #1c1c1e; }
+  .sheet .chip.on { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
+  .sheet .chip.serif { font-family: "New York", ui-serif, Georgia, serif; }
+  .sheet .theme { flex: 1; height: 46px; border-radius: 14px; border: 0; cursor: pointer; font: 600 12px -apple-system, system-ui; }
+  .sheet .theme.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sheet .sizes { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 14px; padding: 6px 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); margin-bottom: 12px; }
+  .sheet .sizes button { border: 0; background: none; font: 600 15px -apple-system, system-ui; cursor: pointer; color: #1c1c1e; }
+  .sheet .sizes .bar { flex: 1; height: 4px; border-radius: 2px; background: #e5e5ea; position: relative; }
+  .sheet .sizes .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); }
+  .sheet .sw-row { display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 14px; padding: 11px 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); font-size: 14px; }
+
+  /* settings list */
+  .grouped-bg { background: var(--grouped); }
+  .list-sec { margin: 0 16px 22px; }
+  .list-sec .hdr { font-size: 13px; color: var(--secondary); text-transform: uppercase; padding: 0 16px 6px; letter-spacing: .02em; }
+  .list-sec .ftr { font-size: 12.5px; color: var(--secondary); padding: 6px 16px 0; }
+  .list-sec .rows { background: #fff; border-radius: 14px; overflow: hidden; }
+  .list-sec .r { display: flex; align-items: center; padding: 11px 16px; border-top: .5px solid var(--sep); font-size: 15px; gap: 10px; }
+  .list-sec .r:first-child { border-top: 0; }
+  .list-sec .r .lbl { flex: 1; }
+  .list-sec .r .val { color: var(--secondary); }
+  .list-sec .r .chk { color: var(--accent); font-weight: 700; }
+
+  /* recipe card mini (recipe tab) */
+  .rc-ings { margin: 0 0 16px; padding: 0; list-style: none; }
+  .rc-ings li { padding: 8px 0; border-bottom: .5px solid var(--sep); display: flex; gap: 10px; }
+  .rc-ings li b { min-width: 64px; }
+  .rc-chips { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .rc-chips span { background: var(--grouped); border-radius: 12px; padding: 5px 10px; font: 600 12.5px -apple-system, system-ui; }
+
+  /* food "photos" */
+  .f1 { background: radial-gradient(circle at 35% 40%, #f6c04f 0 18%, transparent 19%), radial-gradient(circle at 62% 58%, #e2553b 0 22%, transparent 23%), radial-gradient(circle at 50% 50%, #f3e6d2 0 44%, #7a4a2b 45% 100%); }
+  .f2 { background: radial-gradient(circle at 50% 55%, #f9f2e7 0 36%, #2e5d3b 37% 41%, transparent 42%), radial-gradient(circle at 30% 30%, #8fbf5a 0 10%, transparent 11%), linear-gradient(135deg, #3b2a20, #6a4b38); }
+  .f3 { background: radial-gradient(ellipse at 50% 70%, #d7893a 0 30%, transparent 31%), radial-gradient(circle at 70% 30%, #fbe3b5 0 14%, transparent 15%), linear-gradient(160deg, #f0dcc2, #b88a5c); }
+  .f4 { background: radial-gradient(circle at 40% 50%, #c23b2a 0 20%, transparent 21%), radial-gradient(circle at 63% 45%, #f5d36b 0 12%, transparent 13%), radial-gradient(circle at 50% 50%, #263a2c 0 46%, #121a14 47%); }
+  .f5 { background: radial-gradient(circle at 50% 45%, #fff7ea 0 26%, transparent 27%), radial-gradient(circle at 50% 50%, #c9773d 0 40%, transparent 41%), linear-gradient(135deg, #8db6c9, #4e7d92); }
+  .f6 { background: radial-gradient(circle at 45% 50%, #6b2f1f 0 28%, transparent 29%), radial-gradient(circle at 50% 50%, #e9d6b7 0 42%, transparent 43%), linear-gradient(135deg, #c4c0b8, #8f8a80); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Feeds: reader view and viewed posts</h1>
+  <p class="lede">Proposal for the Feeds tab. Every post opens as a clean page in the app: recipes as the recipe card, as they do now, and other posts in a new reader view instead of the ad-filled web page. Posts you've read are marked viewed and drop out of the feed. A <b>Show Viewed</b> switch brings them back.</p>
+
+  <h2>Try it</h2>
+  <div class="proto-row">
+    <div class="phone big"><div class="island"></div><div class="screen" id="proto"></div></div>
+    <div class="proto-notes">
+      <p><b>Things to try:</b></p>
+      <ul>
+        <li><b>Tap a post</b> to open it. The app checks each post for a recipe. If it finds one, the post opens as the recipe card. If not, it opens in reader view. No switch needed.</li>
+        <li><b>Go back</b> using <b>‹</b> or by dragging the page right. The post is marked viewed and fades out of the list. An Undo toast appears.</li>
+        <li><b>Drag a card left</b> to mark it viewed without opening it. Drag right to <b>Save</b> it to My Recipes.</li>
+        <li>Open the <b>View</b> menu (≡) and switch <b>Show Viewed</b> on. Viewed posts come back dimmed, with a ✓ badge. <b>Mark All as Viewed</b> is in the same menu.</li>
+        <li>Pick <b>One at a Time</b> in the View menu and swipe up. Each post you swipe past is marked viewed, and the progress bar turns green.</li>
+        <li>In the reader, <b>Aa</b> changes text size, the font (system or New York serif) and the page color (Light, Sepia or Dark).</li>
+        <li>Mark everything viewed to see <b>You're all caught up</b>.</li>
+      </ul>
+      <p><button class="btn tinted" onclick="resetProto()">Reset prototype</button></p>
+    </div>
+  </div>
+
+  <h2>Screens</h2>
+  <div class="grid" id="frames"></div>
+
+  <h2>What well-loved readers do, and what Recipes takes from them</h2>
+  <table class="research">
+    <tr><th>App</th><th>Pattern</th><th>In this proposal</th></tr>
+    <tr><td><b>NetNewsWire</b></td><td>Swipe actions in the timeline, Hide Read Articles, Mark All as Read, a Reader View that fetches the full text</td><td>Drag a card to mark it viewed, the Show Viewed switch, Mark All as Viewed, and reader view</td></tr>
+    <tr><td><b>Unread</b></td><td>Best-in-class typography and full-text retrieval. Posts are marked read as you scroll past.</td><td>Reader typography, and posts marked viewed as you swipe past them in One at a Time</td></tr>
+    <tr><td><b>Reeder</b></td><td>One calm timeline that remembers your place, with no unread-count badges</td><td>No numbered badges, only a small red dot on new posts, and a "caught up" end state</td></tr>
+    <tr><td><b>Feedly / Inoreader</b></td><td>Magazine, cards and title-only layouts, an Unread/All filter, and undo after Mark All</td><td>The existing three layouts stay, plus the New/All filter and an Undo toast</td></tr>
+    <tr><td><b>Safari Reader / Firefox Reader</b></td><td>Mozilla Readability strips ads and clutter. Text size, font and theme settings.</td><td>Readability.js runs in a hidden WKWebView. The Aa panel uses the app's own Light, Sepia and Dark themes.</td></tr>
+    <tr><td><b>Mela / Paprika</b></td><td>Pull the recipe out of the blog post and skip the life story</td><td>Posts are detected automatically: a recipe opens as the recipe card (already shipping), and anything else opens in reader view</td></tr>
+  </table>
+</div>
+
+<script>
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  checkCircle: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.3l3 3 6-6.3" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  view: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>',
+  stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="3" width="12" height="16" rx="3"/><path d="M4 8v11a3 3 0 003 3h9"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+  safari: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M6 11H5v10h14V11h-1"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  fork: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v8M5 3v5a2 2 0 004 0V3M7 11v10M17 3c-2 0-3 2.5-3 6s1 4 3 4v8"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M9 12h6M9 16h6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  checkAll: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5l4.5 4.5L15 8.5M11 16l1 1 9.5-9.5"/></svg>',
+};
+
+const POSTS = [
+  { id: 'a', src: 'RecipeTin Eats', title: 'Crispy Honey Garlic Chicken Thighs', when: '2 hours ago', ph: 'f1', recipe: true, mins: 35 },
+  { id: 'b', src: 'Smitten Kitchen', title: 'What I Cooked on Our Week in Puglia', when: '5 hours ago', ph: 'f2', recipe: false, mins: 7 },
+  { id: 'c', src: 'King Arthur Baking', title: 'Brown Butter Pecan Sticky Buns', when: 'Yesterday', ph: 'f3', recipe: true, mins: 90 },
+  { id: 'd', src: 'The Guardian · Food', title: 'Why Every Home Cook Should Own a Carbon-Steel Pan', when: 'Yesterday', ph: 'f4', recipe: false, mins: 5 },
+  { id: 'e', src: 'Just One Cookbook', title: 'Weeknight Miso Salmon Rice Bowls', when: '2 days ago', ph: 'f5', recipe: true, mins: 25 },
+  { id: 'f', src: 'Serious Eats', title: 'The Food Lab: The Science of Braising', when: '3 days ago', ph: 'f6', recipe: false, mins: 11 },
+];
+
+function freshState(over = {}) {
+  return Object.assign({
+    screen: 'list',      // list | reader | settings
+    layout: 'stream',    // stream | swipe
+    showViewed: false,
+    viewed: new Set(),
+    menu: false,
+    open: null,
+    sheet: false,
+    size: 2, serif: true, theme: 'light',
+    toast: null,
+    swipeIndex: 0,
+    dragCard: null, dragX: 0,
+  }, over);
+}
+
+// ── rendering ────────────────────────────────────────
+function statusBar() {
+  return `<div class="status"><span>9:41</span><span class="icons">▂▄▆ ◔ ▮</span></div>`;
+}
+
+function card(p, s) {
+  const v = s.viewed.has(p.id);
+  const kind = p.recipe
+    ? `<span class="kind">${ICON.fork}Recipe · ${p.mins} min</span>`
+    : `<span class="kind">${ICON.doc}Article · ${p.mins} min read</span>`;
+  const drag = s.dragCard === p.id ? `style="transform:translateX(${s.dragX}px)"` : '';
+  const showActions = s.dragCard === p.id && s.dragX !== 0;
+  return `
+  <div class="card-wrap" data-id="${p.id}">
+    ${showActions ? `<div class="card-actions">
+      ${s.dragX > 0 ? `<div class="act save" style="margin-left:0;margin-right:auto">${ICON.bookmark}Save</div>` : `<div class="act viewed" style="margin-left:auto">${ICON.check}${v ? 'Unview' : 'Viewed'}</div>`}
+    </div>` : ''}
+    <div class="card ${v ? 'is-viewed' : ''} ${s.dragCard === p.id ? 'dragging' : ''}" data-card="${p.id}" ${drag}>
+      <div class="photo ${p.ph}">${kind}${v ? `<span class="viewed-badge">${ICON.checkCircle}Viewed</span>` : ''}</div>
+      <div class="meta">
+        <div class="title">${p.title}</div>
+        <div class="sub">${v ? '' : '<span class="dot-new"></span>'}<span>${p.src}</span><span>·</span><span>${p.when}</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function visible(s) {
+  return POSTS.filter(p => s.showViewed || !s.viewed.has(p.id));
+}
+
+function navbarFeeds(s) {
+  return `<div class="navbar">
+    <span class="spacer"></span>
+    <button class="glass ${s.menu ? 'on' : ''}" data-act="menu" aria-label="View">${s.layout === 'swipe' ? ICON.stack : ICON.view}</button>
+    <button class="glass" data-act="settings" aria-label="Manage Feeds">${ICON.sliders}</button>
+  </div>`;
+}
+
+function newCount(s) { return POSTS.filter(p => !s.viewed.has(p.id)).length; }
+
+function listScreen(s) {
+  const items = visible(s);
+  const n = newCount(s);
+  let body;
+  if (!items.length) {
+    body = `<div class="empty">
+      <div class="icon">${ICON.check}</div>
+      <h3>You're all caught up</h3>
+      <p>New posts from the ${6} feeds you follow will show up here.</p>
+      <button class="btn tinted" data-act="showViewed">Show Viewed Posts</button>
+    </div>`;
+  } else {
+    body = items.map(p => card(p, s)).join('');
+    if (!s.showViewed && s.viewed.size) {
+      body += `<div style="text-align:center;padding:4px 0 30px"><button class="btn tinted" data-act="showViewed">${ICON.eye.replace('<svg', '<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"')}Show ${s.viewed.size} Viewed</button></div>`;
+    }
+  }
+  return `${statusBar()}${navbarFeeds(s)}
+    <div class="large-title">Feeds<small>${n ? `${n} new` : 'Caught up'}</small></div>
+    <div class="pill-row">
+      <button class="pill ${!s.showViewed ? 'on' : ''}" data-act="filterNew">New<span class="n">${n}</span></button>
+      <button class="pill ${s.showViewed ? 'on' : ''}" data-act="filterAll">All<span class="n">${POSTS.length}</span></button>
+      <button class="pill" style="margin-left:auto;background:var(--accent-soft);color:var(--accent)" data-act="noop">Discover</button>
+    </div>
+    <div class="scroll" data-scroll>${body}</div>
+    ${s.menu ? menu(s) : ''}${toast(s)}`;
+}
+
+function swipeScreen(s) {
+  const items = visible(s);
+  const i = Math.min(s.swipeIndex, items.length);
+  const pages = items.map((p, k) => {
+    const off = (k - i) * 100;
+    return `<div class="swipe-page ${p.ph}" data-card="${p.id}" style="transform:translateY(${off}%) scale(${k === i ? 1 : .94});opacity:${Math.abs(k - i) > 1 ? 0 : 1}">
+      <div class="shade"></div>
+      <div class="txt"><div class="src">${p.src.toUpperCase()} · ${p.recipe ? 'RECIPE' : 'ARTICLE'}</div><div class="ttl">${p.title}</div><div class="when">${p.when}</div></div>
+    </div>`;
+  }).join('');
+  const done = i >= items.length;
+  return `${statusBar()}${navbarFeeds(s)}
+    <div class="progress">${POSTS.map(p => `<i class="${s.viewed.has(p.id) ? 'done' : ''} ${items[i] && items[i].id === p.id ? 'cur' : ''}"></i>`).join('')}</div>
+    <div class="swipe-stage" data-swipe>
+      ${pages}
+      ${done ? `<div class="empty" style="position:absolute;inset:0;padding-top:120px">
+        <div class="icon">${ICON.check}</div><h3>You're all caught up</h3><p>Swipe down to go back through what you've seen.</p>
+        <button class="btn tinted" data-act="showViewed">Show Viewed Posts</button></div>` : ''}
+      ${s.viewed.size && !done ? `<div class="swipe-hint">${ICON.checkCircle}${s.viewed.size} marked viewed</div>` : ''}
+    </div>
+    <div style="display:flex;justify-content:center;gap:10px;padding:8px 0 24px;flex:none">
+      <button class="glass" data-act="swipeUp" aria-label="Previous">↑</button>
+      <button class="glass" data-act="swipeDown" aria-label="Next">↓ Next</button>
+    </div>
+    ${s.menu ? menu(s) : ''}${toast(s)}`;
+}
+
+function menu(s) {
+  return `<div class="menu-scrim" data-act="closeMenu"></div>
+  <div class="menu">
+    <div class="grp">
+      <div class="hdr">View</div>
+      <div class="it" data-act="layoutStream"><span class="chk">${s.layout === 'stream' ? '✓' : ''}</span><span class="lbl">All Posts</span>${ICON.view}</div>
+      <div class="it" data-act="layoutSwipe"><span class="chk">${s.layout === 'swipe' ? '✓' : ''}</span><span class="lbl">One at a Time</span>${ICON.stack}</div>
+      <div class="it" data-act="noop"><span class="chk"></span><span class="lbl">By Feed</span>${ICON.sliders}</div>
+    </div>
+    <div class="grp">
+      <div class="it toggle ${s.showViewed ? 'on' : ''}" data-act="toggleViewed"><span class="lbl">Show Viewed</span><span class="sw"></span></div>
+      <div class="it" data-act="markAll"><span class="lbl">Mark All as Viewed</span>${ICON.checkAll}</div>
+    </div>
+  </div>`;
+}
+
+function toast(s) {
+  if (!s.toast) return '';
+  return `<div class="toast">${ICON.checkCircle}<span class="lbl">${s.toast.text}</span>${s.toast.undo ? '<button data-act="undo">Undo</button>' : ''}</div>`;
+}
+
+const ARTICLE = {
+  b: [
+    'We rented a little trullo outside Alberobello with a kitchen the size of a closet and a view of nothing but olive trees. I cooked more that week than I have in months.',
+    '<div class="inline-img f4"></div><div class="cap">Orecchiette, drying on a dish towel on the windowsill.</div>',
+    'The first lesson of Puglia is that nobody is in a hurry, least of all the tomatoes. They hang in bunches from the rafters and you cook them down slowly until they collapse.',
+    '<div class="pull">“If the bread isn’t from Altamura, why bother?” — our landlady, every morning.</div>',
+    'By the end of the week I had a routine: burrata at the market at nine, a long lunch, and something with chickpeas and greens at night.',
+  ],
+  d: [
+    'Cast iron gets the love, but carbon steel is the pan professional cooks actually reach for. It’s lighter, heats faster and, once seasoned, releases an egg as easily as nonstick.',
+    '<div class="inline-img f6"></div><div class="cap">A well-loved pan, about two years in.</div>',
+    'The trade-off is that it rusts if you leave it wet, and the first few weeks of seasoning can be patchy. Neither is a reason to skip it.',
+  ],
+  f: [
+    'Braising is the closest thing a home cook has to a time machine: tough, cheap cuts go in, and a few hours later something spoonable comes out.',
+    '<div class="inline-img f1"></div><div class="cap">Short ribs after three hours at 300°F.</div>',
+    'What’s happening is collagen turning to gelatin, which starts around 160°F and speeds up as you go higher, but too hot and the muscle fibers squeeze dry.',
+  ],
+};
+
+function readerScreen(s) {
+  const p = POSTS.find(x => x.id === s.open);
+  const fontPx = [13, 15, 17, 19, 22][s.size];
+  let content;
+  if (p.recipe) {
+    content = `<div class="reader-body">
+      <div class="hero ${p.ph}"></div>
+      <div class="site"><span class="fav">${p.src[0]}</span>${p.src}</div>
+      <h1 style="font-family:-apple-system,system-ui">${p.title}</h1>
+      <div class="rc-chips"><span>⏱ ${p.mins} min</span><span>🍽 4 servings</span><span>Dinner</span></div>
+      <ul class="rc-ings">
+        <li><b>6</b>bone-in chicken thighs</li><li><b>⅓ cup</b>honey</li><li><b>5 cloves</b>garlic, minced</li><li><b>2 tbsp</b>soy sauce</li><li><b>1 tbsp</b>rice vinegar</li>
+      </ul>
+      <div class="end">A recipe was found, so the post opens as the recipe card.</div>
+    </div>
+    <div class="bottom-bar"><button class="btn filled grow">Add to My Recipes</button><button class="glass">${ICON.share}</button></div>`;
+  } else {
+    const paras = (ARTICLE[p.id] || ARTICLE.b).map(t => t.startsWith('<') ? t : `<p>${t}</p>`).join('');
+    content = `<div class="reader-body ${s.serif ? 'serif' : ''}" style="font-size:${fontPx}px;line-height:1.55">
+      <div class="site"><span class="fav">${p.src[0]}</span>${p.src}</div>
+      <h1 style="font-size:${fontPx + 10}px">${p.title}</h1>
+      <div class="byline">${p.mins} min read · ${p.when}</div>
+      <div class="hero ${p.ph}"></div>
+      ${paras}
+      ${p.recipe ? '' : `<div class="recipe-callout"><span class="ic">${ICON.fork}</span><div><b>2 recipes in this post</b><span>Add them to My Recipes as recipe cards</span></div></div>`}
+      <div class="end">End of article<br><button class="btn tinted" data-act="doneReading">${ICON.check.replace('<svg', '<svg style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"')}Done, Next Post</button></div>
+    </div>`;
+  }
+  return `<div class="reader ${s.theme}" style="display:flex;flex-direction:column;height:100%;position:relative">
+    ${statusBar()}
+    <div class="navbar">
+      <button class="glass" data-act="back" aria-label="Back">${ICON.back}</button>
+      <span class="spacer"></span>
+      ${p.recipe ? '' : `<button class="glass ${s.sheet ? 'on' : ''}" data-act="sheet" style="font-family:Georgia,serif;font-size:16px">Aa</button>`}
+      <button class="glass" data-act="noop" aria-label="Open in Safari">${ICON.safari}</button>
+    </div>
+    <div class="scroll" data-reader-scroll>${content}</div>
+    ${s.sheet ? appearanceSheet(s) : ''}
+  </div>`;
+}
+
+function appearanceSheet(s) {
+  return `<div class="menu-scrim" data-act="closeSheet"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <h4>Reader</h4>
+    <div class="sizes"><button data-act="smaller" style="font-size:13px">A</button><div class="bar"><i style="width:${(s.size + 1) * 20}%"></i></div><button data-act="bigger" style="font-size:20px">A</button></div>
+    <div class="row">
+      <button class="chip ${!s.serif ? 'on' : ''}" data-act="sans">System</button>
+      <button class="chip serif ${s.serif ? 'on' : ''}" data-act="serif">New York</button>
+    </div>
+    <div class="row">
+      <button class="theme ${s.theme === 'light' ? 'on' : ''}" data-act="themeLight" style="background:#fff;box-shadow:inset 0 0 0 1px #ddd">Light</button>
+      <button class="theme ${s.theme === 'sepia' ? 'on' : ''}" data-act="themeSepia" style="background:#f8f1e3;color:#5b4636">Sepia</button>
+      <button class="theme ${s.theme === 'dark' ? 'on' : ''}" data-act="themeDark" style="background:#1c1c1e;color:#fff">Dark</button>
+    </div>
+    <div class="sw-row"><span>Always open articles in Reader</span><span style="width:36px;height:22px;border-radius:11px;background:#34c759;position:relative;display:inline-block"><span style="position:absolute;top:2px;left:16px;width:18px;height:18px;border-radius:9px;background:#fff"></span></span></div>
+  </div>`;
+}
+
+function settingsScreen() {
+  return `<div class="grouped-bg" style="display:flex;flex-direction:column;height:100%">
+    ${statusBar()}
+    <div class="navbar"><button class="glass" data-act="back">${ICON.back}</button><span class="spacer"></span></div>
+    <div class="large-title" style="font-size:26px">Feeds</div>
+    <div class="scroll">
+      <div class="list-sec"><div class="hdr">Mark as Viewed</div>
+        <div class="rows">
+          <div class="r"><span class="lbl">When I finish reading</span><span class="chk">✓</span></div>
+          <div class="r"><span class="lbl">As soon as I open it</span></div>
+          <div class="r"><span class="lbl">Only when I mark it</span></div>
+        </div>
+        <div class="ftr">Leaving a post marks it viewed. In One at a Time, so does swiping past it.</div>
+      </div>
+      <div class="list-sec"><div class="hdr">Reading</div>
+        <div class="rows">
+          <div class="r"><span class="lbl">Open articles in Reader</span><span class="val">On</span></div>
+          <div class="r"><span class="lbl">Forget viewed posts after</span><span class="val">30 days</span></div>
+        </div>
+      </div>
+      <div class="list-sec"><div class="rows">
+        <div class="r" style="color:var(--accent)"><span class="lbl">Reset Viewed Posts…</span></div>
+      </div></div>
+    </div>
+  </div>`;
+}
+
+function render(s) {
+  if (s.screen === 'reader') return readerScreen(s);
+  if (s.screen === 'settings') return settingsScreen(s);
+  return s.layout === 'swipe' ? swipeScreen(s) : listScreen(s);
+}
+
+// ── interactive prototype ───────────────────────────
+let S = freshState();
+const proto = document.getElementById('proto');
+let toastTimer;
+
+function draw() { proto.innerHTML = '<div class="island"></div>' + render(S); }
+function showToast(text, undo) {
+  S.toast = { text, undo };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { S.toast = null; draw(); }, 3500);
+}
+function markViewed(ids, label) {
+  const before = new Set(S.viewed);
+  ids.forEach(id => S.viewed.add(id));
+  S.undoSnapshot = before;
+  showToast(label, true);
+}
+function resetProto() { S = freshState(); draw(); }
+window.resetProto = resetProto;
+
+const actions = {
+  menu() { S.menu = !S.menu; },
+  closeMenu() { S.menu = false; },
+  settings() { S.screen = 'settings'; },
+  filterNew() { S.showViewed = false; },
+  filterAll() { S.showViewed = true; },
+  showViewed() { S.showViewed = true; S.swipeIndex = 0; },
+  toggleViewed() { S.showViewed = !S.showViewed; S.swipeIndex = 0; },
+  layoutStream() { S.layout = 'stream'; S.menu = false; },
+  layoutSwipe() { S.layout = 'swipe'; S.menu = false; S.swipeIndex = 0; },
+  markAll() { S.menu = false; markViewed(POSTS.map(p => p.id), `Marked ${newCount(S)} posts as viewed`); },
+  undo() { if (S.undoSnapshot) S.viewed = S.undoSnapshot; S.toast = null; S.swipeIndex = 0; },
+  back() {
+    if (S.screen === 'reader') {
+      const id = S.open;
+      S.screen = 'list'; S.sheet = false;
+      if (!S.viewed.has(id)) markViewed([id], 'Marked as viewed');
+    } else S.screen = 'list';
+  },
+  doneReading() { actions.back(); },
+  sheet() { S.sheet = !S.sheet; },
+  closeSheet() { S.sheet = false; },
+  smaller() { S.size = Math.max(0, S.size - 1); },
+  bigger() { S.size = Math.min(4, S.size + 1); },
+  sans() { S.serif = false; }, serif() { S.serif = true; },
+  themeLight() { S.theme = 'light'; }, themeSepia() { S.theme = 'sepia'; }, themeDark() { S.theme = 'dark'; },
+  swipeDown() {
+    const items = visible(S);
+    const cur = items[S.swipeIndex];
+    if (!cur) return;
+    if (!S.viewed.has(cur.id)) { S.viewed.add(cur.id); }
+    if (S.showViewed) S.swipeIndex++;
+    // When viewed posts are hidden, the list shrinks under us, so the index stays put.
+  },
+  swipeUp() {
+    if (S.showViewed) { S.swipeIndex = Math.max(0, S.swipeIndex - 1); return; }
+    const last = [...S.viewed].pop();
+    if (last) { S.viewed.delete(last); }
+  },
+  noop() {},
+};
+
+proto.addEventListener('click', e => {
+  if (justDragged) { justDragged = false; return; }
+  const a = e.target.closest('[data-act]');
+  if (a && actions[a.dataset.act]) { actions[a.dataset.act](); draw(); return; }
+  const c = e.target.closest('[data-card]');
+  if (c && S.screen === 'list') {
+    S.open = c.dataset.card; S.screen = 'reader'; S.menu = false;
+    if (S.layout === 'swipe') { /* opening from a page behaves the same */ }
+    draw();
+  }
+});
+
+// Drag a card sideways, or drag the reader right to go back.
+let drag = null, justDragged = false;
+proto.addEventListener('pointerdown', e => {
+  const c = e.target.closest('.card[data-card]');
+  if (c && S.screen === 'list' && S.layout === 'stream') { drag = { kind: 'card', id: c.dataset.card, x0: e.clientX, y0: e.clientY }; return; }
+  if (S.screen === 'reader' && !S.sheet) drag = { kind: 'reader', x0: e.clientX, y0: e.clientY };
+  if (S.layout === 'swipe' && S.screen === 'list' && e.target.closest('[data-swipe]')) drag = { kind: 'swipe', x0: e.clientX, y0: e.clientY };
+});
+proto.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (drag.kind === 'card' && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+    S.dragCard = drag.id; S.dragX = Math.max(-130, Math.min(130, dx)); draw();
+  }
+  if (drag.kind === 'reader' && dx > 0 && Math.abs(dx) > Math.abs(dy)) {
+    const r = proto.querySelector('.reader'); if (r) r.style.transform = `translateX(${dx}px)`;
+  }
+});
+window.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (drag.kind === 'card' && S.dragCard) {
+    justDragged = true;
+    const id = S.dragCard;
+    S.dragCard = null; S.dragX = 0;
+    if (dx < -80) {
+      if (S.viewed.has(id)) { S.viewed.delete(id); showToast('Marked as new', false); }
+      else markViewed([id], 'Marked as viewed');
+    } else if (dx > 80) showToast('Added to My Recipes', true);
+    draw();
+  }
+  if (drag.kind === 'reader') {
+    if (dx > 90) { justDragged = true; actions.back(); }
+    draw();
+  }
+  if (drag.kind === 'swipe' && Math.abs(dy) > 50) {
+    justDragged = true;
+    dy < 0 ? actions.swipeDown() : actions.swipeUp();
+    draw();
+  }
+  drag = null;
+});
+proto.addEventListener('wheel', e => {
+  if (S.layout !== 'swipe' || S.screen !== 'list' || !e.target.closest('[data-swipe]')) return;
+  e.preventDefault();
+  if (proto._wheelLock) return;
+  proto._wheelLock = true; setTimeout(() => proto._wheelLock = false, 500);
+  e.deltaY > 0 ? actions.swipeDown() : actions.swipeUp();
+  draw();
+}, { passive: false });
+
+draw();
+
+// ── static frames ───────────────────────────────────
+const FRAMES = [
+  { title: '1 · Feeds, New posts only', note: 'Viewed posts are hidden by default. The subtitle shows how many posts are new, and a red dot marks each unread one. Posts are labeled Recipe or Article.',
+    s: freshState({ viewed: new Set(['c']) }) },
+  { title: '2 · Drag a card to mark it viewed', note: 'Drag left to mark viewed, or drag right to save. Long-press gives the same options plus Open Original.',
+    s: freshState({ dragCard: 'b', dragX: -110 }) },
+  { title: '3 · No recipe found: reader view', note: 'Readability strips ads, pop-ups and sidebars. If the post has recipes in it, a button offers to add them to My Recipes.',
+    s: freshState({ screen: 'reader', open: 'b' }) },
+  { title: '4 · Recipe found: recipe card', note: 'When the post has a recipe, it opens straight to the recipe card, as it does today. Posts with no recipe, and sites that block importing, go to reader view instead.',
+    s: freshState({ screen: 'reader', open: 'a' }) },
+  { title: '5 · Aa reader settings', note: 'Text size, system or New York serif, and Light, Sepia or Dark, matching the app\'s Appearance themes. The settings are kept between posts.',
+    s: freshState({ screen: 'reader', open: 'd', sheet: true, theme: 'sepia' }) },
+  { title: '6 · View menu', note: 'The three existing layouts, plus Show Viewed and Mark All as Viewed. Mark All has an Undo toast.',
+    s: freshState({ menu: true, viewed: new Set(['a']) }) },
+  { title: '7 · Back from a post', note: 'Leaving a post marks it viewed. It fades out of the list and an Undo toast appears.',
+    s: freshState({ viewed: new Set(['a']), toast: { text: 'Marked as viewed', undo: true } }) },
+  { title: '8 · Show Viewed is on', note: 'Viewed posts come back dimmed with a ✓ badge. Dragging one again marks it new.',
+    s: freshState({ showViewed: true, viewed: new Set(['a', 'b']) }) },
+  { title: '9 · One at a Time', note: 'Each post you swipe past is marked viewed, the way Unread marks posts read on scroll. Green progress segments show what you\'ve seen.',
+    s: freshState({ layout: 'swipe', viewed: new Set(['a', 'b']), swipeIndex: 0 }) },
+  { title: '10 · All caught up', note: 'The end state, as in Reeder. Show Viewed Posts brings everything back.',
+    s: freshState({ viewed: new Set(POSTS.map(p => p.id)) }) },
+  { title: '11 · Settings → Feeds', note: 'Choose when a post counts as viewed, turn Reader on or off, and set how long viewed posts are remembered.',
+    s: freshState({ screen: 'settings' }) },
+];
+
+const frames = document.getElementById('frames');
+frames.innerHTML = FRAMES.map((f, i) => `
+  <figure class="frame" id="frame-${i + 1}">
+    <div class="phone"><div class="screen"><div class="island"></div>${render(f.s)}</div></div>
+    <figcaption><b>${f.title}</b>${f.note}</figcaption>
+  </figure>`).join('');
+</script>
+</body>
+</html>
