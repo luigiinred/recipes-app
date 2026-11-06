@@ -14,6 +14,7 @@ final class FeedLoader: ObservableObject {
     @Published private(set) var results: [String: ImportResult] = [:]
     /// Feeds with no older posts to page in.
     @Published private(set) var exhausted: Set<String> = []
+    @Published private(set) var viewed: ViewedPosts
     private var pages: [String: Int] = [:]
     private var loadingMore: Set<String> = []
     /// Feeds fetched since launch; any others may only have saved posts.
@@ -21,6 +22,10 @@ final class FeedLoader: ObservableObject {
     private var lastOfflineRefresh: Date?
     private let fetches: Bool
     private let cache = FeedCache.standard
+    private let viewedStore: ViewedPostsStore?
+    private var viewedSave: Task<Void, Never>?
+    /// Posts marked new while open, so going back doesn't mark them viewed again.
+    private(set) var keptNew: Set<String> = []
 
     static let offlineRefreshInterval: TimeInterval = 15 * 60
 
@@ -29,8 +34,10 @@ final class FeedLoader: ObservableObject {
     }
 
     /// A seeded loader never fetches, so previews and snapshots stay offline.
-    init(seed: [String: State]? = nil, results: [String: ImportResult] = [:]) {
+    init(seed: [String: State]? = nil, results: [String: ImportResult] = [:], viewed: ViewedPosts = ViewedPosts()) {
         fetches = seed == nil
+        viewedStore = fetches ? .standard : nil
+        self.viewed = viewedStore?.load() ?? viewed
         states = seed ?? [:]
         exhausted = Set(states.keys)
         self.results = results
@@ -108,6 +115,37 @@ final class FeedLoader: ObservableObject {
 }
 
 extension FeedLoader {
+    func isViewed(_ entry: FeedEntry) -> Bool { viewed.contains(entry.id) }
+
+    func markViewed(_ ids: some Sequence<String>) {
+        keptNew.subtract(ids)
+        viewed.insert(ids)
+        saveViewed()
+    }
+
+    func markNew(_ ids: some Sequence<String>) {
+        keptNew.formUnion(ids)
+        viewed.remove(ids)
+        saveViewed()
+    }
+
+    func opened(_ entry: FeedEntry) { keptNew.remove(entry.id) }
+
+    func resetViewed() {
+        viewed = ViewedPosts()
+        saveViewed()
+    }
+
+    private func saveViewed() {
+        guard let viewedStore else { return }
+        let posts = viewed
+        let previous = viewedSave
+        viewedSave = Task.detached {
+            await previous?.value
+            try? viewedStore.save(posts)
+        }
+    }
+
     /// Sends the followed feeds' newest posts to the Feeds widget.
     func publishWidget(_ feeds: [Feed]) async {
         #if os(iOS)

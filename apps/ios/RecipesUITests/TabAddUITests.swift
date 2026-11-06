@@ -16,15 +16,15 @@ final class TabAddUITests: XCTestCase {
         app.launchEnvironment["RECIPES_DIR"] = library.path
         app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 15))
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: library)
     }
 
-    func testSearchButtonStaysSearchOnRecipes() {
-        XCTAssertTrue(app.tabBars.buttons["Search"].exists)
+    func testTabBarHasNoSearchOrAddTab() {
+        XCTAssertFalse(app.tabBars.buttons["Search"].exists)
         XCTAssertFalse(app.tabBars.buttons["Add"].exists)
     }
 
@@ -44,10 +44,9 @@ final class TabAddUITests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the Add item field should take focus")
     }
 
-    func testSearchStaysSearchOnPlan() {
+    func testPlanAddStaysInItsNavigationBar() {
         app.tabBars.buttons["Plan"].tap()
         XCTAssertTrue(app.navigationBars.buttons["Add"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["Search"].exists)
         XCTAssertFalse(app.tabBars.buttons["Add"].exists)
     }
 
