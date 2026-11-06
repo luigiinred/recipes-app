@@ -125,12 +125,19 @@ struct RootView: View {
         }
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: AppTab = destination == .plan ? .plan : .groceries
+            let target: AppTab = switch destination {
+            case .plan: .plan
+            case .groceries: .groceries
+            case .feeds: .feeds
+            }
             if let main = mainTab(target), shows(main) { tab = target }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
             if id != nil { tab = .recipes }
+        }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            if entry != nil { tab = shows(.feeds) ? .feeds : .recipes }
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
@@ -212,6 +219,7 @@ struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
     @State private var localPath: [RecipesRoute] = []
     @State private var selection: Recipe.ID?
     @FocusState private var isTyping: Bool
@@ -269,6 +277,12 @@ struct RecipesTab: View {
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             if kind == .addRecipe { path = [] }
+        }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            // The Feeds tab opens the post when it's showing.
+            guard let entry, sharedPath != nil, AppSettings.hiddenTabs(hiddenTabsRaw).contains(.feeds) else { return }
+            path = [.feedPost(entry)]
+            router.feedPost = nil
         }
     }
 
@@ -440,7 +454,11 @@ struct RootView: View {
         .cookModeCover(cook)
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: MainTab = destination == .plan ? .plan : .groceries
+            let target: MainTab = switch destination {
+            case .plan: .plan
+            case .groceries: .groceries
+            case .feeds: .feeds
+            }
             if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(target) { section = target.section }
             router.destination = nil
         }

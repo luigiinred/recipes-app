@@ -11,6 +11,7 @@ struct TimerWidgetBundle: WidgetBundle {
         UpNextWidget()
         GroceriesWidget()
         RandomRecipeWidget()
+        FeedsWidget()
     }
 }
 

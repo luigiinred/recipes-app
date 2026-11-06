@@ -107,6 +107,16 @@ final class FeedLoader: ObservableObject {
     }
 }
 
+extension FeedLoader {
+    /// Sends the followed feeds' newest posts to the Feeds widget.
+    func publishWidget(_ feeds: [Feed]) async {
+        #if os(iOS)
+        let loaded = states.compactMapValues(\.entries)
+        await FeedWidgetSync.publish(feeds, loaded: loaded)
+        #endif
+    }
+}
+
 extension FeedLoader.State {
     var isFailed: Bool { if case .failed = self { true } else { false } }
     var entries: [FeedEntry]? { if case .loaded(let entries) = self { entries } else { nil } }

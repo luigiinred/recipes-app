@@ -42,14 +42,16 @@ struct RecipesApp: App {
                     switch scenePhase {
                     case .active:
                         mealie.refresh(); mealie.request(); discover.refresh(); rescheduleReminders()
-                        Task { await feeds.refreshOffline(library.feeds) }
+                        Task { await feeds.refreshOffline(library.feeds); await feeds.publishWidget(library.feeds) }
                     #if os(iOS)
-                    case .background: FeedRefresh.schedule()
+                    case .background:
+                        FeedRefresh.schedule()
+                        Task { await feeds.publishWidget(library.feeds) }
                     #endif
                     default: break
                     }
                 }
-                .onChange(of: library.feeds) { Task { await feeds.refreshOffline(library.feeds) } }
+                .onChange(of: library.feeds) { Task { await feeds.refreshOffline(library.feeds); await feeds.publishWidget(library.feeds) } }
                 .onOpenURL(perform: open)
                 .task {
                     // App Store captures on an unfolded iPhone Duo can't drive the app with UI tests, so they open a link at launch.
@@ -75,6 +77,7 @@ struct RecipesApp: App {
         else if let id = RecipeLink.cookRecipeID(from: url) { router.cookRecipeID = id }
         else if let id = RecipeLink.recipeID(from: url) { router.recipeID = id }
         else if let destination = RecipeLink.destination(from: url) { router.destination = destination }
+        else if let entry = RecipeLink.feedEntry(from: url) { router.feedPost = entry }
     }
 
     private func rescheduleReminders() {

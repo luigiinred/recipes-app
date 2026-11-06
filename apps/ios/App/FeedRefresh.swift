@@ -23,7 +23,8 @@ enum FeedRefresh {
         schedule()
         guard FeedLoader.savesOffline else { return }
         let feeds = await Task.detached { (try? RecipeLocation.resolveForApp().library.feeds.list()) ?? [] }.value
-        _ = await FeedCache.standard.refresh(feeds)
+        let fetched = await FeedCache.standard.refresh(feeds)
+        await FeedWidgetSync.publish(feeds, loaded: fetched)
     }
 }
 #endif
