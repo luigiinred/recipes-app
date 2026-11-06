@@ -34,6 +34,14 @@ final class FeedWidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.posts.map(\.title), ["bread"])
     }
 
+    func testViewedPostsAreHiddenAndNewerOnesFillIn() {
+        let many = (0..<10).map { entry("post\($0)", TimeInterval(1000 - $0)) }
+        let viewed: Set = [many[0].id, many[1].id, "https://bakes.example/gone"]
+        let snapshot = FeedWidgetSnapshot.make(feeds: [bakes], entries: [bakes.url: many], viewed: viewed)
+        XCTAssertEqual(snapshot.posts.map(\.title), (2..<8).map { "post\($0)" })
+        XCTAssertEqual(snapshot.viewed, [many[0].id, many[1].id])
+    }
+
     func testSavingKeepsPhotosOnlyForShownPosts() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
