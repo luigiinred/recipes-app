@@ -54,7 +54,7 @@ final class RecipesBrowseUITests: XCTestCase {
         tile(app, "Dessert").tap()
         XCTAssertTrue(app.staticTexts["Black Bean Chili"].waitForExistence(timeout: 5), "tapping the tag again clears it")
 
-        app.tabBars.buttons["Search"].tap()
+        app.searchFields.firstMatch.tap()
         let filters = app.buttons["Filters"].firstMatch
         XCTAssertTrue(filters.waitForExistence(timeout: 5), "the search row leads with the filter button")
         filters.tap()

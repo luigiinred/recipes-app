@@ -75,7 +75,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             tab("Settings")
             tab("Home")
         case "search":
-            tab("Search")
+            app.searchFields.firstMatch.tap()
         case "import":
             tapButton("Add Recipe")
             tapButton("Import from Web or YouTube…")
