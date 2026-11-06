@@ -11,6 +11,7 @@ final class AppRouter: ObservableObject {
     @Published var reminder: ReminderKind?
     @Published var mealieLink: MealieLink?
     @Published var destination: AppDestination?
+    @Published var feedPost: FeedEntry?
     /// Set by the tab bar's add button; the tab it names starts adding and clears it.
     @Published var add: AppDestination?
 }

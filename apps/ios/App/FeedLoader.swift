@@ -145,6 +145,14 @@ extension FeedLoader {
             try? viewedStore.save(posts)
         }
     }
+
+    /// Sends the followed feeds' newest posts to the Feeds widget.
+    func publishWidget(_ feeds: [Feed]) async {
+        #if os(iOS)
+        let loaded = states.compactMapValues(\.entries)
+        await FeedWidgetSync.publish(feeds, loaded: loaded)
+        #endif
+    }
 }
 
 extension FeedLoader.State {

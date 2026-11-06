@@ -125,12 +125,23 @@ struct RootView: View {
         }
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: AppTab = destination == .plan ? .plan : .groceries
+            let target: AppTab = switch destination {
+            case .plan: .plan
+            case .groceries: .groceries
+            case .feeds: .feeds
+            }
             if let main = mainTab(target), inBar(main) { tab = target }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
             if id != nil { tab = .recipes }
+        }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            guard let entry else { return }
+            if inBar(.feeds) { tab = .feeds; return }
+            tab = .recipes
+            recipesPath = [.feedPost(entry)]
+            router.feedPost = nil
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
@@ -400,7 +411,11 @@ struct RootView: View {
         .cookModeCover(cook)
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: MainTab = destination == .plan ? .plan : .groceries
+            let target: MainTab = switch destination {
+            case .plan: .plan
+            case .groceries: .groceries
+            case .feeds: .feeds
+            }
             if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(target) { section = target.section }
             router.destination = nil
         }

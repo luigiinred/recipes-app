@@ -109,8 +109,18 @@ struct FeedStreamItem: Identifiable {
 }
 
 struct FeedStreamTab: View {
+    @EnvironmentObject private var router: AppRouter
+    @State private var opened: FeedEntry?
+
     var body: some View {
-        NavigationStack { FeedStreamView() }
+        NavigationStack {
+            FeedStreamView().navigationDestination(item: $opened) { FeedEntryPreview(entry: $0) }
+        }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            guard let entry else { return }
+            opened = entry
+            router.feedPost = nil
+        }
     }
 }
 
