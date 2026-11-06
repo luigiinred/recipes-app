@@ -12,6 +12,7 @@ struct PopularFeed: Identifiable {
         case latin = "Latin American"
         case mediterranean = "Mediterranean & Middle Eastern"
         case grilling = "Grilling & BBQ"
+        case reddit = "Reddit"
     }
 
     let name: String
@@ -90,6 +91,14 @@ struct PopularFeed: Identifiable {
         PopularFeed(name: "Hey Grill, Hey", detail: "Susie Bulloch", url: "https://heygrillhey.com/feed/", kind: .grilling),
         PopularFeed(name: "Girls Can Grill", detail: "Christie Vanover", url: "https://girlscangrill.com/feed/", kind: .grilling),
         PopularFeed(name: "Vindulge", detail: "Smoking and wine pairing", url: "https://www.vindulge.com/feed/", kind: .grilling),
+        PopularFeed(name: "r/recipes", detail: "Recipes shared on Reddit", url: "https://www.reddit.com/r/recipes/.rss", kind: .reddit),
+        PopularFeed(name: "r/Cooking", detail: "Home cooking questions and wins", url: "https://www.reddit.com/r/Cooking/.rss", kind: .reddit),
+        PopularFeed(name: "r/EatCheapAndHealthy", detail: "Budget-friendly healthy eating", url: "https://www.reddit.com/r/EatCheapAndHealthy/.rss", kind: .reddit),
+        PopularFeed(name: "r/MealPrepSunday", detail: "Cooking for the week ahead", url: "https://www.reddit.com/r/MealPrepSunday/.rss", kind: .reddit),
+        PopularFeed(name: "r/Baking", detail: "Bakes and how they turned out", url: "https://www.reddit.com/r/Baking/.rss", kind: .reddit),
+        PopularFeed(name: "r/slowcooking", detail: "Slow cooker recipes", url: "https://www.reddit.com/r/slowcooking/.rss", kind: .reddit),
+        PopularFeed(name: "r/veganrecipes", detail: "Plant-based recipes", url: "https://www.reddit.com/r/veganrecipes/.rss", kind: .reddit),
+        PopularFeed(name: "r/AsianEats", detail: "Asian home cooking", url: "https://www.reddit.com/r/AsianEats/.rss", kind: .reddit),
     ]
 }
 

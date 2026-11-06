@@ -91,7 +91,7 @@ struct AddFeedSheet: View {
                         #endif
                         .onSubmit(subscribe)
                 } footer: {
-                    Text("Enter a recipe blog's address, its RSS feed, or a YouTube channel.")
+                    Text("Enter a recipe blog's address, its RSS feed, a YouTube channel, or a subreddit like r/recipes.")
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
                 Section {
@@ -131,6 +131,7 @@ struct AddFeedSheet: View {
     private func find(then use: @escaping (_ found: (url: URL, title: String)) async -> Void) {
         guard !isLoading else { return }
         var text = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let subreddit = FeedService.subreddit(text) { text = subreddit.url.absoluteString }
         if !text.contains("://") { text = "https://" + text }
         guard let url = URL(string: text), url.host != nil else {
             errorMessage = "That doesn't look like a web address."

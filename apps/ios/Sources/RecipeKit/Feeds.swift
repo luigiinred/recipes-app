@@ -193,10 +193,26 @@ public enum FeedService {
         return try FeedParser.parse(data, baseURL: url)
     }
 
-    /// The feed behind a shared link that names a source rather than one post: a YouTube channel or playlist, a site's front page, or a feed itself.
+    /// A subreddit's feed, from `r/name`, `/r/name` or any reddit.com link inside the subreddit.
+    public static func subreddit(_ text: String) -> (url: URL, name: String)? {
+        let pattern = #"^(?:https?://)?(?:(?:www|old|new|m)\.)?(?:reddit\.com)?/?r/([A-Za-z0-9_]{2,21})(?:[/?#].*)?$"#
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = trimmed.range(of: pattern, options: [.regularExpression, .caseInsensitive]),
+              match == trimmed.startIndex..<trimmed.endIndex else { return nil }
+        let afterR = trimmed.range(of: "r/", options: .caseInsensitive).map { trimmed[$0.upperBound...] } ?? ""
+        let name = String(afterR.prefix { $0.isLetter || $0.isNumber || $0 == "_" })
+        guard name.count >= 2, let url = URL(string: "https://www.reddit.com/r/\(name)/.rss") else { return nil }
+        return (url, name)
+    }
+
+    /// The feed behind a shared link that names a source rather than one post: a YouTube channel or playlist, a subreddit, a site's front page, or a feed itself.
     public static func followable(_ url: URL) async -> (url: URL, title: String)? {
         let host = url.host?.lowercased() ?? ""
         let path = url.path
+        if host == "reddit.com" || host.hasSuffix(".reddit.com") {
+            guard !path.contains("/comments/") else { return nil }
+            return try? await discover(from: url)
+        }
         if host == "youtube.com" || host.hasSuffix(".youtube.com") {
             if path == "/playlist", let list = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "list" })?.value,
                let feed = URL(string: "https://www.youtube.com/feeds/videos.xml?playlist_id=\(list)") {
@@ -212,6 +228,10 @@ public enum FeedService {
 
     /// Accepts a feed URL or a site URL and finds the feed behind it.
     public static func discover(from url: URL) async throws -> (url: URL, title: String) {
+        if let subreddit = subreddit(url.absoluteString) {
+            _ = try await fetch(subreddit.url)
+            return (subreddit.url, "r/\(subreddit.name)")
+        }
         let (data, response) = try await download(url)
         let finalURL = response.url ?? url
         if let feed = try? FeedParser.parse(data, baseURL: finalURL) { return (finalURL, feed.title) }
