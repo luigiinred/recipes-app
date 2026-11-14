@@ -131,6 +131,7 @@ enum AppSettings {
         static let feedShowViewed = "feedShowViewed"
         static let feedMarkViewed = "feedMarkViewed"
         static let feedReader = "feedOpensInReader"
+        static let feedDiscoverDismissed = "feedDiscoverCardDismissed"
         static let readerTextSize = "readerTextSize"
         static let readerFont = "readerFont"
         static let readerTheme = "readerTheme"

@@ -68,3 +68,10 @@ Add Feed SHALL have a YouTube mode that searches YouTube channels by name, listi
 
 ### Requirement: Your Feeds lists everything followed
 The Manage Feeds page SHALL list every feed the user follows under "Your Feeds" at the top, including popular ones, each with a symbol for YouTube, Reddit or other feeds, before the popular feeds to discover.
+
+### Requirement: Feeds toolbar and view settings
+The Feeds page SHALL always show a Discover button in its navigation bar, and a Mark All as Viewed button beside Manage Feeds. The Discover card at the top of the list has an X that dismisses it for good; Settings → Feeds → View brings it back with "Discover Card", and also holds the Layout choice (All Posts, One at a Time, By Feed) and "Show Viewed Posts".
+
+#### Scenario: Dismiss the Discover card
+- **WHEN** the user taps the X on the Discover card
+- **THEN** the card goes away and Discover stays reachable from the navigation bar
