@@ -34,6 +34,9 @@ private struct FeedPostActions: ViewModifier {
                     if viewed { Label("Mark as New", systemImage: "circle") } else { Label("Mark as Viewed", systemImage: "checkmark.circle") }
                 }
                 Button { save() } label: { Label("Add to My Recipes", systemImage: "plus") }
+                if VideoRecipeFinder.isVideo(entry.link) {
+                    Button { saveForLater() } label: { Label("Find Recipe Later", systemImage: "play.rectangle.on.rectangle") }
+                }
                 Link(destination: entry.link) { Label("Open in Browser", systemImage: "safari") }
                 ShareLink(item: entry.link) { Label("Share", systemImage: "square.and.arrow.up") }
             }
@@ -55,9 +58,17 @@ private struct FeedPostActions: ViewModifier {
                 guard let result = loader.results[entry.id], let saved = await library.add(result) else { return }
                 ToastCenter.shared.show("Added \(saved.title) to My Recipes") { await library.delete(saved) }
             } catch {
-                ToastCenter.shared.show("No recipe found in this post", symbol: "exclamationmark.circle.fill")
+                if VideoRecipeFinder.isVideo(entry.link) {
+                    await VideoRecipeFinder.saveForLater(title: entry.title, link: entry.link, imageURL: entry.imageURL, library: library)
+                } else {
+                    ToastCenter.shared.show("No recipe found in this post", symbol: "exclamationmark.circle.fill")
+                }
             }
         }
+    }
+
+    private func saveForLater() {
+        Task { await VideoRecipeFinder.saveForLater(title: entry.title, link: entry.link, imageURL: entry.imageURL, library: library) }
     }
 
     #if os(iOS)

@@ -6,7 +6,7 @@ struct ImportURLView: View {
     let onReview: (ImportResult) -> Void
     var onSaved: (Recipe) -> Void = { _ in }
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
+    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
 
     @State private var address = ""
     @State private var isLoading = false

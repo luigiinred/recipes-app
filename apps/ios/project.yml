@@ -85,6 +85,7 @@ targets:
       - ShareExtension
       - App/ImportProgressView.swift
       - App/RecipeEditorView.swift
+      - App/IngredientEntryBar.swift
       - App/TagEditor.swift
       - App/ChipFlow.swift
       - App/RecipeActions.swift

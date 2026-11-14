@@ -101,7 +101,7 @@ In the app, a web import SHALL standardize the draft (see recipe-format) and pas
 - **THEN** the draft keeps that single step
 
 ### Requirement: Review or save
-The app SHALL open a finished import in the recipe editor for review, with the photo and step photos attached, when the "Review before saving" setting (Settings → Recipes → Importing, on by default) is on or the import is incomplete. With the setting off and a complete import, the app saves the recipe directly, closes the sheet and selects the new recipe.
+The app SHALL open a finished import in the recipe editor for review, with the photo and step photos attached, when the "Review before saving" setting (Settings → Recipes → Importing, off by default) is on or the import is incomplete. With the setting off and a complete import, the app saves the recipe directly, closes the sheet and opens the new recipe's page, which offers a cleanup if it needs one (see recipe-detail). A scanned photo or PDF follows the same rule when it reads as a title, ingredients and steps.
 
 #### Scenario: Review off
 - **GIVEN** "Review before saving" is off

@@ -38,7 +38,39 @@ enum FeedMarkMode: String, CaseIterable {
     }
 }
 
-/// What the first tab opens on: the Home sections, or every recipe.
+/// A tab the user can place in the tab bar, in the order they choose.
+enum TabItem: String, CaseIterable, Identifiable {
+    case home, recipes, feeds, upNext, plan, groceries, settings
+
+    var id: String { rawValue }
+
+    init(_ tab: MainTab) { self = TabItem(rawValue: tab.rawValue)! }
+
+    var feature: MainTab? { MainTab(rawValue: rawValue) }
+
+    /// Home and Recipes both open the library; at least one of them always stays.
+    var isLibrary: Bool { self == .home || self == .recipes }
+
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .recipes: "Recipes"
+        case .settings: "Settings"
+        default: feature?.title ?? rawValue
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home: "house"
+        case .recipes: "book.closed"
+        case .settings: "gearshape"
+        default: feature?.symbol ?? "square"
+        }
+    }
+}
+
+/// What the first tab opened on before tabs could be arranged; read once to carry the choice over.
 enum FirstTab: String, CaseIterable {
     case home, recipes
 
@@ -104,6 +136,9 @@ enum AppSettings {
         static let readerTheme = "readerTheme"
         static let settingsInTabBar = "settingsInTabBar"
         static let firstTab = "firstTab"
+        static let tabOrder = "tabOrder"
+        static let suggestCleanups = "suggestCleanups"
+        static let scanForCleanups = "scanLibraryForCleanups"
 
         static func reminderOn(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).on" }
         static func reminderMinutes(_ kind: ReminderKind) -> String { "reminder.\(kind.rawValue).minutes" }
@@ -159,26 +194,39 @@ enum AppSettings {
         meals.map(\.rawValue).sorted().joined(separator: ",")
     }
 
-    static func hiddenTabs(_ raw: String) -> Set<MainTab> {
-        Set(raw.split(separator: ",").compactMap { MainTab(rawValue: String($0)) })
+    /// The tabs in the tab bar, in order. An empty value carries over the older first-tab, hidden-tab and Settings choices.
+    static func tabs(_ raw: String, defaults: UserDefaults = .standard) -> [TabItem] {
+        var seen = Set<TabItem>()
+        let decoded = raw.split(separator: ",").compactMap { TabItem(rawValue: String($0)) }.filter { seen.insert($0).inserted }
+        if decoded.contains(where: \.isLibrary) { return decoded }
+        let first = FirstTab(rawValue: defaults.string(forKey: Key.firstTab) ?? "") == .recipes ? TabItem.recipes : .home
+        let hidden = Set((defaults.string(forKey: Key.hiddenTabs) ?? "").split(separator: ",").compactMap { MainTab(rawValue: String($0)) })
+        let features = MainTab.allCases.filter { !hidden.contains($0) }.map(TabItem.init)
+        let settings: [TabItem] = defaults.bool(forKey: Key.settingsInTabBar) ? [.settings] : []
+        return [first] + features + settings
     }
 
-    static func encode(_ tabs: Set<MainTab>) -> String {
-        tabs.map(\.rawValue).sorted().joined(separator: ",")
+    static func encode(_ tabs: [TabItem]) -> String {
+        tabs.map(\.rawValue).joined(separator: ",")
+    }
+
+    static func hiddenTabs(_ raw: String) -> Set<MainTab> {
+        Set(MainTab.allCases).subtracting(tabs(raw).compactMap(\.feature))
     }
 
     static let tabBarLimit = 5
 
-    /// The optional tabs that fit in the iPhone tab bar beside the first tab, and Settings when it sits there.
-    static func barTabs(hidden raw: String, settingsInTabBar: Bool) -> [MainTab] {
-        let room = tabBarLimit - 1 - (settingsInTabBar ? 1 : 0)
-        return Array(MainTab.allCases.filter { !hiddenTabs(raw).contains($0) }.prefix(room))
+    /// The tabs that fit in the iPhone tab bar.
+    static func barTabs(_ raw: String) -> [TabItem] {
+        Array(tabs(raw).prefix(tabBarLimit))
     }
 
+    /// Adds a tab at the end of the bar, or takes it out.
     static func showing(_ tab: MainTab, _ shown: Bool, hidden raw: String) -> String {
-        var hidden = hiddenTabs(raw)
-        if shown { hidden.remove(tab) } else { hidden.insert(tab) }
-        return encode(hidden)
+        var list = tabs(raw)
+        let item = TabItem(tab)
+        if shown { if !list.contains(item) { list.append(item) } } else { list.removeAll { $0 == item } }
+        return encode(list)
     }
 
     static var keepsScreenAwake: Bool {

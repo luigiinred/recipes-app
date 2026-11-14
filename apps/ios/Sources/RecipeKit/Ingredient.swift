@@ -5,6 +5,7 @@ public enum IngredientUnit: String, CaseIterable, Identifiable, Hashable, Sendab
     case milliliter, centiliter, deciliter, liter
     case milligram, gram, kilogram, ounce, pound
     case pinch, dash, clove, can, package, jar, bunch, sprig, stalk, head, slice, stick, handful
+    case piece, sheet, drop, bag, box, bottle, cube, fillet, scoop, strip
 
     public var id: String { rawValue }
 
@@ -52,6 +53,16 @@ public enum IngredientUnit: String, CaseIterable, Identifiable, Hashable, Sendab
         case .slice: ("slice", "slices")
         case .stick: ("stick", "sticks")
         case .handful: ("handful", "handfuls")
+        case .piece: ("piece", "pieces")
+        case .sheet: ("sheet", "sheets")
+        case .drop: ("drop", "drops")
+        case .bag: ("bag", "bags")
+        case .box: ("box", "boxes")
+        case .bottle: ("bottle", "bottles")
+        case .cube: ("cube", "cubes")
+        case .fillet: ("fillet", "fillets")
+        case .scoop: ("scoop", "scoops")
+        case .strip: ("strip", "strips")
         }
     }
 
@@ -91,7 +102,7 @@ public enum IngredientUnit: String, CaseIterable, Identifiable, Hashable, Sendab
             .teaspoon: ["tsp", "tsps", "teaspoon", "teaspoons"],
             .tablespoon: ["tbsp", "tbsps", "tbs", "tablespoon", "tablespoons"],
             .cup: ["cup", "cups"],
-            .fluidOunce: ["floz", "fl.oz", "fl.oz."],
+            .fluidOunce: ["floz", "fl.oz", "fl.oz.", "fl oz", "fluid ounce", "fluid ounces"],
             .pint: ["pt", "pint", "pints"],
             .quart: ["qt", "qts", "quart", "quarts"],
             .gallon: ["gal", "gallon", "gallons"],
@@ -117,6 +128,16 @@ public enum IngredientUnit: String, CaseIterable, Identifiable, Hashable, Sendab
             .slice: ["slice", "slices"],
             .stick: ["stick", "sticks"],
             .handful: ["handful", "handfuls"],
+            .piece: ["piece", "pieces", "pc", "pcs"],
+            .sheet: ["sheet", "sheets"],
+            .drop: ["drop", "drops"],
+            .bag: ["bag", "bags"],
+            .box: ["box", "boxes"],
+            .bottle: ["bottle", "bottles"],
+            .cube: ["cube", "cubes"],
+            .fillet: ["fillet", "fillets"],
+            .scoop: ["scoop", "scoops"],
+            .strip: ["strip", "strips"],
         ]
         var result: [String: IngredientUnit] = [:]
         for (unit, names) in table { for name in names { result[name] = unit } }
@@ -127,6 +148,29 @@ public enum IngredientUnit: String, CaseIterable, Identifiable, Hashable, Sendab
     public init?(alias: String) {
         guard let unit = Self.aliases[alias.lowercased().trimmingCharacters(in: .punctuationCharacters)] else { return nil }
         self = unit
+    }
+
+    public var isMetric: Bool {
+        switch self {
+        case .milliliter, .centiliter, .deciliter, .liter, .milligram, .gram, .kilogram: true
+        default: false
+        }
+    }
+
+    private static let common: [IngredientUnit] = [.cup, .tablespoon, .teaspoon, .gram, .ounce, .pound, .milliliter, .clove, .pinch, .can]
+
+    /// Units for a search field: common ones first when empty, then names that start with the query before ones that contain it.
+    public static func matching(_ query: String) -> [IngredientUnit] {
+        let query = query.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return common + allCases.filter { !common.contains($0) } }
+        let names = Dictionary(grouping: aliases, by: \.value).mapValues { $0.map(\.key) + [$0[0].value.title.lowercased()] }
+        func rank(_ unit: IngredientUnit) -> Int? {
+            let words = names[unit] ?? []
+            if words.contains(where: { $0.hasPrefix(query) }) { return 0 }
+            if words.contains(where: { $0.contains(query) }) { return 1 }
+            return nil
+        }
+        return allCases.compactMap { unit in rank(unit).map { (unit, $0) } }.sorted { $0.1 < $1.1 }.map(\.0)
     }
 
     /// Values for a language model to choose from, with "none" for a bare count.
@@ -209,7 +253,7 @@ public struct Ingredient: Hashable, Sendable {
 
     /// The quantity and unit together, such as "1 1/2 cups"; empty for items without one.
     public var amount: String {
-        let amount = Self.normalizedQuantity(quantity)
+        let amount = Self.standardQuantity(quantity, unit: unit)
         guard !amount.isEmpty else { return "" }
         guard let unit else { return amount }
         return amount + " " + unit.label(forQuantity: amount)
@@ -230,7 +274,7 @@ public struct Ingredient: Hashable, Sendable {
     /// The standard written form. A unit without a quantity reads as one.
     public var text: String {
         let name = item.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        var amount = Self.normalizedQuantity(quantity)
+        var amount = Self.standardQuantity(quantity, unit: unit)
         if amount.isEmpty, unit != nil, !name.isEmpty { amount = "1" }
         var parts: [String] = []
         if !amount.isEmpty { parts.append(amount) }
@@ -277,6 +321,7 @@ public struct Ingredient: Hashable, Sendable {
 
     private static func isNumeric(_ token: String) -> Bool {
         guard let first = token.first else { return false }
+        if first == ".", token.dropFirst().first?.isNumber == true { return true }
         return first.isNumber || vulgarFractions[first] != nil
     }
 
@@ -290,6 +335,27 @@ public struct Ingredient: Hashable, Sendable {
             rest = rest.dropFirst()
         }
         return (number, String(rest))
+    }
+
+    /// One written form per amount: fractions for cups, spoons and counts ("0.5" becomes "1/2"), decimals for metric
+    /// units ("1/2 l" becomes "0.5 l"). A decimal with no close fraction, like 0.2, stays as written.
+    public static func standardQuantity(_ quantity: String, unit: IngredientUnit?) -> String {
+        let normalized = normalizedQuantity(quantity)
+        guard !normalized.isEmpty else { return "" }
+        let ends = normalized.split(separator: "-", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        return ends.map { end in
+            guard let value = number(of: end) else { return end }
+            if unit?.isMetric == true {
+                return end.contains("/") ? decimal(value) : end
+            }
+            guard end.contains("."), let mixed = mixedNumber(value, tolerance: 0.02) else { return end }
+            return mixed
+        }.joined(separator: "-")
+    }
+
+    private static func decimal(_ value: Double) -> String {
+        let rounded = (value * 100).rounded() / 100
+        return rounded == rounded.rounded() ? String(Int(rounded)) : String(format: "%g", rounded)
     }
 
     /// "½" and "1½" become "1/2" and "1 1/2", an en dash in a range becomes a hyphen, and surrounding spaces collapse.

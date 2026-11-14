@@ -118,7 +118,7 @@ struct OnboardingHomePage: View {
 // MARK: Tabs
 
 struct OnboardingTabsPage: View {
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenRaw = ""
 
     var body: some View {
         VStack(spacing: 24) {
@@ -377,7 +377,7 @@ struct OnboardingRemindersPage: View {
 struct OnboardingSummaryPage: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var discover: DiscoverController
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     #if os(iOS)
     @AppStorage(AppSettings.Key.homeSections) private var homeOrderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeRaw = ""

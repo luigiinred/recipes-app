@@ -16,6 +16,7 @@ struct RecipeDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
+    @State private var findingVideoRecipe = false
     @StateObject private var player = YouTubePlayerController()
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
@@ -34,6 +35,7 @@ struct RecipeDetailView: View {
     @State private var editingTags = false
     @State private var scale = 1.0
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
+    @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
     private var scaled: Recipe { recipe.scaled(by: scale) }
 
@@ -88,6 +90,9 @@ struct RecipeDetailView: View {
                             }
                             .disabled(findingTimestamps)
                         }
+                        if !recipe.isIdea {
+                            Button("Clean Up", systemImage: "sparkles") { Task { await CleanupAdvisor.shared.checkNow(recipe) } }
+                        }
                         Divider()
                         Button("Edit", systemImage: "pencil") { editing = true }
                     } label: { Label("More", systemImage: "ellipsis.circle") }
@@ -109,6 +114,17 @@ struct RecipeDetailView: View {
         }
         .sheet(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: scaled) }
         .sheet(isPresented: $addingToCalendar) { AddToCalendarSheet(recipe: recipe) }
+        .overlay(alignment: .bottom) {
+            if previewSave == nil, let cleanup = CleanupAdvisor.shared.suggestion(for: recipe) {
+                CleanupSuggestionCard(recipe: recipe, cleanup: cleanup)
+            }
+        }
+        .task(id: recipe.cleanupFingerprint) {
+            guard previewSave == nil, suggestsCleanups else { return }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await CleanupAdvisor.shared.check(recipe)
+        }
     }
 
     private var oneColumn: some View {
@@ -360,6 +376,17 @@ struct RecipeDetailView: View {
             Text("Add ingredients and steps when you have a recipe for it, and this becomes a full recipe.")
                 .foregroundStyle(.secondary)
             if previewSave == nil {
+                if recipe.youTubeVideoID != nil {
+                    Button(findingVideoRecipe ? "Looking…" : "Find the Recipe in This Video", systemImage: "sparkles") {
+                        findingVideoRecipe = true
+                        Task {
+                            await VideoRecipeFinder.findRecipe(for: recipe, in: library)
+                            findingVideoRecipe = false
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(findingVideoRecipe)
+                }
                 Button("Add Ingredients and Steps", systemImage: "pencil") { editing = true }
                     .buttonStyle(.bordered)
             }

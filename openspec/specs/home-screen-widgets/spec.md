@@ -22,7 +22,10 @@ The system SHALL keep the widgets' copy of the library current while the app run
 
 #### Scenario: New accent
 - **WHEN** the user changes the accent color in Settings
-- **THEN** the widgets' headers and symbols use the new color
+- **THEN** the widgets' symbols and highlights use the new color
+
+### Requirement: No name labels
+Home Screen widgets SHALL NOT show the widget's or feed's name above their content, so the content starts at the top. The Meal Plan widget still labels its days.
 
 ### Requirement: Meal Plan widget
 The system SHALL show planned meals ordered by meal within each day, each with its meal's symbol: Today with up to three meals in the small size, Today and Tomorrow side by side in the medium size, five days from Today in the large size, and two of today's meals on the Lock Screen. Extra meals show "+N more" and an empty day "Nothing planned". In medium and large sizes a meal planned from a recipe opens that recipe; any other tap opens Plan.
@@ -38,7 +41,7 @@ The system SHALL show planned meals ordered by meal within each day, each with i
 - **THEN** the app opens on Lemon Pasta's page
 
 ### Requirement: Up Next widget
-The system SHALL show the first recipes in the Up Next queue, in queue order: up to three titles in the small size, three rows with photo, title and total time in the medium size, six in the large size with the queue count in the header, and two titles on the Lock Screen. An empty queue shows a prompt to line recipes up ("Nothing lined up" on the Lock Screen). Tapping a row in medium or large opens that recipe; any other tap opens Plan.
+The system SHALL show the first recipes in the Up Next queue, in queue order: up to three titles in the small size, three rows with photo, title and total time in the medium size, six in the large size, and two titles on the Lock Screen. An empty queue shows a prompt to line recipes up ("Nothing lined up" on the Lock Screen). Tapping a row in medium or large opens that recipe; any other tap opens Plan.
 
 #### Scenario: Queue order
 - **GIVEN** "First" was queued before "Second", and another recipe is not queued
@@ -46,12 +49,12 @@ The system SHALL show the first recipes in the Up Next queue, in queue order: up
 - **THEN** it lists "First" then "Second" and nothing else
 
 ### Requirement: Groceries widget
-The system SHALL show the unchecked grocery items, oldest first, as "name · quantity" (or just the name): up to four in the small size, six in two columns in medium and fourteen in large, with "+N more" beyond that and "N to buy" in the header. An empty list reads "Everything is checked off" when items are checked off, otherwise "Nothing to buy". Tapping the widget opens Groceries.
+The system SHALL show the unchecked grocery items, oldest first, as "name · quantity" (or just the name): up to four in the small size, six in two columns in medium and fourteen in large, with "+N more" beyond that. An empty list reads "Everything is checked off" when items are checked off, otherwise "Nothing to buy". Tapping the widget opens Groceries.
 
 #### Scenario: Only what's left
 - **GIVEN** "Flour" added before "Milk 1 L", and "Eggs" checked off
 - **WHEN** the Groceries widget is shown
-- **THEN** it lists "Flour" then "Milk · 1 L" under "2 to buy"
+- **THEN** it lists "Flour" then "Milk · 1 L"
 
 #### Scenario: Lock Screen
 - **GIVEN** three items left to buy

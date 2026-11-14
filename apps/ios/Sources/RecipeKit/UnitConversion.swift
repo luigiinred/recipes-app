@@ -59,14 +59,14 @@ extension Ingredient {
         (0.625, "5/8"), (2.0 / 3, "2/3"), (0.75, "3/4"), (0.875, "7/8"), (1, ""),
     ]
 
-    /// "1 1/2" for 1.5, or nil when no common fraction is within 6% of the amount. Past 10 only halves are used.
-    static func mixedNumber(_ amount: Double) -> String? {
+    /// "1 1/2" for 1.5, or nil when no common fraction is within `tolerance` of the amount. Past 10 only halves are used.
+    static func mixedNumber(_ amount: Double, tolerance: Double = 0.06) -> String? {
         var whole = amount.rounded(.down)
         let allowed = amount >= 10 ? fractions.filter { [0, 0.5, 1].contains($0.value) } : fractions
         guard let nearest = allowed.min(by: { abs($0.value - (amount - whole)) < abs($1.value - (amount - whole)) }) else { return nil }
         if nearest.value == 1 { whole += 1 }
         let approximate = nearest.value == 1 ? whole : whole + nearest.value
-        guard approximate > 0, abs(approximate - amount) / amount <= 0.06 else { return nil }
+        guard approximate > 0, abs(approximate - amount) / amount <= tolerance else { return nil }
         let fraction = nearest.value == 1 ? "" : nearest.text
         if whole == 0 { return fraction }
         return fraction.isEmpty ? String(Int(whole)) : "\(Int(whole)) \(fraction)"

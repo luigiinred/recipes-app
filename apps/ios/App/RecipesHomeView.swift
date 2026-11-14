@@ -284,8 +284,7 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.homeSections) private var homeSectionsRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
-    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
@@ -410,7 +409,7 @@ struct RecipesHomeView: View {
         .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
         .toolbar {
             #if os(iOS)
-            if isTabRoot, query.isEmpty, !isRegular, !settingsInTabBar {
+            if isTabRoot, query.isEmpty, !isRegular, !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }

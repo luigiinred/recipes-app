@@ -88,12 +88,25 @@ The system SHALL show an idea (a recipe with no ingredients or steps) as a note,
 - **THEN** the idea note and Add Ingredients and Steps button appear instead of ingredients and directions
 
 ### Requirement: More menu
-The system SHALL give the recipe page a More (⋯) menu with Favorite / Remove Favorite, Rate, Add to / Remove from Up Next, Timeline (see cooking-timeline), Create a Photo… (only when Image Playground is available and the recipe has no photo; see recipe-photos), Print…, Share, Find Step Timestamps (only for a YouTube recipe with steps; see youtube-import), and Edit (see recipe-editor). Deleting the recipe from the editor closes the page.
+The system SHALL give the recipe page a More (⋯) menu with Favorite / Remove Favorite, Rate, Add to / Remove from Up Next, Timeline (see cooking-timeline), Create a Photo… (only when Image Playground is available and the recipe has no photo; see recipe-photos), Print…, Share, Find Step Timestamps (only for a YouTube recipe with steps; see youtube-import), Clean Up (not for ideas; checks the recipe again even after a dismissed suggestion), and Edit (see recipe-editor). Deleting the recipe from the editor closes the page.
 
 #### Scenario: Create a Photo hidden when there is one
 - **GIVEN** a recipe that has a photo
 - **WHEN** the user opens the More menu
 - **THEN** Create a Photo… is not listed
+
+### Requirement: Cleanup suggestions
+About a second after a recipe page opens, when "Suggest cleanups on recipes" is on (Settings → Apple Intelligence, on by default), the system SHALL check the recipe for a cleanup: ingredients and steps in standard form (see recipe-format), labels such as "Dressing:" turned into sections, and, with Apple Intelligence, long steps split and a long ingredient list grouped. When something would change, a card at the bottom of the page reads "Clean up this recipe?" with what would change, such as "Tidy 2 ingredients and split the method into 6 steps.", a Clean Up button and an X. Clean Up saves the tidied recipe and shows a toast with Undo; X dismisses the card. A recipe found tidy or dismissed is not offered again until its ingredients, sections, steps or notes change. If the number of steps changes, step times and photos are cleared. With "Check all recipes in the background" on, every recipe is checked one at a time while the app is open, and Settings → Apple Intelligence → Recipes to Tidy lists the ones with a cleanup waiting, each with Clean Up and a Dismiss swipe.
+
+#### Scenario: Messy import
+- **GIVEN** a recipe whose ingredients include "0.5 cup milk"
+- **WHEN** the user opens it
+- **THEN** the card offers to tidy the ingredients, and Clean Up saves "1/2 cup milk"
+
+#### Scenario: Dismissed
+- **GIVEN** the user tapped X on a recipe's card
+- **WHEN** they open the recipe again without changing it
+- **THEN** no card appears
 
 ### Requirement: Print
 The system SHALL print a recipe as a page with the title, the summary in italics, a facts line ("Serves N · Prep N min · Cook N min"), "Ingredients" with section subheadings, a numbered "Method", "Notes" and the source URL, using the system print dialog on iPhone, iPad and Mac.

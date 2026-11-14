@@ -36,6 +36,34 @@ final class StandardsTests: XCTestCase {
         }
     }
 
+    func testQuantitiesHaveOneWrittenForm() {
+        let cases: [(String, String)] = [
+            ("0.5 cup milk", "1/2 cup milk"),
+            ("1.5 cups flour", "1 1/2 cups flour"),
+            (".25 tsp salt", "1/4 tsp salt"),
+            ("0.33 cup oil", "1/3 cup oil"),
+            ("0.2 tsp salt", "0.2 tsp salt"),
+            ("0.5-1 tsp chili", "1/2-1 tsp chili"),
+            ("1/2 l stock", "0.5 l stock"),
+            ("1 1/2 kg potatoes", "1.5 kg potatoes"),
+            ("0.75 kg beef", "0.75 kg beef"),
+            ("2.5 eggs", "2 1/2 eggs"),
+        ]
+        for (input, expected) in cases {
+            XCTAssertEqual(Ingredient(parsing: input).text, expected, input)
+            XCTAssertEqual(Ingredient(parsing: expected).text, expected, "idempotent: \(input)")
+        }
+    }
+
+    func testUnitSearch() {
+        XCTAssertEqual(IngredientUnit.matching("tabl").first, .tablespoon)
+        XCTAssertEqual(IngredientUnit.matching("gr").first, .gram)
+        XCTAssertEqual(IngredientUnit.matching("").first, .cup)
+        XCTAssertTrue(IngredientUnit.matching("knob").isEmpty)
+        XCTAssertEqual(IngredientUnit(alias: "fl oz"), .fluidOunce)
+        XCTAssertEqual(Ingredient(parsing: "3 pieces chicken").unit, .piece)
+    }
+
     func testScalingIngredients() {
         let cases: [(String, Double, String)] = [
             ("1 1/2 cups flour", 2, "3 cups flour"),

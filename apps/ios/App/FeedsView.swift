@@ -22,7 +22,9 @@ struct FeedEntryPreview: View {
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
                 .transition(.opacity)
             } else if errorMessage != nil {
-                if opensInReader {
+                if VideoRecipeFinder.isVideo(entry.link) {
+                    VideoWithoutRecipe(entry: entry)
+                } else if opensInReader {
                     ArticleReader(entry: entry)
                 } else {
                     WebView(url: entry.link)
@@ -65,9 +67,42 @@ struct FeedEntryPreview: View {
     }
 }
 
+/// A video whose recipe isn't written down anywhere the app can read yet: watch it, or save it to find the recipe later.
+private struct VideoWithoutRecipe: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let entry: FeedEntry
+
+    var body: some View {
+        VStack(spacing: 0) {
+            WebView(url: entry.link)
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles").foregroundStyle(Theme.accent)
+                Text("No recipe in this video's description yet.").appFont(.subheadline)
+                Spacer(minLength: 4)
+                Button("Find Later") {
+                    Task { await VideoRecipeFinder.saveForLater(title: entry.title, link: entry.link, imageURL: entry.imageURL, library: library) }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+            }
+            .padding(14)
+            .background(.bar)
+        }
+        .navigationTitle(entry.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
 struct AddFeedSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
+    @State private var source = Source.site
+
+    enum Source: String, CaseIterable {
+        case site = "Site or Feed", youtube = "YouTube"
+    }
 
     @State private var address = ""
     @State private var isLoading = false
@@ -82,6 +117,15 @@ struct AddFeedSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Picker("Source", selection: $source) {
+                    ForEach(Source.allCases, id: \.self) { Text($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+                if source == .youtube {
+                    YouTubeChannelSearch()
+                } else {
                 Section {
                     TextField("https://", text: $address)
                         #if os(iOS)
@@ -98,6 +142,7 @@ struct AddFeedSheet: View {
                     Button("Preview Feed") { find { preview = FoundFeed(url: $0.url.absoluteString, title: $0.title) } }
                         .disabled(address.isEmpty || isLoading)
                 }
+                }
             }
             .navigationDestination(item: $preview) { found in
                 FeedPreviewPage(url: found.url, title: found.title, onFollow: { dismiss() })
@@ -110,7 +155,9 @@ struct AddFeedSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { CancelButton() }
                 ToolbarItem(placement: .confirmationAction) {
-                    if isLoading { ProgressView().controlSize(.small) } else {
+                    if source == .youtube {
+                        ConfirmButton(title: "Done") { dismiss() }
+                    } else if isLoading { ProgressView().controlSize(.small) } else {
                         ConfirmButton(title: "Subscribe", isDisabled: address.isEmpty, action: subscribe)
                     }
                 }

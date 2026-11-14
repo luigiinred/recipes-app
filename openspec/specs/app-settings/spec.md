@@ -20,6 +20,18 @@ The system SHALL list these pages: Recipes, Planner, Cooking, Groceries, Reminde
 - **WHEN** the user taps Show Welcome Tour
 - **THEN** the welcome tour opens (full screen on iPhone and iPad, as a sheet on Mac)
 
+### Requirement: Arrange Tabs
+On iPhone and iPad, the system SHALL offer Settings → Tabs → Arrange Tabs, a list of the tabs in the tab bar in order (key `tabOrder`) that can be dragged to reorder and swiped to remove, with the remaining tabs under "More Tabs" to add at the end. The tabs are Home, Recipes (every recipe), Feeds, Up Next, Plan, Groceries and Settings; at least one of Home and Recipes always stays. The iPhone tab bar holds five tabs, so adding is disabled once five are shown; without Settings in the bar, the gear on Home or Recipes opens it. On iPad, Settings is always in the sidebar and Home and Recipes sit in its Recipes section. Recipes opened from links, widgets and reminders open in the first of Home and Recipes. Before the tabs were first arranged, the list comes from the older First Tab, hidden tab and Settings in Tab Bar choices.
+
+#### Scenario: Both library tabs
+- **WHEN** the user adds Recipes under Home
+- **THEN** the tab bar shows Home and Recipes as separate tabs, each with its own navigation
+
+#### Scenario: Last library tab
+- **GIVEN** Recipes is in the tab bar and Home is not
+- **WHEN** the user opens Arrange Tabs
+- **THEN** Recipes can't be removed
+
 ### Requirement: Help Support Us section
 The system SHALL show a "Help Support Us" section with Leave a Review (the App Store write-review page) and Tell a Friend Who Cooks (shares the App Store listing with a message) only when the app has an App Store ID configured, and hide it otherwise.
 
@@ -34,7 +46,7 @@ The system SHALL offer on the Recipes page: "Recipe list" (Photo Cards or Compac
 #### Scenario: Defaults
 - **GIVEN** a fresh install
 - **WHEN** the user opens the Recipes page
-- **THEN** Recipe list is Compact List, Mark recipes with is Favorites, Show Delete is off and Review before saving is on
+- **THEN** Recipe list is Compact List, Mark recipes with is Favorites, Show Delete is off and Review before saving is off
 
 ### Requirement: Planner page
 The system SHALL offer on the Planner page: "Add recipes as" (the default meal, including Automatic, which picks breakfast, lunch, a snack or dinner by time of day; key `defaultMeal`), "Week starts on" (System Default, Sunday, Monday or Saturday; key `weekStart`), and a "Meals to plan" toggle for each meal, stored as a comma-separated list of hidden meals (key `hiddenMeals`). Their effect is described in meal-planning.

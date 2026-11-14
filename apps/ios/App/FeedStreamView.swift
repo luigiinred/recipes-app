@@ -769,10 +769,6 @@ struct RecipeFeedsPage: View {
     @State private var adding = false
     var showsTabToggle = false
 
-    private var customFeeds: [Feed] {
-        let popular = Set(PopularFeed.all.map(\.url))
-        return library.feeds.filter { !popular.contains($0.url) }
-    }
 
     var body: some View {
         List {
@@ -782,22 +778,22 @@ struct RecipeFeedsPage: View {
                 OfflineFeedsSection()
             }
             Section {
-                ForEach(customFeeds) { feed in
+                ForEach(library.feeds) { feed in
                     NavigationLink { FeedPreviewPage(url: feed.url, title: feed.title) } label: {
-                        Label(feed.title, systemImage: "dot.radiowaves.up.forward")
+                        Label(feed.title, systemImage: feed.symbol)
                     }
                     .swipeActions {
                         Button("Unsubscribe", role: .destructive) { Task { await library.remove(feed) } }
                     }
                 }
-                Button { adding = true } label: { Label("Add a Site or Feed…", systemImage: "plus") }
+                Button { adding = true } label: { Label("Add a Site, Feed or YouTube Channel…", systemImage: "plus") }
             } header: {
                 Text("Your Feeds")
             } footer: {
-                Text("Tap a feed to preview its newest posts. Paste any recipe site's or YouTube channel's address and Recipes finds its feed.")
+                Text("Everything you follow. Tap one to preview its newest posts, or swipe to unsubscribe. Search YouTube by channel name, or paste any recipe site's address and Recipes finds its feed.")
             }
             ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
-                Section(kind.rawValue) {
+                Section("Discover: \(kind.rawValue)") {
                     ForEach(PopularFeed.all.filter { $0.kind == kind }) { row($0) }
                 }
             }

@@ -31,10 +31,8 @@ struct RecipeEditorView: View {
     @State private var prep: String
     @State private var cook: String
     @State private var ingredients: [EditableIngredient]
-    @State private var isCleaning = false
-    @State private var cleanupMessage: String?
     @State private var steps: [EditableLine]
-    @FocusState private var focused: UUID?
+    @FocusState private var focused: EditorField?
     @State private var generatingImage = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var tags: [String]
@@ -114,12 +112,12 @@ struct RecipeEditorView: View {
                     .alwaysReorderable()
                     addButton("Add Ingredient") {
                         let line = EditableIngredient()
-                        focused = line.id
+                        focused = .quantity(line.id)
                         ingredients.append(line)
                     }
                     addButton("Add Section") {
                         let line = EditableIngredient(heading: "")
-                        focused = line.id
+                        focused = .line(line.id)
                         ingredients.append(line)
                     }
                 } header: {
@@ -153,21 +151,6 @@ struct RecipeEditorView: View {
                     PlainField("Source URL", text: $source)
                     PlainField("Notes", text: $notes, axis: .vertical)
                 }
-                Section {
-                    Button { Task { await cleanUp() } } label: {
-                        Label(isCleaning ? "Cleaning Up…" : "Clean Up with Apple Intelligence", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isCleaning)
-                    .frame(maxWidth: .infinity)
-                } footer: {
-                    if let cleanupMessage {
-                        Text(cleanupMessage)
-                    } else {
-                        Text("Removes stray symbols from ingredients, turns labels like “Dressing:” into sections, splits steps that run together and groups a long ingredient list. Nothing is saved until you tap Save.")
-                    }
-                }
                 if isSaved {
                     Section {
                         Button("Delete Recipe…", role: .destructive) { confirmingDelete = true }
@@ -184,6 +167,8 @@ struct RecipeEditorView: View {
             } message: {
                 Text("This can't be undone. The recipe and its photo are removed from all your devices.")
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) { ingredientBar }
+            .onChange(of: focused) { old, _ in tidyIngredient(leaving: old) }
             .navigationTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -217,7 +202,7 @@ struct RecipeEditorView: View {
 
     private func newLine() -> EditableLine {
         let line = EditableLine(text: "")
-        focused = line.id
+        focused = .line(line.id)
         return line
     }
 
@@ -242,62 +227,7 @@ struct RecipeEditorView: View {
     static func rows(for recipe: Recipe) -> [EditableIngredient] {
         recipe.ingredientGroups.flatMap { group -> [EditableIngredient] in
             let heading = group.title.map { [EditableIngredient(heading: $0)] } ?? []
-            return heading + group.items.map { EditableIngredient(parsing: $0.text) }
-        }
-    }
-
-    private func cleanUp() async {
-        isCleaning = true
-        cleanupMessage = nil
-        defer { isCleaning = false }
-
-        var items: [String] = []
-        var sections: [IngredientSection] = []
-        for row in ingredients {
-            if row.isHeading {
-                let name = row.item.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty { sections.append(IngredientSection(title: name, start: items.count)) }
-            } else if !row.text.isEmpty {
-                items.append(row.text)
-            }
-        }
-        let before = (ingredients: items, steps: steps.map(\.text), sections: sections.count, notes: notes)
-        var recipe = Recipe(title: title, ingredients: items, ingredientSections: sections, steps: before.steps, notes: notes).standardized()
-
-        let status = AppleIntelligence.status
-        recipe.steps = await StepSplitter.split(recipe.steps)
-        var grouped = false
-        if recipe.ingredientSections.isEmpty, status.isAvailable,
-           case .grouped(let list, let found) = await IngredientGrouper.group(title: title, ingredients: recipe.ingredients, steps: recipe.steps) {
-            recipe.ingredients = list
-            recipe.ingredientSections = found
-            grouped = true
-        }
-
-        var changes: [String] = []
-        let known = Set(before.ingredients)
-        let tidied = recipe.ingredients.filter { !known.contains($0) }.count
-        if tidied > 0 { changes.append("tidied \(tidied) \(tidied == 1 ? "ingredient" : "ingredients")") }
-        if recipe.ingredientSections.count > before.sections {
-            let added = recipe.ingredientSections.count - before.sections
-            changes.append("\(grouped ? "grouped the ingredients into" : "found") \(added) \(added == 1 ? "section" : "sections")")
-        }
-        if recipe.steps.count != steps.filter({ !$0.text.isEmpty }).count { changes.append("split the method into \(recipe.steps.count) steps") }
-        if recipe.notes != before.notes { changes.append("moved loose notes into Notes") }
-
-        withAnimation(.snappy) {
-            ingredients = Self.rows(for: recipe)
-            notes = recipe.notes
-            if recipe.steps.count == steps.count {
-                for index in steps.indices { steps[index].text = recipe.steps[index] }
-            } else {
-                let hadExtras = steps.contains { !$0.time.isEmpty || $0.imageID != nil }
-                steps = recipe.steps.map { EditableLine(text: $0) }
-                if hadExtras { changes.append("cleared step times and photos because the steps changed") }
-            }
-            var message = changes.isEmpty ? "Everything already looks tidy." : "Cleaned up: " + changes.joined(separator: ", ") + "."
-            if !status.isAvailable { message += " Splitting long steps and grouping ingredients need Apple Intelligence. " + status.explanation }
-            cleanupMessage = message
+            return heading + group.items.map { EditableIngredient(parsing: $0.text, customUnits: CustomUnits.all) }
         }
     }
 
@@ -311,7 +241,7 @@ struct RecipeEditorView: View {
             Image(systemName: "text.alignleft").foregroundStyle(Theme.accent).accessibilityHidden(true)
             PlainField("Section name", text: line.item)
                 .appFont(.headline)
-                .focused($focused, equals: line.wrappedValue.id)
+                .focused($focused, equals: .line(line.wrappedValue.id))
             #if os(macOS)
             Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.borderless)
@@ -323,16 +253,31 @@ struct RecipeEditorView: View {
     }
 
     private func plainIngredientRow(line: Binding<EditableIngredient>) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let id = line.wrappedValue.id
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
             PlainField("Qty", text: line.quantity)
                 .multilineTextAlignment(.trailing)
                 #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
                 #endif
+                .submitLabel(.next)
+                .focused($focused, equals: .quantity(id))
+                .onSubmit { focused = .unit(id) }
                 .frame(width: 46)
-            UnitMenu(unit: line.unit)
+                .accessibilityLabel("Quantity")
+            PlainField("unit", text: line.unitText)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+                .autocorrectionDisabled()
+                .submitLabel(.next)
+                .foregroundStyle(Theme.accent)
+                .focused($focused, equals: .unit(id))
+                .onSubmit { focused = .line(id) }
+                .frame(width: 58)
+                .accessibilityLabel("Unit")
             PlainField("Ingredient", text: line.item, axis: .vertical)
-                .focused($focused, equals: line.wrappedValue.id)
+                .focused($focused, equals: .line(id))
             #if os(macOS)
             Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.borderless)
@@ -341,6 +286,48 @@ struct RecipeEditorView: View {
             #endif
         }
         .contextMenu { Button("Delete", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } }
+    }
+
+    private var focusedIngredient: (index: Int, field: EditorField)? {
+        guard let field = focused else { return nil }
+        let id: UUID
+        switch field {
+        case .quantity(let line), .unit(let line): id = line
+        case .line: return nil
+        }
+        return ingredients.firstIndex { $0.id == id }.map { ($0, field) }
+    }
+
+    @ViewBuilder
+    private var ingredientBar: some View {
+        if let focus = focusedIngredient {
+            IngredientEntryBar(
+                line: $ingredients[focus.index],
+                field: focus.field,
+                onNext: { focused = focus.field.next },
+                onDone: { focused = nil }
+            )
+        }
+    }
+
+    /// Leaving a field writes it the standard way: "0.5" as "1/2", "Tablespoons" as "tbsp".
+    private func tidyIngredient(leaving field: EditorField?) {
+        switch field {
+        case .quantity(let id):
+            guard let index = ingredients.firstIndex(where: { $0.id == id }) else { return }
+            let line = ingredients[index]
+            let tidy = Ingredient.standardQuantity(line.quantity, unit: line.unit)
+            if tidy != line.quantity { ingredients[index].quantity = tidy }
+        case .unit(let id):
+            guard let index = ingredients.firstIndex(where: { $0.id == id }) else { return }
+            let line = ingredients[index]
+            let tidy = line.unit?.abbreviation ?? line.unitText.trimmingCharacters(in: .whitespaces)
+            if tidy != line.unitText { ingredients[index].unitText = tidy }
+            let quantity = Ingredient.standardQuantity(line.quantity, unit: line.unit)
+            if quantity != line.quantity { ingredients[index].quantity = quantity }
+        default:
+            break
+        }
     }
 
     private func row(
@@ -355,7 +342,7 @@ struct RecipeEditorView: View {
                     .background(Theme.accent, in: Circle())
             }
             PlainField(placeholder, text: line.text, axis: .vertical)
-                .focused($focused, equals: line.wrappedValue.id)
+                .focused($focused, equals: .line(line.wrappedValue.id))
             if number != nil { StepPhotoButton(line: line) }
             if showsTime {
                 PlainField("m:ss", text: line.time)
@@ -486,6 +473,7 @@ struct RecipeEditorView: View {
         }
         let kept = Set(recipe.stepImages.compactMap { $0 })
         changes.removed = original.stepImages.compactMap { $0 }.filter { !kept.contains($0) }
+        CustomUnits.remember(ingredients.compactMap(\.customUnit))
         onSave(recipe, imageChange, changes)
         dismiss()
     }
@@ -499,10 +487,25 @@ struct EditableLine: Identifiable, Hashable {
     var newImage: Data?
 }
 
+enum EditorField: Hashable {
+    /// A step, a section heading, or an ingredient's item.
+    case line(UUID)
+    case quantity(UUID)
+    case unit(UUID)
+
+    var next: EditorField {
+        switch self {
+        case .quantity(let id): .unit(id)
+        case .unit(let id), .line(let id): .line(id)
+        }
+    }
+}
+
 struct EditableIngredient: Identifiable, Hashable {
     let id = UUID()
     var quantity = ""
-    var unit: IngredientUnit?
+    /// A unit as typed: a known one such as "tbsp", or anything else, such as "knob".
+    var unitText = ""
     var item = ""
     /// A section heading (its title is in `item`) rather than an ingredient.
     var isHeading = false
@@ -514,16 +517,34 @@ struct EditableIngredient: Identifiable, Hashable {
         isHeading = true
     }
 
-    init(parsing text: String) {
+    /// Units the parser doesn't know come back as the start of the item, so ones used before are split out again.
+    init(parsing text: String, customUnits: [String] = []) {
         let parsed = Ingredient(parsing: text)
         quantity = parsed.quantity
-        unit = parsed.unit
+        unitText = parsed.unit?.abbreviation ?? ""
         item = parsed.item
+        guard parsed.unit == nil, !parsed.quantity.isEmpty else { return }
+        let lowered = item.lowercased()
+        if let custom = customUnits.sorted(by: { $0.count > $1.count }).first(where: { lowered.hasPrefix($0.lowercased() + " ") }) {
+            unitText = String(item.prefix(custom.count))
+            item = String(item.dropFirst(custom.count + 1))
+        }
+    }
+
+    var unit: IngredientUnit? { IngredientUnit(alias: unitText.trimmingCharacters(in: .whitespaces)) }
+
+    /// A typed unit the app doesn't know.
+    var customUnit: String? {
+        let typed = unitText.trimmingCharacters(in: .whitespaces)
+        return typed.isEmpty || unit != nil ? nil : typed
     }
 
     /// Pasting a whole line such as "2 cups flour" into the item field still splits it into parts.
     var text: String {
-        if quantity.trimmingCharacters(in: .whitespaces).isEmpty, unit == nil { return Ingredient(parsing: item).text }
+        if quantity.trimmingCharacters(in: .whitespaces).isEmpty, unitText.trimmingCharacters(in: .whitespaces).isEmpty {
+            return Ingredient(parsing: item).text
+        }
+        if let customUnit { return Ingredient(quantity: quantity, item: customUnit + " " + item).text }
         return Ingredient(quantity: quantity, unit: unit, item: item).text
     }
 }
@@ -546,32 +567,6 @@ struct PlainField: View {
         #else
         TextField(title, text: $text, axis: axis)
         #endif
-    }
-}
-
-struct UnitMenu: View {
-    @Binding var unit: IngredientUnit?
-
-    var body: some View {
-        Menu {
-            Picker("Unit", selection: $unit) {
-                Text("No unit").tag(IngredientUnit?.none)
-                ForEach(IngredientUnit.Group.allCases, id: \.self) { group in
-                    Section(group.rawValue) {
-                        ForEach(IngredientUnit.units(in: group)) { Text($0.title).tag(Optional($0)) }
-                    }
-                }
-            }
-        } label: {
-            Text(unit?.abbreviation ?? "unit")
-                .foregroundStyle(unit == nil ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(Theme.accent))
-                .frame(minWidth: 54)
-        }
-        #if os(macOS)
-        .menuStyle(.borderlessButton)
-        .frame(width: 76, alignment: .leading)
-        #endif
-        .accessibilityLabel("Unit")
     }
 }
 

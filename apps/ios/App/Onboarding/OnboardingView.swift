@@ -8,7 +8,7 @@ struct OnboardingView: View {
     }
 
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     #if os(iOS)
     @AppStorage(AppSettings.Key.homeSections) private var homeOrderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeRaw = ""
