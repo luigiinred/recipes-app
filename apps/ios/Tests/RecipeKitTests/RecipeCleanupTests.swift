@@ -86,3 +86,14 @@ final class IngredientGroupingGateTests: XCTestCase {
         XCTAssertFalse(IngredientGrouper.accepts([group("Spices", [0, 1]), group("Produce", [2, 3])], steps: steps))
     }
 }
+
+final class RecipeCleanupFilterTests: XCTestCase {
+    func testKeepingOnlySomeKinds() async {
+        let recipe = Recipe(title: "Salad", ingredients: ["0.5 cup oil", "1 lettuce"], steps: ["  toss   it  "])
+        let cleanup = await RecipeCleanup.suggest(for: recipe)
+        let ingredientsOnly = cleanup.keeping { if case .ingredient = $0 { true } else { false } }
+        XCTAssertEqual(ingredientsOnly.changes.map(\.kind), [.ingredient(0)])
+        XCTAssertEqual(ingredientsOnly.summary, "Tidy 1 ingredient.")
+        XCTAssertTrue(cleanup.keeping { _ in false }.isEmpty)
+    }
+}

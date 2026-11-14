@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case tabs, home, recipes, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
+    case tabs, home, recipes, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -100,6 +100,7 @@ struct SettingsView: View {
         }
         Section {
             NavigationLink(value: SettingsPage.intelligence) { Label("Apple Intelligence", systemImage: "sparkles") }
+            NavigationLink(value: SettingsPage.aiImprovements) { Label("AI Improvements", systemImage: "wand.and.stars") }
         }
         Section {
             NavigationLink(value: SettingsPage.data) { Label("Data & Developer", systemImage: "externaldrive") }
@@ -136,6 +137,8 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
+        case .aiImprovements:
+            AIImprovementsPage()
         case .tabs:
             #if os(iOS)
             TabsSettingsPage()
@@ -816,8 +819,6 @@ struct CustomThemePage: View {
 private struct IntelligenceSettingsPage: View {
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
-    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = true
     let override: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
     var body: some View {
@@ -836,30 +837,9 @@ private struct IntelligenceSettingsPage: View {
                 }
             }
             Section {
-                Toggle("Suggest cleanups on recipes", isOn: $suggestsCleanups)
-                Toggle("Check all recipes in the background", isOn: $scansLibrary)
-                    .disabled(!suggestsCleanups)
-                NavigationLink {
-                    RecipesToTidyView()
-                } label: {
-                    LabeledContent("Recipes to Tidy") {
-                        Text("\(CleanupAdvisor.shared.recipesToTidy(in: library.recipes).count)").monospacedDigit()
-                    }
-                }
-                if scansLibrary, suggestsCleanups {
-                    LabeledContent("Waiting to Be Checked") {
-                        Text("\(CleanupAdvisor.shared.waiting(in: library.recipes).count)").monospacedDigit()
-                    }
-                }
-            } header: {
-                Text("Cleanup")
+                NavigationLink { AIImprovementsPage() } label: { Label("AI Improvements", systemImage: "wand.and.stars") }
             } footer: {
-                if let progress = CleanupAdvisor.shared.scanProgress {
-                    Text("Checked \(progress.done) of \(progress.total) recipes…")
-                } else {
-                    Text("Recipes are checked for messy ingredients and run-together steps, and the ones that could be tidied wait in Recipes to Tidy for you to review. "
-                         + "The background check works through every recipe while the app is open, one at a time, and checks a recipe again whenever you change it.")
-                }
+                Text("Suggested cleanups for your recipes: what's offered, the background check, and the recipes waiting.")
             }
             Section {
                 ForEach(AIAction.allCases) { action in

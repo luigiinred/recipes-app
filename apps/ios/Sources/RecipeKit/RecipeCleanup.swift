@@ -30,6 +30,13 @@ public struct RecipeCleanup: Sendable {
 
     public var isEmpty: Bool { changes.isEmpty }
 
+    /// Only the kinds of change the user wants offered; the rest are dropped from the list and the summary.
+    public func keeping(_ allowed: (Change.Kind) -> Bool) -> RecipeCleanup {
+        var copy = self
+        copy.changes = changes.filter { allowed($0.kind) }
+        return copy
+    }
+
     /// The recipe with every change accepted.
     public var recipe: Recipe { applying(Set(changes.map(\.id))) }
 
