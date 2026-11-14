@@ -47,8 +47,8 @@ struct MascotSnapshotTests {
     @Test("empty states")
     func emptyStates() {
         let page = VStack {
-            MascotEmptyState(scene: .wave, character: .tomato, title: "No recipes yet", message: "Tap + to add one, or share one from Safari.")
-            MascotEmptyState(scene: .hop, character: .lemon, title: "Nothing to buy", message: "Add ingredients from any recipe.")
+            EmptyStateView(symbol: "book.closed", title: "No recipes yet", message: "Tap + to add one, or share one from Safari.")
+            EmptyStateView(symbol: "cart", title: "Nothing to buy", message: "Add ingredients from any recipe.")
         }
         assertPageSnapshots(of: page.paperBackground(), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }

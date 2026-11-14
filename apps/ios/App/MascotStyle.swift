@@ -52,44 +52,6 @@ struct PaperButtonStyle: ButtonStyle {
     }
 }
 
-/// A character with a message, for screens with nothing on them yet. A different one each time it appears.
-struct MascotEmptyState<Actions: View>: View {
-    let scene: MascotScene
-    let title: String
-    var message: String?
-    @ViewBuilder var actions: Actions
-    @State private var character: MascotCharacter
-
-    init(scene: MascotScene, character: MascotCharacter? = nil, title: String, message: String? = nil, @ViewBuilder actions: () -> Actions) {
-        self.scene = scene
-        self.title = title
-        self.message = message
-        self.actions = actions()
-        _character = State(initialValue: character ?? MascotCast.next())
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            MascotView(character: character, scene: scene, height: 130)
-            Text(title).appFont(.title3, weight: .bold).multilineTextAlignment(.center)
-            if let message {
-                Text(message).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            }
-            actions.padding(.top, 6)
-        }
-        .padding(24)
-        .frame(maxWidth: 360)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-extension MascotEmptyState where Actions == EmptyView {
-    init(scene: MascotScene, character: MascotCharacter? = nil, title: String, message: String? = nil) {
-        self.init(scene: scene, character: character, title: title, message: message) { EmptyView() }
-    }
-}
-
 /// The tomato in the middle with its friends on either side.
 struct MascotCluster: View {
     var height: CGFloat = 170

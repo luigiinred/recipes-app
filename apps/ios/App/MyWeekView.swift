@@ -79,8 +79,8 @@ struct MyWeekView: View {
     }
 
     private var emptyWeek: some View {
-        MascotEmptyState(
-            scene: .bookWrite, title: isThisWeek ? "Nothing planned this week" : "Nothing planned yet",
+        EmptyStateView(
+            symbol: "calendar.badge.plus", title: isThisWeek ? "Nothing planned this week" : "Nothing planned yet",
             message: "Pick a few recommended recipes and they'll fill the week, or let Smart Plan choose for you."
         ) {
             VStack(spacing: 10) {

@@ -148,9 +148,9 @@ struct RecipeListView: View {
             EmptyLibraryView()
         } else if items.isEmpty, search.isEmpty {
             #if os(iOS)
-            if subcategories.isEmpty { MascotEmptyState(scene: .idle, title: collection.title, message: "No recipes here yet.") }
+            if subcategories.isEmpty { EmptyStateView(symbol: "tray", title: collection.title, message: "No recipes here yet.") }
             #else
-            MascotEmptyState(scene: .idle, title: collection.title, message: "No recipes here yet.")
+            EmptyStateView(symbol: "tray", title: collection.title, message: "No recipes here yet.")
             #endif
         } else if items.isEmpty {
             ContentUnavailableView.search(text: search)
@@ -214,8 +214,8 @@ struct EmptyLibraryView: View {
 
     var body: some View {
         if library.isLoaded {
-            MascotEmptyState(scene: .wave, title: "No recipes yet",
-                             message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
+            EmptyStateView(symbol: "book.closed", title: "No recipes yet",
+                           message: "Tap + to add one, share one from Safari, or use the recipes command-line tool.")
         } else if let message = library.errorMessage {
             ContentUnavailableView("Couldn't load recipes", systemImage: "exclamationmark.triangle", description: Text(message))
         } else {

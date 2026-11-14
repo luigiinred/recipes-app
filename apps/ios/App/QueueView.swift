@@ -48,8 +48,8 @@ struct QueueView: View {
         .animation(.snappy, value: queue.map(\.id))
         .overlay {
             if queue.isEmpty {
-                MascotEmptyState(
-                    scene: .bookWrite, title: "Nothing in Up Next",
+                EmptyStateView(
+                    symbol: "text.line.first.and.arrowtriangle.forward", title: "Nothing in Up Next",
                     message: "Swipe a recipe left in your library, or tap Add, to line up what you want to cook soon."
                 ) {
                     Button("Add Recipes") { adding = true }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)
