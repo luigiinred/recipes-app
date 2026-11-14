@@ -96,12 +96,14 @@ The system SHALL give the recipe page a More (⋯) menu with Favorite / Remove F
 - **THEN** Create a Photo… is not listed
 
 ### Requirement: Cleanup suggestions
-About a second after a recipe page opens, when "Suggest cleanups on recipes" is on (Settings → Apple Intelligence, on by default), the system SHALL check the recipe for a cleanup: ingredients and steps in standard form (see recipe-format), labels such as "Dressing:" turned into sections, and, with Apple Intelligence, long steps split and a long ingredient list grouped. When something would change, a card at the bottom of the page reads "Clean up this recipe?" with what would change, such as "Tidy 2 ingredients and split the method into 6 steps.", a Clean Up button and an X. Clean Up saves the tidied recipe and shows a toast with Undo; X dismisses the card. A recipe found tidy or dismissed is not offered again until its ingredients, sections, steps or notes change. If the number of steps changes, step times and photos are cleared. With "Check all recipes in the background" on, every recipe is checked one at a time while the app is open, and Settings → Apple Intelligence → Recipes to Tidy lists the ones with a cleanup waiting, each with Clean Up and a Dismiss swipe.
+About a second after a recipe page opens, when "Suggest cleanups on recipes" is on (Settings → Apple Intelligence, on by default), the system SHALL check the recipe for a cleanup and, when something would change, show a "Suggested cleanup" card at the bottom of the page with a summary such as "Tidy 2 ingredients and split 1 long step.", a Review button and an X. The changes are found one by one: each ingredient written in standard form (see recipe-format), labels such as "Dressing:" turned into sections or, with Apple Intelligence, a long ingredient list grouped into sections, each step tidied or split (numbered steps run together, and with Apple Intelligence long steps), and text before numbered steps moved into Notes.
 
-#### Scenario: Messy import
-- **GIVEN** a recipe whose ingredients include "0.5 cup milk"
-- **WHEN** the user opens it
-- **THEN** the card offers to tidy the ingredients, and Clean Up saves "1/2 cup milk"
+Review opens "Review Cleanup", which lists every change under Ingredients, Sections, Steps and Notes as a before and an after: a one-line change shows removed words struck through in red and added words in the accent, and other changes show the whole before and after (section titles as headings). Each change has a checkbox, all ticked at first, and the page offers Select All / Deselect All. "Apply All" (or "Apply N") saves only the ticked changes and shows a toast with Undo; Cancel changes nothing. A split step keeps its video time and photo on its first part. X dismisses the card. A recipe found tidy or dismissed is not offered again until its ingredients, sections, steps or notes change. With "Check all recipes in the background" on, every recipe is checked one at a time while the app is open, and Settings → Apple Intelligence → Recipes to Tidy lists the ones with a cleanup waiting, each with Review and a Dismiss swipe.
+
+#### Scenario: Keep only some changes
+- **GIVEN** a recipe whose ingredients include "0.5 cup milk" and "2 Tablespoons butter"
+- **WHEN** the user opens Review, unticks the butter change and taps Apply 1
+- **THEN** the recipe is saved with "1/2 cup milk" and "2 Tablespoons butter"
 
 #### Scenario: Dismissed
 - **GIVEN** the user tapped X on a recipe's card
