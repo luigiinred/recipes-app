@@ -311,9 +311,10 @@ struct RecipeDetailView: View {
         } else {
             ChipFlow {
                 ForEach(recipe.tags, id: \.self) { tag in
-                    Button { editingTags = true } label: { tagChip(tag) }
+                    NavigationLink { TagRecipesPage(tag: tag) } label: { tagChip(tag) }
                         .buttonStyle(.plain)
-                        .accessibilityHint("Edits tags")
+                        .accessibilityHint("Shows recipes with this tag")
+                        .contextMenu { Button("Edit Tags…", systemImage: "tag") { editingTags = true } }
                 }
                 Button { editingTags = true } label: {
                     Label(recipe.tags.isEmpty ? "Add Tags" : "Add", systemImage: "plus")
@@ -582,5 +583,25 @@ private struct PhotoBanner<Artwork: View>: View {
                     .offset(y: y > 0 ? y / 2 : 0)
             }
             .mask(alignment: .bottom) { Rectangle().frame(height: 10_000) }
+    }
+}
+
+/// Every recipe with a tag, opened from a tag on a recipe page; a recipe tapped here opens on top.
+struct TagRecipesPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let tag: String
+    @State private var collection: RecipeCollection
+    @State private var selection: Recipe.ID?
+
+    init(tag: String) {
+        self.tag = tag
+        _collection = State(initialValue: .category(tag))
+    }
+
+    var body: some View {
+        RecipeListView(collection: $collection, selection: $selection)
+            .navigationDestination(item: $selection) { id in
+                if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+            }
     }
 }
