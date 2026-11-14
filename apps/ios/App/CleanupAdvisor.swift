@@ -15,6 +15,7 @@ final class CleanupAdvisor {
     private var suggestions: [UUID: Suggestion] = [:]
     private var checking: Set<UUID> = []
     private var scanTask: Task<Void, Never>?
+    private var scanToken: UUID?
     private(set) var scanProgress: (done: Int, total: Int)?
 
     private static let reviewedKey = "cleanupReviewed"
@@ -83,28 +84,41 @@ final class CleanupAdvisor {
     }
 
     /// Checks each recipe in turn, one at a time so the on-device model never competes with the app.
-    func scan(_ recipes: [Recipe]) {
-        scanTask?.cancel()
-        let candidates = recipes.filter { !$0.isIdea && reviewed[$0.id.uuidString] != $0.cleanupFingerprint }
-        guard !candidates.isEmpty else {
-            scanProgress = nil
-            return
+    /// Recipes not yet checked in their current form: new ones, and any changed since they were last checked or dismissed.
+    func waiting(in recipes: [Recipe]) -> [Recipe] {
+        recipes.filter { recipe in
+            let fingerprint = recipe.cleanupFingerprint
+            return !recipe.isIdea && reviewed[recipe.id.uuidString] != fingerprint && suggestions[recipe.id]?.fingerprint != fingerprint
         }
-        scanProgress = (0, candidates.count)
+    }
+
+    /// Works through the queue one recipe at a time, reading it afresh each turn so new and edited recipes join the same pass.
+    func scan(_ recipes: @escaping @MainActor () -> [Recipe]) {
+        guard scanTask == nil else { return }
+        let token = UUID()
+        scanToken = token
         scanTask = Task(priority: .background) { [weak self] in
-            for (index, recipe) in candidates.enumerated() {
-                guard !Task.isCancelled, let self else { return }
-                await self.check(recipe)
-                self.scanProgress = (index + 1, candidates.count)
+            var tried = Set<String>()
+            var done = 0
+            while !Task.isCancelled, let self {
+                let queue = self.waiting(in: recipes()).filter { !tried.contains($0.id.uuidString + $0.cleanupFingerprint) }
+                guard let next = queue.first else { break }
+                self.scanProgress = (done, done + queue.count)
+                tried.insert(next.id.uuidString + next.cleanupFingerprint)
+                await self.check(next)
+                done += 1
                 try? await Task.sleep(for: .milliseconds(250))
             }
-            self?.scanProgress = nil
+            guard let self, self.scanToken == token else { return }
+            self.scanProgress = nil
+            self.scanTask = nil
         }
     }
 
     func stopScanning() {
         scanTask?.cancel()
         scanTask = nil
+        scanToken = nil
         scanProgress = nil
     }
 
@@ -344,16 +358,24 @@ extension View {
     func cleanupScanning() -> some View { modifier(CleanupScanning()) }
 }
 
+private struct ScanKey: Equatable {
+    let on: Bool
+    let hasWaiting: Bool
+}
+
 private struct CleanupScanning: ViewModifier {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
-    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = false
+    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = true
 
     func body(content: Content) -> some View {
-        content.task(id: suggestsCleanups && scansLibrary && library.isLoaded && scenePhase == .active) {
+        content.task(id: ScanKey(on: suggestsCleanups && scansLibrary && library.isLoaded && scenePhase == .active,
+                                 hasWaiting: !CleanupAdvisor.shared.waiting(in: library.recipes).isEmpty)) {
             if suggestsCleanups, scansLibrary, library.isLoaded, scenePhase == .active {
-                CleanupAdvisor.shared.scan(library.recipes)
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                CleanupAdvisor.shared.scan { [library] in library.recipes }
             } else {
                 CleanupAdvisor.shared.stopScanning()
             }

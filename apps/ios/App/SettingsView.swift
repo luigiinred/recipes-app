@@ -945,7 +945,7 @@ private struct IntelligenceSettingsPage: View {
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @EnvironmentObject private var library: RecipeLibrary
     @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
-    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = false
+    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = true
     let override: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
     var body: some View {
@@ -974,14 +974,19 @@ private struct IntelligenceSettingsPage: View {
                         Text("\(CleanupAdvisor.shared.recipesToTidy(in: library.recipes).count)").monospacedDigit()
                     }
                 }
+                if scansLibrary, suggestsCleanups {
+                    LabeledContent("Waiting to Be Checked") {
+                        Text("\(CleanupAdvisor.shared.waiting(in: library.recipes).count)").monospacedDigit()
+                    }
+                }
             } header: {
                 Text("Cleanup")
             } footer: {
                 if let progress = CleanupAdvisor.shared.scanProgress {
                     Text("Checked \(progress.done) of \(progress.total) recipes…")
                 } else {
-                    Text("Opening a recipe checks it for messy ingredients, run-together steps and long ingredient lists, and offers to tidy it. "
-                         + "The background check looks through every recipe while the app is open, one at a time.")
+                    Text("Recipes are checked for messy ingredients and run-together steps, and the ones that could be tidied wait in Recipes to Tidy for you to review. "
+                         + "The background check works through every recipe while the app is open, one at a time, and checks a recipe again whenever you change it.")
                 }
             }
             Section {
