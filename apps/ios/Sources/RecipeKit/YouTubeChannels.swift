@@ -71,23 +71,23 @@ public enum YouTubeChannels {
         return found
     }
 
-    private static func initialData(in html: String) -> Any? {
+    static func initialData(in html: String) -> Any? {
         guard let marker = html.range(of: "var ytInitialData = ") ?? html.range(of: "ytInitialData = ") else { return nil }
         let rest = html[marker.upperBound...]
         guard let end = rest.range(of: ";</script>") else { return nil }
         return try? JSONSerialization.jsonObject(with: Data(rest[..<end.lowerBound].utf8))
     }
 
-    private static func visit(_ node: Any, _ found: ([String: Any]) -> Void) {
+    static func visit(_ node: Any, key: String = "channelRenderer", _ found: ([String: Any]) -> Void) {
         if let object = node as? [String: Any] {
-            if let renderer = object["channelRenderer"] as? [String: Any] { found(renderer) }
-            for value in object.values { visit(value, found) }
+            if let renderer = object[key] as? [String: Any] { found(renderer) }
+            for (name, value) in object where name != key { visit(value, key: key, found) }
         } else if let array = node as? [Any] {
-            for value in array { visit(value, found) }
+            for value in array { visit(value, key: key, found) }
         }
     }
 
-    private static func text(_ node: Any?) -> String? {
+    static func text(_ node: Any?) -> String? {
         guard let object = node as? [String: Any] else { return nil }
         if let simple = object["simpleText"] as? String { return simple }
         let runs = (object["runs"] as? [[String: Any]])?.compactMap { $0["text"] as? String }
