@@ -30,7 +30,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .discoverSearch: "A search box on Discover for finding new recipes."
-        case .searchWeb: "Recipe pages from across the web, from DuckDuckGo."
+        case .searchWeb: "Google's results, read in a hidden browser, shown as a clean list. DuckDuckGo fills in when Google gives none."
         case .searchGoogle: "A row that opens Google; tapping a result shows it as a recipe."
         case .searchFollowedSites: "Posts from the WordPress sites in your feeds."
         case .searchYouTube: "Recipe videos, with Find Recipe Later."
@@ -129,22 +129,127 @@ struct DiscoverSearchResults: View {
         videos = []
         let (wantsWeb, wantsSites, wantsYouTube) = (showsWeb, showsSites, showsYouTube)
         let followed = wantsSites ? Array(Set(library.feeds.compactMap { RecipeSearch.site(ofFeed: $0.url) })).prefix(12) : []
-        async let found = withTaskGroup(of: [RecipeSearchResult].self) { group in
-            for site in followed { group.addTask { await RecipeSearch.wordPress(site: site, query: text) } }
-            var all: [RecipeSearchResult] = []
-            for await results in group { all += results }
-            return all
+        enum Found { case web([RecipeSearchResult]), sites([RecipeSearchResult]), videos([RecipeSearchResult]) }
+        await withTaskGroup(of: Found.self) { group in
+            if wantsWeb { group.addTask { .web(await GoogleResults.search(text)) } }
+            if wantsYouTube { group.addTask { .videos(await RecipeSearch.youTube(text)) } }
+            if !followed.isEmpty {
+                group.addTask {
+                    await withTaskGroup(of: [RecipeSearchResult].self) { sites in
+                        for site in followed { sites.addTask { await RecipeSearch.wordPress(site: site, query: text) } }
+                        var all: [RecipeSearchResult] = []
+                        for await results in sites { all += results }
+                        return .sites(all)
+                    }
+                }
+            }
+            for await found in group {
+                guard !Task.isCancelled else { return }
+                withAnimation(.snappy) {
+                    switch found {
+                    case .web(let results): web = results
+                    case .sites(let results): sites = results
+                    case .videos(let results): videos = results
+                    }
+                }
+            }
         }
-        async let youTube = wantsYouTube ? RecipeSearch.youTube(text) : []
-        async let fromWeb = wantsWeb ? RecipeSearch.web(text) : []
-        let (webResults, siteResults, videoResults) = await (fromWeb, found, youTube)
-        guard !Task.isCancelled else { return }
-        withAnimation(.snappy) {
-            web = webResults
-            sites = siteResults
-            videos = videoResults
-            isSearching = false
+        if !Task.isCancelled { isSearching = false }
+    }
+}
+
+/// Google's results for a query, read from the page after it runs in a browser no one sees, since Google only builds them with JavaScript.
+@MainActor
+enum GoogleResults {
+    static func search(_ query: String) async -> [RecipeSearchResult] {
+        async let fallback = RecipeSearch.web(query)
+        var found: [RecipeSearchResult] = []
+        if let url = RecipeSearch.webSearchURL(query) {
+            let page = WebPage()
+            if (try? await finishLoading(page, url)) != nil {
+                for _ in 0..<12 {
+                    if let results = try? await results(on: page), !results.isEmpty { found = results; break }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+            }
         }
+        guard found.count < 8 else { return found }
+        let pages = Set(found.map(Self.pageKey))
+        return found + (await fallback).filter { !pages.contains(Self.pageKey($0)) }
+    }
+
+    private static func pageKey(_ result: RecipeSearchResult) -> String {
+        (result.link.host?.replacingOccurrences(of: "www.", with: "") ?? "") + result.link.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private static func finishLoading(_ page: WebPage, _ url: URL) async throws {
+        for try await _ in page.load(URLRequest(url: url, timeoutInterval: 15)) {}
+    }
+
+    /// Groups the result cards' links by where they go, taking each card's first lines of text and its first picture.
+    private static let script = """
+    const groups = new Map();
+    for (const a of document.querySelectorAll('#rso a[href], #search a[href]')) {
+      if (!a.href.startsWith('http')) continue;
+      const u = new URL(a.href);
+      if (/(^|\\.)google\\./.test(u.hostname) && u.pathname !== '/goto' && u.pathname !== '/url') continue;
+      let group = groups.get(a.href);
+      if (!group) { group = { url: a.href, lines: [], image: '' }; groups.set(a.href, group); }
+      const lines = (a.innerText || '').split('\\n').map(t => t.trim()).filter(Boolean);
+      if (!group.lines.length && lines.length) group.lines = lines.slice(0, 3);
+      if (!group.image) {
+        const img = a.querySelector('img');
+        const src = img && (img.currentSrc || img.src);
+        if (src && (src.startsWith('http') || src.startsWith('data:image'))) group.image = src;
+      }
+    }
+    return [...groups.values()].filter(g => g.lines.length).map(g => ({ title: g.lines[0], detail: g.lines.slice(1).join(' '), url: g.url, image: g.image }));
+    """
+
+    private static func results(on page: WebPage) async throws -> [RecipeSearchResult] {
+        guard let rows = try await page.callJavaScript(script) as? [[String: Any]], !rows.isEmpty else { return [] }
+        let cards: [(title: String, detail: String, link: URL, image: URL?)] = rows.compactMap { row in
+            guard let title = row["title"] as? String, !title.isEmpty, let link = (row["url"] as? String).flatMap(URL.init(string:)) else { return nil }
+            let image = (row["image"] as? String).flatMap { $0.isEmpty ? nil : URL(string: $0) }
+            return (title, row["detail"] as? String ?? "", link, image)
+        }
+        let resolved = await withTaskGroup(of: (Int, URL?).self) { group in
+            for (index, card) in cards.enumerated() { group.addTask { (index, await destination(of: card.link)) } }
+            var found: [Int: URL] = [:]
+            for await (index, url) in group { if let url { found[index] = url } }
+            return found
+        }
+        var seen = Set<String>()
+        return cards.indices.compactMap { index in
+            guard let link = resolved[index], link.scheme?.hasPrefix("http") == true, !RecipeSearch.isSearchEnginePage(link),
+                  seen.insert(link.absoluteString).inserted else { return nil }
+            let card = cards[index]
+            let host = link.host?.replacingOccurrences(of: "www.", with: "") ?? ""
+            let rating = card.detail.range(of: #"^\d(\.\d)? \([\d.,]+K?\)"#, options: .regularExpression).map { "★ " + card.detail[$0] }
+            return RecipeSearchResult(title: card.title, link: link, source: [host, rating].compactMap { $0 }.joined(separator: " · "),
+                                      imageURL: card.image, kind: .web)
+        }
+    }
+
+    /// Google's mobile links go through `/goto`, which answers with a redirect to the page; this reads it without following.
+    nonisolated private static func destination(of url: URL) async -> URL? {
+        guard RecipeSearch.isSearchEnginePage(url) else { return url }
+        guard url.path == "/goto" else {
+            let target = RecipeSearch.destination(of: url)
+            return target == url ? nil : target
+        }
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)", forHTTPHeaderField: "User-Agent")
+        guard let response = try? await URLSession.shared.data(for: request, delegate: StopAtRedirect()).1 as? HTTPURLResponse,
+              let location = response.value(forHTTPHeaderField: "Location") else { return nil }
+        return URL(string: location, relativeTo: url)?.absoluteURL
+    }
+}
+
+private final class StopAtRedirect: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        nil
     }
 }
 

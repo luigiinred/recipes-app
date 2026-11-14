@@ -78,12 +78,12 @@ The Feeds page SHALL always show a Discover button in its navigation bar, and a 
 
 ### Requirement: Discover search (experimental)
 Behind the "Discover Search" switch in Developer Tools (off by default), Discover SHALL have a search box. Submitting a search lists, each under its own switch (on by default):
-- "From the Web": recipe pages parsed from DuckDuckGo's HTML results
+- "From the Web": Google's results, loaded in a hidden in-app browser and read from the page once it has run (title, star rating and picture from each card, with Google's `/goto` links resolved to the real page), topped up from DuckDuckGo's HTML results when Google gives fewer than eight
 - "Search Google for …": opens Google in an in-app browser, where tapping a result opens it in the app's recipe preview instead of the site
 - "From Sites You Follow": matching posts from the WordPress sites behind followed feeds, through their REST API
 - "YouTube": matching recipe videos, with Find Recipe Later in their long-press menu
 
-Tapping any result opens the same recipe preview as a feed post, with Add to My Recipes. No source needs an API key.
+Each section appears as soon as its source answers. Tapping any result opens the same recipe preview as a feed post, with Add to My Recipes. No source needs an API key.
 
 #### Scenario: Turned off
 - **GIVEN** Discover Search is off in Developer Tools
