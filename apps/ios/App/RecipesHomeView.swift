@@ -536,6 +536,12 @@ struct RecipesHomeView: View {
                     .contextMenu { recipeMenu(recipe) }
                 }
                 if items.isEmpty { noMatches.listRowSeparator(.hidden).themedRow() }
+                if !query.isEmpty {
+                    SearchOnlineLink(query: query)
+                        .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 24, trailing: margin))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
             }
         }
     }
@@ -586,6 +592,7 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             if items.isEmpty { noMatches }
+            if !query.isEmpty { SearchOnlineLink(query: query).padding(.horizontal, margin) }
             }
         }
     }

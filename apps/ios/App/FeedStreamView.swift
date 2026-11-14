@@ -159,7 +159,8 @@ struct FeedStreamView: View {
     var body: some View {
         content
             .themedCanvas()
-            .navigationTitle("Feeds")
+            .discoverSearch()
+            .navigationTitle("Discover")
             #if os(iOS)
             .navigationSubtitle(subtitle)
             #endif
@@ -176,7 +177,7 @@ struct FeedStreamView: View {
             .onChange(of: layout) { refreshHidden() }
             .toolbar {
                 ToolbarItem(placement: .navigation) {
-                    NavigationLink { FeedDiscoverPage() } label: { Label("Discover", systemImage: "sparkle.magnifyingglass") }
+                    NavigationLink { FeedDiscoverPage() } label: { Label("Popular Feeds", systemImage: "flame") }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: markAllViewed) { Label("Mark All as Viewed", systemImage: "checkmark.circle") }
@@ -208,7 +209,7 @@ struct FeedStreamView: View {
             LazyVStack(alignment: .leading, spacing: 36) {
                 if !discoverDismissed { discoverLink }
                 if library.feeds.isEmpty {
-                    Text("Follow recipe sites, blogs and YouTube channels from Discover and their newest posts show up here.")
+                    Text("Follow recipe sites, blogs and YouTube channels from Popular Feeds and their newest posts show up here.")
                         .appFont(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)
@@ -233,10 +234,10 @@ struct FeedStreamView: View {
         HStack(spacing: 8) {
             NavigationLink { FeedDiscoverPage() } label: {
                 HStack(spacing: 14) {
-                    Image(systemName: "sparkle.magnifyingglass").appFont(.title2).foregroundStyle(accent)
+                    Image(systemName: "flame").appFont(.title2).foregroundStyle(accent)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Discover").appFont(.headline)
-                        Text("Popular recipe sites by kind of cooking").appFont(.subheadline).foregroundStyle(.secondary)
+                        Text("Popular Feeds").appFont(.headline)
+                        Text("Recipe sites by kind of cooking").appFont(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -291,40 +292,16 @@ struct FeedDiscoverPage: View {
     @Environment(\.appAccent) private var accent
     @Environment(\.colorScheme) private var colorScheme
     @State private var kind = PopularFeed.Kind.allCases[0]
-    @AppStorage(FeatureFlag.discoverSearch.key) private var searchEnabled = false
-    @State private var query = ""
-    @State private var submitted = ""
 
     var body: some View {
-        searchable(content)
+        pages
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .safeAreaBar(edge: .top) { tabs }
             .themedCanvas()
-            .navigationTitle("Discover")
+            .navigationTitle("Popular Feeds")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if searchEnabled, !submitted.isEmpty {
-            DiscoverSearchResults(query: submitted)
-        } else {
-            pages
-                .scrollEdgeEffectStyle(.soft, for: .top)
-                .safeAreaBar(edge: .top) { tabs }
-        }
-    }
-
-    @ViewBuilder
-    private func searchable(_ view: some View) -> some View {
-        if searchEnabled {
-            view
-                .searchable(text: $query, prompt: "Search recipes")
-                .onSubmit(of: .search) { submitted = query.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
-        } else {
-            view
-        }
     }
 
     @ViewBuilder
@@ -463,7 +440,7 @@ struct FeedCaughtUp: View {
                     .tint(accent)
                 }
                 NavigationLink { FeedDiscoverPage() } label: {
-                    Label("Find More Feeds", systemImage: "sparkle.magnifyingglass").frame(maxWidth: .infinity)
+                    Label("Find More Feeds", systemImage: "flame").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
             }
@@ -904,7 +881,7 @@ struct RecipeFeedsPage: View {
         }
         .listStyle(.plain)
         .themedCanvas()
-        .navigationTitle("Feeds")
+        .navigationTitle(showsTabToggle ? "Discover" : "Feeds")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -951,12 +928,12 @@ private struct ReadingFeedsSection: View {
             }
             Toggle(isOn: $showViewed) { Label("Show Viewed Posts", systemImage: "eye") }
             Toggle(isOn: Binding(get: { !discoverDismissed }, set: { discoverDismissed = !$0 })) {
-                Label("Discover Card", systemImage: "sparkle.magnifyingglass")
+                Label("Popular Feeds Card", systemImage: "flame")
             }
         } header: {
             Text("View")
         } footer: {
-            Text("Discover is always in the Feeds toolbar; the card at the top of Feeds is a bigger way in.")
+            Text("Popular Feeds is always in the Discover toolbar; the card at the top of Discover is a bigger way in.")
         }
         Section {
             Toggle(isOn: $opensInReader) { Label("Open Articles in Reader", systemImage: "doc.plaintext") }
@@ -971,7 +948,7 @@ private struct ReadingFeedsSection: View {
         } header: {
             Text("Reading")
         } footer: {
-            Text("Posts with a recipe open as the recipe. Other posts open in Reader, without the site's ads, or as the full web page when Reader is off. Viewed posts leave Feeds until you turn on Show Viewed.")
+            Text("Posts with a recipe open as the recipe. Other posts open in Reader, without the site's ads, or as the full web page when Reader is off. Viewed posts leave Discover until you turn on Show Viewed.")
         }
         .confirmationDialog("Reset viewed posts?", isPresented: $confirmingReset, titleVisibility: .visible) {
             Button("Reset", role: .destructive) {
@@ -980,7 +957,7 @@ private struct ReadingFeedsSection: View {
                 ToastCenter.shared.show("Every post is new again") { loader.markViewed(before) }
             }
         } message: {
-            Text("Every post shows up in Feeds again.")
+            Text("Every post shows up in Discover again.")
         }
     }
 }
@@ -1066,7 +1043,7 @@ struct FollowFeedButton: View {
                 }
             }
         } message: {
-            Text("Its posts stop showing up in Feeds.")
+            Text("Its posts stop showing up in Discover.")
         }
     }
 }

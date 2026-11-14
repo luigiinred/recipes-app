@@ -64,20 +64,20 @@ Add Feed SHALL have a YouTube mode that searches YouTube channels by name, listi
 
 #### Scenario: Follow a channel by name
 - **WHEN** the user searches "Pasta Grannies" in Add Feed's YouTube mode and taps its follow button
-- **THEN** the channel's newest videos show up in Feeds
+- **THEN** the channel's newest videos show up in Discover
 
 ### Requirement: Your Feeds lists everything followed
 The Manage Feeds page SHALL list every feed the user follows under "Your Feeds" at the top, including popular ones, each with a symbol for YouTube, Reddit or other feeds, before the popular feeds to discover.
 
-### Requirement: Feeds toolbar and view settings
-The Feeds page SHALL always show a Discover button in its navigation bar, and a Mark All as Viewed button beside Manage Feeds. The Discover card at the top of the list has an X that dismisses it for good; Settings → Feeds → View brings it back with "Discover Card", and also holds the Layout choice (All Posts, One at a Time, By Feed) and "Show Viewed Posts".
+### Requirement: Discover tab toolbar and view settings
+The followed-posts tab SHALL be named "Discover". It always shows a Popular Feeds button in its navigation bar, and a Mark All as Viewed button beside Manage Feeds. The Popular Feeds card at the top of the list has an X that dismisses it for good; Settings → Discover → View brings it back with "Popular Feeds Card", and also holds the Layout choice (All Posts, One at a Time, By Feed) and "Show Viewed Posts".
 
-#### Scenario: Dismiss the Discover card
-- **WHEN** the user taps the X on the Discover card
-- **THEN** the card goes away and Discover stays reachable from the navigation bar
+#### Scenario: Dismiss the Popular Feeds card
+- **WHEN** the user taps the X on the Popular Feeds card
+- **THEN** the card goes away and Popular Feeds stays reachable from the navigation bar
 
 ### Requirement: Discover search (experimental)
-Behind the "Discover Search" switch in Developer Tools (off by default), Discover SHALL have a search box. Submitting a search lists, each under its own switch (on by default):
+Behind the "Discover Search" switch (off by default, in Settings → Discover and Developer Tools), the Discover tab SHALL have a "Search Recipes Online" box, and a search on Home or Recipes SHALL end with a "Search Recipes Online for …" row that opens the same results. Submitting a search lists, each under its own switch (on by default):
 - "From the Web": Google's results, loaded in a hidden in-app browser and read from the page once it has run (title, star rating and picture from each card, with Google's `/goto` links resolved to the real page), topped up from DuckDuckGo's HTML results when Google gives fewer than eight
 - "Search Google for …": opens Google in an in-app browser, where tapping a result opens it in the app's recipe preview instead of the site
 - "From Sites You Follow": matching posts from the WordPress sites behind followed feeds, through their REST API

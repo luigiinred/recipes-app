@@ -23,7 +23,7 @@ struct YouTubeChannelSearch: View {
                 if isSearching { ProgressView().controlSize(.small) }
             }
         } footer: {
-            Text("Their newest videos show up in Feeds. Tap one to read its recipe, or save it to find the recipe later.")
+            Text("Their newest videos show up in Discover. Tap one to read its recipe, or save it to find the recipe later.")
         }
         if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
         if !results.isEmpty {

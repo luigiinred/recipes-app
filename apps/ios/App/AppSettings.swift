@@ -8,7 +8,7 @@ enum MainTab: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .feeds: "Feeds"
+        case .feeds: "Discover"
         case .upNext: "Up Next"
         case .plan: "Plan"
         case .groceries: "Groceries"
@@ -17,7 +17,7 @@ enum MainTab: String, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .feeds: "dot.radiowaves.up.forward"
+        case .feeds: "safari"
         case .upNext: "text.line.first.and.arrowtriangle.forward"
         case .plan: "calendar"
         case .groceries: "checklist"
