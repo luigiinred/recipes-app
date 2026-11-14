@@ -75,3 +75,17 @@ The Feeds page SHALL always show a Discover button in its navigation bar, and a 
 #### Scenario: Dismiss the Discover card
 - **WHEN** the user taps the X on the Discover card
 - **THEN** the card goes away and Discover stays reachable from the navigation bar
+
+### Requirement: Discover search (experimental)
+Behind the "Discover Search" switch in Developer Tools (off by default), Discover SHALL have a search box. Submitting a search lists, each under its own switch (on by default):
+- "From the Web": recipe pages parsed from DuckDuckGo's HTML results
+- "Search Google for …": opens Google in an in-app browser, where tapping a result opens it in the app's recipe preview instead of the site
+- "From Sites You Follow": matching posts from the WordPress sites behind followed feeds, through their REST API
+- "YouTube": matching recipe videos, with Find Recipe Later in their long-press menu
+
+Tapping any result opens the same recipe preview as a feed post, with Add to My Recipes. No source needs an API key.
+
+#### Scenario: Turned off
+- **GIVEN** Discover Search is off in Developer Tools
+- **WHEN** the user opens Discover
+- **THEN** there is no search box

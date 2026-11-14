@@ -291,16 +291,40 @@ struct FeedDiscoverPage: View {
     @Environment(\.appAccent) private var accent
     @Environment(\.colorScheme) private var colorScheme
     @State private var kind = PopularFeed.Kind.allCases[0]
+    @AppStorage(FeatureFlag.discoverSearch.key) private var searchEnabled = false
+    @State private var query = ""
+    @State private var submitted = ""
 
     var body: some View {
-        pages
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .safeAreaBar(edge: .top) { tabs }
+        searchable(content)
             .themedCanvas()
             .navigationTitle("Discover")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if searchEnabled, !submitted.isEmpty {
+            DiscoverSearchResults(query: submitted)
+        } else {
+            pages
+                .scrollEdgeEffectStyle(.soft, for: .top)
+                .safeAreaBar(edge: .top) { tabs }
+        }
+    }
+
+    @ViewBuilder
+    private func searchable(_ view: some View) -> some View {
+        if searchEnabled {
+            view
+                .searchable(text: $query, prompt: "Search recipes")
+                .onSubmit(of: .search) { submitted = query.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
+        } else {
+            view
+        }
     }
 
     @ViewBuilder
