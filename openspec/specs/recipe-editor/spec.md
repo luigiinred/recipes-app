@@ -21,12 +21,16 @@ The system SHALL edit Title, Summary, Servings, Prep minutes, Cook minutes, Sour
 - **THEN** the recipe is saved without a servings value
 
 ### Requirement: Structured ingredient rows
-The system SHALL edit each ingredient as three parts: a quantity field ("Qty"), a unit menu ("No unit" or a unit from the preset groups), and an item field. An item typed or pasted as a whole line with no quantity or unit (such as "2 cups flour") is still split into its parts when saved. Empty ingredient rows are dropped on save.
+The system SHALL edit each ingredient as three parts: a quantity field ("Qty"), a unit field, and an item field. Add Ingredient focuses the new row's quantity, and Return (or Next) moves from quantity to unit to item. While the quantity or unit is focused, a bar above the keyboard offers Next and a button to hide the keyboard: for the quantity it offers fraction buttons (½ ¼ ¾ ⅓ ⅔ ⅛, where a second tap replaces the last fraction rather than adding to it) and "to" for a range; for the unit it lists units matching what has been typed (common ones first when empty), units the user typed before, "No unit", and "Use “…”" for a unit the app doesn't know. Any text can be a unit; a unit the app doesn't know is saved at the front of the item and read back into the unit field when the editor opens if the user has used it before. Leaving the quantity writes it in standard form (see recipe-format) and leaving the unit writes a known unit as its abbreviation ("Tablespoons" becomes "tbsp"). An item typed or pasted as a whole line with no quantity or unit (such as "2 cups flour") is still split into its parts when saved. Empty ingredient rows are dropped on save.
 
 #### Scenario: Pasted whole line
 - **GIVEN** an ingredient row with no quantity or unit
 - **WHEN** the user types "2 cups flour" in the item field and saves
 - **THEN** the saved ingredient is "2 cups flour", and reopening the editor shows 2, cups and flour in their own fields
+
+#### Scenario: A unit the app doesn't know
+- **WHEN** the user types 1, "knob" and "ginger" and saves
+- **THEN** the saved ingredient is "1 knob ginger", and reopening the editor shows knob in the unit field
 
 ### Requirement: Ingredient sections
 The system SHALL let the user add a section heading among the ingredients with "Add Section", name it, drag it to a new position, and delete it, so the ingredients after a heading belong to that section until the next one. The footer advises adding a section only for a distinct part of the meal, like a salad's dressing.
@@ -128,15 +132,6 @@ When opened on an import or scan, the system SHALL show any notice from the impo
 - **WHEN** the editor opens
 - **THEN** a "Scanned text" disclosure holds the recognized text
 
-### Requirement: Clean Up with Apple Intelligence
-The system SHALL offer "Clean Up with Apple Intelligence", which tidies the ingredients, turns labels such as "Dressing:" into sections, splits run-together steps, and groups a long ingredient list, then reports what it changed ("Everything already looks tidy." when nothing changed). Nothing is saved until the user taps Save. If the number of steps changes, step times and photos are cleared and the message says so.
+### Requirement: Cleanup suggestions
+The editor SHALL NOT have a cleanup button; cleanups are offered on the recipe page instead (see recipe-detail).
 
-#### Scenario: Without Apple Intelligence
-- **GIVEN** Apple Intelligence is unavailable
-- **WHEN** the user taps Clean Up with Apple Intelligence
-- **THEN** the message adds that splitting long steps and grouping ingredients need Apple Intelligence, and why it is unavailable (see apple-intelligence)
-
-#### Scenario: Nothing to clean
-- **GIVEN** a recipe already in standard form
-- **WHEN** the user taps Clean Up with Apple Intelligence
-- **THEN** the footer reads "Everything already looks tidy."

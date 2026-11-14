@@ -3,10 +3,19 @@ import SwiftUI
 
 @MainActor
 final class ShareModel: ObservableObject {
-    enum State { case loading, follow(url: URL, title: String, following: Bool), followed(String), review, saving, saved(Recipe, note: String?), failed(String) }
+    enum State { case loading, follow(url: URL, title: String, following: Bool), followed(String), incomplete, review, saving, saved(Recipe, note: String?), failed(String) }
+
+    struct Source {
+        let url: URL
+        let title: String
+        var following: Bool
+    }
 
     @Published var state = State.loading
     @Published private(set) var host: String?
+    /// The blog or channel behind a shared post or video, offered to follow beside the recipe.
+    @Published private(set) var source: Source?
+    private var sharedURL: URL?
     let progress = ImportProgressModel()
 
     private(set) var result: ImportResult?
@@ -19,14 +28,32 @@ final class ShareModel: ObservableObject {
             return
         }
         host = url.host?.replacingOccurrences(of: "www.", with: "")
+        sharedURL = url
+        let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
+        self.library = library
         if let feed = await FeedService.followable(url) {
-            let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
-            let feeds = await Task.detached { (try? library.feeds.list()) ?? [] }.value
-            self.library = library
-            state = .follow(url: feed.url, title: feed.title, following: feeds.contains { $0.url == feed.url.absoluteString })
+            state = .follow(url: feed.url, title: feed.title, following: await isFollowing(feed.url))
             return
         }
+        Task {
+            guard let feed = await FeedService.sourceFeed(for: url) else { return }
+            source = Source(url: feed.url, title: feed.title, following: await isFollowing(feed.url))
+        }
         await importRecipe(from: url)
+    }
+
+    private func isFollowing(_ url: URL) async -> Bool {
+        guard let library else { return false }
+        let feeds = await Task.detached { (try? library.feeds.list()) ?? [] }.value
+        return feeds.contains { $0.url == url.absoluteString }
+    }
+
+    func followSource() async {
+        guard let library, let source, !source.following else { return }
+        let feed = Feed(url: source.url.absoluteString, title: source.title)
+        if case .success = await Task.detached(operation: { Result { try library.feeds.save(feed) } }).value {
+            self.source?.following = true
+        }
     }
 
     func follow(_ url: URL, title: String) async {
@@ -42,16 +69,42 @@ final class ShareModel: ObservableObject {
     private func importRecipe(from url: URL) async {
         do {
             let result = try await RecipeImporter.importResult(from: url, progress: progress.report)
-            let library = await Task.detached { RecipeLocation.resolveForApp().library }.value
+            guard let library else { return }
             let recipes = await Task.detached { (try? library.recipes.list()) ?? [] }.value
             self.result = result
-            self.library = library
             recipeLibrary = RecipeLibrary(recipes: recipes)
-            state = .review
+            if let existing = recipes.first(where: { $0.sourceURL != nil && $0.sourceURL == result.recipe.sourceURL }) {
+                state = .saved(existing, note: "It was already in your cookbook.")
+            } else if result.isComplete {
+                await saveDirectly(result)
+            } else {
+                state = .incomplete
+            }
         } catch {
             state = .failed(error.localizedDescription)
         }
     }
+
+    /// A complete recipe goes straight in; the app's recipe page offers a cleanup if it needs one.
+    private func saveDirectly(_ result: ImportResult) async {
+        guard let library else { return }
+        state = .saving
+        switch await Task.detached(operation: { Result { try library.add(result) } }).value {
+        case .success(let saved): state = .saved(saved, note: nil)
+        case .failure(let error): state = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Keeps a link whose recipe couldn't be read as an idea, with its title and photo, to fill in later.
+    func saveAsIdea() async {
+        guard let result else { return }
+        var idea = Recipe(title: result.recipe.title.isEmpty ? (host ?? "Saved link") : result.recipe.title,
+                          sourceURL: result.recipe.sourceURL ?? sharedURL?.absoluteString)
+        idea.summary = result.recipe.summary
+        await save(idea, image: result.imageData.map(ImageChange.set) ?? .unchanged, steps: StepImageChanges())
+    }
+
+    var isVideo: Bool { sharedURL.map { YouTubeImporter.videoID(from: $0) != nil } ?? false }
 
     var notice: String? {
         guard let result, !result.isComplete else { return nil }
@@ -132,6 +185,31 @@ struct ShareView: View {
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .sensoryFeedback(.success, trigger: title)
+            case .incomplete:
+                VStack(spacing: 14) {
+                    MascotView(character: .tomato, scene: .wave, height: 120)
+                    Text(model.isVideo ? "No written recipe yet" : "Only part of a recipe").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
+                    Text(model.isVideo
+                         ? "Save the video now, and open it in Recipes to find its recipe later. Or check the draft from its description and captions."
+                         : (model.notice ?? "Save it as an idea for later, or check what was found and fill in the rest."))
+                        .appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    VStack(spacing: 10) {
+                        Button { Task { await model.saveAsIdea() } } label: {
+                            Label(model.isVideo ? "Find Recipe Later" : "Save as an Idea", systemImage: model.isVideo ? "play.rectangle.on.rectangle" : "lightbulb")
+                        }
+                        .buttonStyle(PaperButtonStyle())
+                        .keyboardShortcut(.defaultAction)
+                        Button("Review the Draft") { model.state = .review }
+                            .buttonStyle(PaperButtonStyle(prominent: false))
+                        followSourceButton
+                        Button("Cancel", action: cancel)
+                            .buttonStyle(PaperButtonStyle(prominent: false))
+                    }
+                    .frame(maxWidth: 320)
+                    .padding(.top, 6)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .review:
                 if let result = model.result {
                     NavigationStack {
@@ -163,6 +241,7 @@ struct ShareView: View {
                         Button { openApp(RecipeLink.url(for: recipe.id)) } label: { Label("Open in Recipes", systemImage: "arrow.up.forward.app") }
                             .buttonStyle(PaperButtonStyle())
                             .keyboardShortcut(.defaultAction)
+                        followSourceButton
                         Button("Done", action: finish)
                             .buttonStyle(PaperButtonStyle(prominent: false))
                     }
@@ -177,11 +256,14 @@ struct ShareView: View {
                     MascotView(character: .lemon, scene: .sour, height: 130)
                     Text("Couldn't import that").appFont(.title3, weight: .bold)
                     Text(message).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Done", action: cancel)
-                        .buttonStyle(PaperButtonStyle())
-                        .keyboardShortcut(.defaultAction)
-                        .frame(maxWidth: 320)
-                        .padding(.top, 6)
+                    VStack(spacing: 10) {
+                        followSourceButton
+                        Button("Done", action: cancel)
+                            .buttonStyle(PaperButtonStyle())
+                            .keyboardShortcut(.defaultAction)
+                    }
+                    .frame(maxWidth: 320)
+                    .padding(.top, 6)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -191,6 +273,20 @@ struct ShareView: View {
         .animation(.snappy, value: model.state.tag)
         .tint(Theme.defaultAccent)
         .task { await model.load(url: await loadURL()) }
+    }
+
+    @ViewBuilder
+    private var followSourceButton: some View {
+        if let source = model.source {
+            Button { Task { await model.followSource() } } label: {
+                Label(source.following ? "Following \(source.title)" : "Follow \(source.title)",
+                      systemImage: source.following ? "checkmark.circle.fill" : "dot.radiowaves.up.forward")
+                    .lineLimit(1)
+            }
+            .buttonStyle(PaperButtonStyle(prominent: false))
+            .disabled(source.following)
+            .transition(.opacity)
+        }
     }
 }
 
@@ -204,6 +300,7 @@ extension ShareModel.State {
         case .failed: 4
         case .follow: 5
         case .followed: 6
+        case .incomplete: 7
         }
     }
 }

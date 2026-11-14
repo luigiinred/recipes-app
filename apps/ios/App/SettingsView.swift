@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case home, recipes, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
+    case tabs, home, recipes, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
 }
 
 struct SettingsView: View {
@@ -17,9 +17,6 @@ struct SettingsView: View {
     var listing = AppStoreLink.listing
     var writeReview = AppStoreLink.writeReview
 
-    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
-    @AppStorage(AppSettings.Key.firstTab) private var firstTab = FirstTab.home
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
     @State private var showingTour = false
     @State private var page: SettingsPage? = .recipes
 
@@ -76,30 +73,17 @@ struct SettingsView: View {
     private var rows: some View {
         Section {
             #if os(iOS)
-            Picker(selection: $firstTab) {
-                ForEach(FirstTab.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
-            } label: {
-                Label("First Tab", systemImage: firstTab.symbol)
-            }
-            if firstTab == .home {
-                NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
-            }
+            NavigationLink(value: SettingsPage.tabs) { Label("Arrange Tabs", systemImage: "square.grid.3x1.below.line.grid.1x2") }
+            NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
             #endif
             NavigationLink(value: SettingsPage.feeds) { TabRowLabel(tab: .feeds) }
             NavigationLink(value: SettingsPage.upNext) { TabRowLabel(tab: .upNext) }
             NavigationLink(value: SettingsPage.planner) { TabRowLabel(tab: .plan) }
             NavigationLink(value: SettingsPage.groceries) { TabRowLabel(tab: .groceries) }
-            #if os(iOS)
-            if !splitsPages {
-                Toggle(isOn: $settingsInTabBar) { Label("Settings in Tab Bar", systemImage: "gearshape") }
-                    .disabled(!settingsInTabBar && AppSettings.hiddenTabs(hiddenTabsRaw).isEmpty)
-            }
-            #endif
         } header: {
             Text("Tabs")
         } footer: {
-            Text(splitsPages ? "Open a tab to change how it works, or hide it if you don't use it." :
-                "Open a tab to change how it works, or hide it if you don't use it. The tab bar holds five tabs, so Settings can sit there once another tab is hidden; otherwise it's behind the gear on \(firstTab.title).")
+            Text("Choose which tabs show and in what order, or open one to change how it works.")
         }
         Section {
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
@@ -152,6 +136,12 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
+        case .tabs:
+            #if os(iOS)
+            TabsSettingsPage()
+            #else
+            EmptyView()
+            #endif
         case .home:
             #if os(iOS)
             HomeSettingsPage()
@@ -176,7 +166,7 @@ struct SettingsView: View {
 private struct RecipesSettingsPage: View {
     @AppStorage(AppSettings.Key.listStyle) private var listStyle = RecipeListStyle.list
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
-    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = true
+    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
     @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
     #if os(iOS)
@@ -253,7 +243,7 @@ private struct RecipesSettingsPage: View {
             } header: {
                 Text("Importing")
             } footer: {
-                Text("Open the title and categories for a check after every import, including from the Share sheet.")
+                Text("Off: an import opens straight on its recipe page, which offers a cleanup if it needs one. On: every import opens in the editor first, including from the Share sheet.")
             }
         }
         .formStyle(.grouped)
@@ -953,6 +943,9 @@ struct CustomThemePage: View {
 
 private struct IntelligenceSettingsPage: View {
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
+    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = false
     let override: (status: AppleIntelligence.Status, imagePlayground: Bool)?
 
     var body: some View {
@@ -968,6 +961,27 @@ private struct IntelligenceSettingsPage: View {
                     Text("Everything runs on this device. Smart Plan fills your week from your recipes, and videos without a written recipe are turned into one from their captions.")
                 } else {
                     Text(status.explanation + " Smart Plan falls back to a simple rotation, and a video without a written recipe opens as a draft with its captions beside it.")
+                }
+            }
+            Section {
+                Toggle("Suggest cleanups on recipes", isOn: $suggestsCleanups)
+                Toggle("Check all recipes in the background", isOn: $scansLibrary)
+                    .disabled(!suggestsCleanups)
+                NavigationLink {
+                    RecipesToTidyView()
+                } label: {
+                    LabeledContent("Recipes to Tidy") {
+                        Text("\(CleanupAdvisor.shared.recipesToTidy(in: library.recipes).count)").monospacedDigit()
+                    }
+                }
+            } header: {
+                Text("Cleanup")
+            } footer: {
+                if let progress = CleanupAdvisor.shared.scanProgress {
+                    Text("Checked \(progress.done) of \(progress.total) recipes…")
+                } else {
+                    Text("Opening a recipe checks it for messy ingredients, run-together steps and long ingredient lists, and offers to tidy it. "
+                         + "The background check looks through every recipe while the app is open, one at a time.")
                 }
             }
             Section {
@@ -1160,7 +1174,7 @@ extension View {
 
 /// A tab's name in Settings, marked when it's hidden from the tab bar.
 private struct TabRowLabel: View {
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenRaw = ""
     let tab: MainTab
 
     var body: some View {
@@ -1174,17 +1188,15 @@ private struct TabRowLabel: View {
 
 /// The switch that shows or hides a tab, at the top of its settings page.
 struct TabVisibilitySection: View {
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenRaw = ""
-    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenRaw = ""
     @Environment(\.horizontalSizeClass) private var sizeClass
     let tab: MainTab
 
     /// Showing this tab would push the iPhone tab bar past five.
     private var isFull: Bool {
         #if os(iOS)
-        let hidden = AppSettings.hiddenTabs(hiddenRaw)
-        guard sizeClass != .regular, settingsInTabBar, hidden.contains(tab) else { return false }
-        return MainTab.allCases.count - hidden.count >= AppSettings.tabBarLimit - 2
+        guard sizeClass != .regular, AppSettings.hiddenTabs(hiddenRaw).contains(tab) else { return false }
+        return AppSettings.tabs(hiddenRaw).count >= AppSettings.tabBarLimit
         #else
         false
         #endif
@@ -1200,7 +1212,7 @@ struct TabVisibilitySection: View {
             }
             .disabled(isFull)
         } footer: {
-            Text(isFull ? "The tab bar holds five tabs. Hide another tab, or take Settings out of the tab bar, to show this one." :
+            Text(isFull ? "The tab bar holds five tabs. Take one out in Arrange Tabs to show this one." :
                 "Hiding a tab keeps everything in it. Turn it back on any time.")
         }
     }
@@ -1216,3 +1228,63 @@ extension View {
         #endif
     }
 }
+
+#if os(iOS)
+/// The tab bar as a list to reorder, with the tabs that aren't in it below to add.
+struct TabsSettingsPage: View {
+    @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var shown: [TabItem] { AppSettings.tabs(tabOrderRaw) }
+    private var isFull: Bool { sizeClass != .regular && shown.count >= AppSettings.tabBarLimit }
+
+    var body: some View {
+        let shown = shown
+        let others = TabItem.allCases.filter { !shown.contains($0) && !(sizeClass == .regular && $0 == .settings) }
+        Form {
+            Section {
+                ForEach(shown) { item in
+                    Label(item.title, systemImage: item.symbol)
+                        .deleteDisabled(item.isLibrary && shown.filter(\.isLibrary).count == 1)
+                }
+                .onMove { from, to in
+                    var list = shown
+                    list.move(fromOffsets: from, toOffset: to)
+                    tabOrderRaw = AppSettings.encode(list)
+                }
+                .onDelete { offsets in
+                    var list = shown
+                    list.remove(atOffsets: offsets)
+                    tabOrderRaw = AppSettings.encode(list)
+                }
+            } header: {
+                Text("In the Tab Bar")
+            } footer: {
+                Text(sizeClass == .regular
+                     ? "Drag to reorder. Keep Home, Recipes, or both. Settings is always in the sidebar."
+                     : "Drag to reorder. Keep Home, Recipes, or both. The tab bar holds five tabs; without Settings in it, the gear on Home or Recipes opens it.")
+            }
+            if !others.isEmpty {
+                Section("More Tabs") {
+                    ForEach(others) { item in
+                        Button {
+                            tabOrderRaw = AppSettings.encode(shown + [item])
+                        } label: {
+                            HStack {
+                                Label(item.title, systemImage: item.symbol).foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill").foregroundStyle(isFull ? Color.secondary : .green)
+                            }
+                        }
+                        .disabled(isFull)
+                        .accessibilityLabel("Add \(item.title)")
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .environment(\.editMode, .constant(.active))
+        .settingsPage("Tabs")
+    }
+}
+#endif

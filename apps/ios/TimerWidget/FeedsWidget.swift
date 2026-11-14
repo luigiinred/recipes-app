@@ -179,23 +179,16 @@ private struct FeedsWidgetView: View {
     }
 
     private func list(limit: Int, photo: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "dot.radiowaves.up.forward")
-                Text(entry.title).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(accent)
+        VStack(alignment: .leading, spacing: 10) {
             if entry.posts.isEmpty {
                 empty
             } else {
                 ForEach(entry.posts.prefix(limit)) { post in
                     Link(destination: RecipeLink.feedPostURL(for: post.entry)) { row(post, photo: photo) }
                 }
-                Spacer(minLength: 0)
             }
         }
+        .frame(maxHeight: .infinity)
     }
 
     private func row(_ post: FeedWidgetSnapshot.Post, photo: CGFloat) -> some View {

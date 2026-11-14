@@ -58,3 +58,13 @@ The system SHALL let the user unsubscribe from a feed from its context menu in t
 #### Scenario: Unsubscribe
 - **WHEN** the user picks Unsubscribe on a feed
 - **THEN** the feed disappears from the sidebar and its stored record is deleted
+
+### Requirement: YouTube channels
+Add Feed SHALL have a YouTube mode that searches YouTube channels by name, listing each match with its picture, name and handle or subscriber count, and a follow button that adds the channel's video feed. A video post's long-press menu offers "Find Recipe Later", which saves the video as an idea with its title and thumbnail and then looks for the recipe in its description and captions in the background, filling the idea in when it finds one. Saving a video post whose recipe can't be read does the same. A video post that opens without a readable recipe shows the video with "Find Later". An idea saved from a video offers "Find the Recipe in This Video" on its page.
+
+#### Scenario: Follow a channel by name
+- **WHEN** the user searches "Pasta Grannies" in Add Feed's YouTube mode and taps its follow button
+- **THEN** the channel's newest videos show up in Feeds
+
+### Requirement: Your Feeds lists everything followed
+The Manage Feeds page SHALL list every feed the user follows under "Your Feeds" at the top, including popular ones, each with a symbol for YouTube, Reddit or other feeds, before the popular feeds to discover.

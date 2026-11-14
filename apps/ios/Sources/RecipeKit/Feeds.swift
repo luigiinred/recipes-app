@@ -226,6 +226,20 @@ public enum FeedService {
         return isSourcePage ? try? await discover(from: url) : nil
     }
 
+    /// The feed of whoever made a shared post or video, such as the blog behind a recipe or a video's channel, if it has one.
+    public static func sourceFeed(for url: URL) async -> (url: URL, title: String)? {
+        if let video = YouTubeImporter.videoID(from: url) {
+            return await YouTubeChannels.channel(forVideo: video).map { ($0.feedURL, $0.title) }
+        }
+        if let found = try? await discover(from: url) { return found }
+        guard var root = URLComponents(url: url, resolvingAgainstBaseURL: false), YouTubeImporter.videoID(from: url) == nil else { return nil }
+        root.path = "/"
+        root.query = nil
+        root.fragment = nil
+        guard let home = root.url, home != url else { return nil }
+        return try? await discover(from: home)
+    }
+
     /// Accepts a feed URL or a site URL and finds the feed behind it.
     public static func discover(from url: URL) async throws -> (url: URL, title: String) {
         if let subreddit = subreddit(url.absoluteString) {
@@ -244,7 +258,8 @@ public enum FeedService {
         for tag in tags where tag.range(of: #"type\s*=\s*["']application/(rss|atom)\+xml["']"#, options: [.regularExpression, .caseInsensitive]) != nil {
             guard let hrefRange = tag.range(of: #"href\s*=\s*["']([^"']+)["']"#, options: [.regularExpression, .caseInsensitive]),
                   let valueRange = tag[hrefRange].range(of: #"(?<=["'])[^"']+"#, options: .regularExpression),
-                  let feedURL = URL(string: String(tag[hrefRange][valueRange]), relativeTo: finalURL)?.absoluteURL else { continue }
+                  let feedURL = URL(string: String(tag[hrefRange][valueRange]), relativeTo: finalURL)?.absoluteURL,
+                  !feedURL.path.lowercased().contains("comments") else { continue }
             let (feedData, _) = try await download(feedURL)
             let feed = try FeedParser.parse(feedData, baseURL: feedURL)
             return (feedURL, feed.title)

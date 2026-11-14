@@ -13,16 +13,14 @@ enum AppSection: Hashable {
 #if os(iOS)
 struct RootView: View {
     enum AppTab: Hashable {
-        case recipes, feeds, upNext, plan, groceries, settings, discover
+        case home, recipes, feeds, upNext, plan, groceries, settings, discover
         case collection(RecipeCollection)
     }
 
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
-    @AppStorage(AppSettings.Key.settingsInTabBar) private var settingsInTabBar = false
-    @AppStorage(AppSettings.Key.firstTab) private var firstTab = FirstTab.home
+    @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -32,6 +30,8 @@ struct RootView: View {
     private let showsSmartPlan: Bool
     /// Kept here so folding or unfolding a Duo, which swaps the tab items, keeps the open recipe.
     @State private var recipesPath: [RecipesRoute]
+    @State private var otherLibraryPath: [RecipesRoute] = []
+    @State private var otherLibraryQuery = ""
 
     init(
         tab: AppTab = .recipes, searchQuery: String = "", showsSmartPlan: Bool = false,
@@ -43,7 +43,8 @@ struct RootView: View {
             if let recipeSelection { path.append(.recipe(recipeSelection)) }
         }
         _recipesPath = State(initialValue: path)
-        _tab = State(initialValue: tab)
+        let shown = AppSettings.tabs(UserDefaults.standard.string(forKey: AppSettings.Key.tabOrder) ?? "")
+        _tab = State(initialValue: tab == .recipes || tab == .home ? Self.appTab(shown.first(where: \.isLibrary) ?? .home) : tab)
         _query = State(initialValue: searchQuery)
         self.showsSmartPlan = showsSmartPlan
     }
@@ -53,112 +54,137 @@ struct RootView: View {
             .filter { $0 != .uncategorized || !$0.filter(library.recipes).isEmpty }
     }
 
-    private func shows(_ tab: MainTab) -> Bool { !AppSettings.hiddenTabs(hiddenTabsRaw).contains(tab) }
-
-    /// iPhone's tab bar never holds more than five, so it never grows a More tab.
-    private func inBar(_ tab: MainTab) -> Bool {
-        guard sizeClass != .regular else { return shows(tab) }
-        return AppSettings.barTabs(hidden: hiddenTabsRaw, settingsInTabBar: settingsInTabBar).contains(tab)
+    /// iPhone's tab bar never holds more than five, so it never grows a More tab. iPad's sidebar holds them all.
+    private var barTabs: [TabItem] {
+        sizeClass == .regular ? AppSettings.tabs(tabOrderRaw) : AppSettings.barTabs(tabOrderRaw)
     }
 
-    /// The tab bar and the sidebar are one component on iPad. Collections and categories filter the Recipes tab.
+    private func inBar(_ tab: MainTab) -> Bool { barTabs.contains(TabItem(tab)) }
+
+    /// Where recipes open: the first of Home and Recipes in the bar.
+    private var libraryTab: AppTab { Self.appTab(barTabs.first(where: \.isLibrary) ?? .home) }
+
+    private static func appTab(_ item: TabItem) -> AppTab {
+        switch item {
+        case .home: .home
+        case .recipes: .recipes
+        case .feeds: .feeds
+        case .upNext: .upNext
+        case .plan: .plan
+        case .groceries: .groceries
+        case .settings: .settings
+        }
+    }
+
+    /// The first library tab keeps the shared stack, so links and a folding Duo land there; the second has its own.
+    private func libraryTab(_ item: TabItem) -> some TabContent<AppTab> {
+        let primary = Self.appTab(item) == libraryTab
+        return Tab(item.title, systemImage: item.symbol, value: Self.appTab(item)) {
+            RecipesTab(path: primary ? $recipesPath : $otherLibraryPath, query: primary ? $query : $otherLibraryQuery,
+                       showsAllRecipes: item == .recipes)
+        }
+    }
+
+    private func featureTab(_ item: TabItem) -> some TabContent<AppTab> {
+        Tab(item.title, systemImage: item.symbol, value: Self.appTab(item)) {
+            switch item {
+            case .feeds: AnyView(FeedStreamTab())
+            case .upNext: AnyView(UpNextTab())
+            case .plan: AnyView(PlanTab(showsSmartPlan: showsSmartPlan))
+            case .groceries: AnyView(GroceriesTab())
+            default: AnyView(SettingsView(inSheet: false, splitsPages: sizeClass == .regular))
+            }
+        }
+    }
+
+    @TabContentBuilder<AppTab>
+    private var sidebarTabs: some TabContent<AppTab> {
+        let tabs = barTabs
+        TabSection("Recipes") {
+            ForEach(tabs.filter(\.isLibrary)) { libraryTab($0) }
+            ForEach(sidebarCollections, id: \.self) { collection in
+                Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
+                    .defaultVisibility(.hidden, for: .tabBar)
+            }
+            if !discover.sources.isEmpty {
+                Tab("Discover", systemImage: "binoculars", value: AppTab.discover) { RecipesTab(root: .discoverHome(discover.sources)) }
+                    .defaultVisibility(.hidden, for: .tabBar)
+            }
+            ForEach(library.categoryTree) { node in
+                Tab(node.name, systemImage: node.children.isEmpty ? "tag" : "folder", value: AppTab.collection(.category(node.path))) {
+                    RecipesTab(root: .category(node.path))
+                }
+                .defaultVisibility(.hidden, for: .tabBar)
+            }
+        }
+        ForEach(tabs.filter { $0.feature != nil }) { featureTab($0) }
+        Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: true) }
+            .defaultVisibility(.hidden, for: .tabBar)
+    }
+
+    @TabContentBuilder<AppTab>
+    private var phoneTabs: some TabContent<AppTab> {
+        ForEach(barTabs) { item in
+            if item.isLibrary { libraryTab(item) } else { featureTab(item) }
+        }
+    }
+
+    /// The tab bar and the sidebar are one component on iPad. Collections and categories filter the library tabs.
     var body: some View {
         TabView(selection: $tab) {
-            if sizeClass == .regular {
-                TabSection("Recipes") {
-                    Tab(firstTab.title, systemImage: firstTab.symbol, value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
-                    ForEach(sidebarCollections, id: \.self) { collection in
-                        Tab(collection.title, systemImage: collection.symbol, value: AppTab.collection(collection)) { RecipesTab(root: collection) }
-                            .defaultVisibility(.hidden, for: .tabBar)
-                    }
-                    if !discover.sources.isEmpty {
-                        Tab("Discover", systemImage: "binoculars", value: AppTab.discover) { RecipesTab(root: .discoverHome(discover.sources)) }
-                            .defaultVisibility(.hidden, for: .tabBar)
-                    }
-                    ForEach(library.categoryTree) { node in
-                        Tab(node.name, systemImage: node.children.isEmpty ? "tag" : "folder", value: AppTab.collection(.category(node.path))) { RecipesTab(root: .category(node.path)) }
-                            .defaultVisibility(.hidden, for: .tabBar)
-                    }
-                }
-            } else {
-                Tab(firstTab.title, systemImage: firstTab.symbol, value: AppTab.recipes) { RecipesTab(path: $recipesPath, query: $query) }
-            }
-            if inBar(.feeds) {
-                Tab("Feeds", systemImage: "dot.radiowaves.up.forward", value: AppTab.feeds) { FeedStreamTab() }
-            }
-            if inBar(.upNext) {
-                Tab("Up Next", systemImage: MainTab.upNext.symbol, value: AppTab.upNext) { UpNextTab() }
-            }
-            if inBar(.plan) {
-                Tab("Plan", systemImage: "calendar", value: AppTab.plan) { PlanTab(showsSmartPlan: showsSmartPlan) }
-            }
-            if inBar(.groceries) {
-                Tab("Groceries", systemImage: "checklist", value: AppTab.groceries) { GroceriesTab() }
-            }
-            // iPhone opens Settings from the gear on the first tab unless it's set to sit in the tab bar; iPad keeps it in the sidebar.
-            if sizeClass == .regular {
-                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: true) }
-                    .defaultVisibility(.hidden, for: .tabBar)
-            } else if settingsInTabBar {
-                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) { SettingsView(inSheet: false, splitsPages: false) }
-            }
+            if sizeClass == .regular { sidebarTabs } else { phoneTabs }
         }
         .environment(browsing)
         .tabViewStyle(.sidebarAdaptable)
         .sidebarFirst()
         .reviewPrompt()
         .toastHost()
+        .cleanupScanning()
         .cookModeCover(cook)
-        .onChange(of: settingsInTabBar) { _, shown in
-            if !shown, sizeClass != .regular, tab == .settings { tab = .recipes }
-            if let main = mainTab(tab), !inBar(main) { tab = .recipes }
-        }
-        .onChange(of: hiddenTabsRaw) {
-            if let hidden = mainTab(tab), !inBar(hidden) { tab = .recipes }
-        }
+        .onChange(of: tabOrderRaw) { keepTabShown() }
         .onChange(of: sizeClass) { _, size in
-            if size != .regular, tab == .settings, !settingsInTabBar { tab = .recipes }
             if size != .regular, case .collection(let collection) = tab {
                 recipesPath = [.collection(collection)]
-                tab = .recipes
+                tab = libraryTab
             }
+            keepTabShown()
         }
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: AppTab = switch destination {
+            let target: MainTab = switch destination {
             case .plan: .plan
             case .groceries: .groceries
             case .feeds: .feeds
             }
-            if let main = mainTab(target), inBar(main) { tab = target }
+            if inBar(target) { tab = Self.appTab(TabItem(target)) }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
-            if id != nil { tab = .recipes }
+            if id != nil { tab = libraryTab }
         }
         .onChange(of: router.feedPost, initial: true) { _, entry in
             guard let entry else { return }
             if inBar(.feeds) { tab = .feeds; return }
-            tab = .recipes
+            tab = libraryTab
             recipesPath = [.feedPost(entry)]
             router.feedPost = nil
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
             case .logDinner, .planWeek: if inBar(.plan) { tab = .plan }
-            case .addRecipe: tab = .recipes
+            case .addRecipe: tab = libraryTab
             case nil: break
             }
         }
     }
 
-    private func mainTab(_ tab: AppTab) -> MainTab? {
+    /// A tab taken out of the bar, or Settings leaving the iPhone bar, falls back to the library.
+    private func keepTabShown() {
+        let shown: Set<AppTab> = Set(barTabs.map(Self.appTab))
         switch tab {
-        case .feeds: .feeds
-        case .upNext: .upNext
-        case .plan: .plan
-        case .groceries: .groceries
-        default: nil
+        case .collection, .discover: if sizeClass != .regular { tab = libraryTab }
+        case .settings: if sizeClass != .regular, !shown.contains(.settings) { tab = libraryTab }
+        default: if !shown.contains(tab) { tab = libraryTab }
         }
     }
 }
@@ -175,13 +201,13 @@ struct RecipesTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @AppStorage(AppSettings.Key.firstTab) private var firstTab = FirstTab.home
     @State private var localPath: [RecipesRoute] = []
     @State private var selection: Recipe.ID?
     @FocusState private var isTyping: Bool
     @Binding private var query: String
     private let sharedPath: Binding<[RecipesRoute]>?
     private let root: RecipesRoute?
+    private var showsAllRecipes = false
 
     init(root: RecipeCollection) {
         self.init(root: .collection(root))
@@ -193,10 +219,11 @@ struct RecipesTab: View {
         _query = .constant("")
     }
 
-    init(path: Binding<[RecipesRoute]>, query: Binding<String>) {
+    init(path: Binding<[RecipesRoute]>, query: Binding<String>, showsAllRecipes: Bool = false) {
         root = nil
         sharedPath = path
         _query = query
+        self.showsAllRecipes = showsAllRecipes
     }
 
     private var searchPlacement: SearchFieldPlacement {
@@ -219,7 +246,7 @@ struct RecipesTab: View {
                 if let root { destination(root) }
                 else {
                     RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty, isSearching: isTyping,
-                                    showsAllRecipes: firstTab == .recipes, isTabRoot: true) { isTyping = false }
+                                    showsAllRecipes: showsAllRecipes, isTabRoot: true) { isTyping = false }
                         .searchable(text: $query, placement: searchPlacement, prompt: "Search My Recipes")
                         .searchFocused($isTyping)
                 }
@@ -361,7 +388,7 @@ struct RootView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
 
     @State private var section: AppSection?
     @State private var path: [Recipe.ID]
@@ -408,6 +435,7 @@ struct RootView: View {
             selection = nil
         }
         .toastHost()
+        .cleanupScanning()
         .cookModeCover(cook)
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
@@ -462,7 +490,7 @@ struct SidebarView: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.onboardingCompleted) private var onboarded = false
     @AppStorage(AppSettings.Key.reviewPromptDismissed) private var reviewDismissed = false
-    @AppStorage(AppSettings.Key.hiddenTabs) private var hiddenTabsRaw = ""
+    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     @Binding var section: AppSection?
     @State private var recipesExpanded = true
     @State private var collapsed: Set<String> = []
@@ -481,8 +509,7 @@ struct SidebarView: View {
                         .onTapGesture { recipesExpanded.toggle() }
                         .categoryRootDrop()
                 }
-                let hidden = AppSettings.hiddenTabs(hiddenTabsRaw)
-                ForEach(MainTab.allCases.filter { !hidden.contains($0) }, id: \.self) { tab in
+                ForEach(AppSettings.tabs(hiddenTabsRaw).compactMap(\.feature), id: \.self) { tab in
                     Label(tab.title, systemImage: tab.symbol).tag(tab.section)
                 }
             }

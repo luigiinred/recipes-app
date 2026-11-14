@@ -51,6 +51,17 @@ struct OnboardingTests {
         #expect(AppSettings.hiddenTabs(AppSettings.showing(.feeds, true, hidden: hidden)) == [.plan])
     }
 
+    @Test("arranged tabs carry over the older tab choices and keep a library tab")
+    func arrangedTabs() throws {
+        let defaults = try #require(UserDefaults(suiteName: "tabs-\(UUID().uuidString)"))
+        defaults.set(FirstTab.recipes.rawValue, forKey: AppSettings.Key.firstTab)
+        defaults.set("plan", forKey: AppSettings.Key.hiddenTabs)
+        defaults.set(true, forKey: AppSettings.Key.settingsInTabBar)
+        #expect(AppSettings.tabs("", defaults: defaults) == [.recipes, .feeds, .upNext, .groceries, .settings])
+        #expect(AppSettings.tabs("groceries,home,recipes", defaults: defaults) == [.groceries, .home, .recipes])
+        #expect(AppSettings.tabs("feeds,plan", defaults: defaults).first == .recipes)
+    }
+
     private func library(adding indices: [Int], feeds: [Feed] = []) -> RecipeLibrary {
         RecipeLibrary(recipes: indices.map {
             let source = OnboardingSources.all[$0]

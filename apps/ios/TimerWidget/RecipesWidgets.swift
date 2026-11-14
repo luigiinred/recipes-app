@@ -178,7 +178,6 @@ private struct MealPlanView: View {
             }
         case .systemLarge:
             VStack(alignment: .leading, spacing: 10) {
-                Header(title: "Meal Plan", symbol: "calendar", accent: accent)
                 ForEach(0..<5, id: \.self) { offset in
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(label(for: offset)).font(.subheadline.weight(.semibold))
@@ -262,7 +261,6 @@ private struct UpNextView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         case .systemSmall:
             VStack(alignment: .leading, spacing: 6) {
-                Header(title: "Up Next", symbol: "text.line.first.and.arrowtriangle.forward", accent: accent)
                 if queue.isEmpty {
                     Empty(symbol: "text.line.first.and.arrowtriangle.forward", message: "Swipe a recipe to line it up")
                 } else {
@@ -274,7 +272,6 @@ private struct UpNextView: View {
             let limit = family == .systemLarge ? 6 : 3
             let photo: CGFloat = family == .systemLarge ? 40 : 32
             VStack(alignment: .leading, spacing: 6) {
-                Header(title: "Up Next", symbol: "text.line.first.and.arrowtriangle.forward", accent: accent, detail: queue.isEmpty ? nil : "\(queue.count)")
                 if queue.isEmpty {
                     Empty(symbol: "text.line.first.and.arrowtriangle.forward", message: "Swipe a recipe left in your library to line it up")
                 } else {
@@ -339,7 +336,6 @@ private struct GroceriesView: View {
             let limit = family == .systemSmall ? 4 : family == .systemMedium ? 6 : 14
             let columns = family == .systemSmall ? 1 : 2
             VStack(alignment: .leading, spacing: 8) {
-                Header(title: "Groceries", symbol: "checklist", accent: accent, detail: items.isEmpty ? nil : "\(items.count) to buy")
                 if items.isEmpty {
                     Empty(symbol: "cart", message: entry.snapshot.checkedCount > 0 ? "Everything is checked off" : "Nothing to buy")
                 } else {

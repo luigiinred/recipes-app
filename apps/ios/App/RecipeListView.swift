@@ -219,26 +219,34 @@ struct EmptyLibraryView: View {
         } else if let message = library.errorMessage {
             ContentUnavailableView("Couldn't load recipes", systemImage: "exclamationmark.triangle", description: Text(message))
         } else {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Syncing recipes…").appFont(.subheadline, weight: .semibold)
-                    if let detail = progressDetail {
-                        Text(detail)
-                            .appFont(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .animation(.snappy, value: library.loadProgress)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .accessibilityElement(children: .combine)
-                RecipeRowsSkeleton().accessibilityHidden(true)
-            }
-            .padding(.top, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            RecipeRowsSkeleton()
+                .padding(.top, 16)
+                .accessibilityHidden(true)
+                .overlay(alignment: .top) { syncStatus.padding(.top, 72) }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+    }
+
+    private var syncStatus: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Syncing recipes…").appFont(.headline)
+            }
+            if let detail = progressDetail {
+                Text(detail)
+                    .appFont(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: library.loadProgress)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+        .accessibilityElement(children: .combine)
     }
 
     private var progressDetail: String? {
@@ -369,6 +377,7 @@ private struct RecipeActionsModifier: ViewModifier {
     @State private var mealPhotoItem: PhotosPickerItem?
     @State private var progressMessage: String?
     @State private var scanError: String?
+    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
 
     func body(content: Content) -> some View {
         if scope == nil { actions(content) } else { content }
@@ -503,25 +512,27 @@ private struct RecipeActionsModifier: ViewModifier {
 
     @ViewBuilder
     private var addItems: some View {
-        Button("New Recipe", systemImage: "square.and.pencil") { showingNew = true }
-        Button("New Idea…", systemImage: "lightbulb") { ideaDraft = IdeaDraft() }
-        Button("Import from Web or YouTube…", systemImage: "globe") { showingImport = true }
+        Button("Paste a Link…", systemImage: "link") { showingImport = true }
         #if os(iOS)
-        Button("Scan Recipe…", systemImage: "doc.viewfinder") {
-            if DocumentScanner.isAvailable { showingScanner = true } else { scanError = "Scanning needs a device with a camera." }
-        }
-        #endif
-        Button("Import Photo or PDF…", systemImage: "photo.on.rectangle") { showingFileImporter = true }
-        #if os(iOS)
-        Menu("Idea from Photo", systemImage: "fork.knife.circle") {
-            if MealCamera.isAvailable {
-                Button("Take Photo", systemImage: "camera") { showingMealCamera = true }
+        Menu("From a Photo or PDF", systemImage: "doc.viewfinder") {
+            Button("Scan with Camera", systemImage: "camera.viewfinder") {
+                if DocumentScanner.isAvailable { showingScanner = true } else { scanError = "Scanning needs a device with a camera." }
             }
-            Button("Choose Photo", systemImage: "photo") { showingMealLibrary = true }
+            Button("Choose a File", systemImage: "folder") { showingFileImporter = true }
         }
         #else
-        Button("Idea from Photo…", systemImage: "fork.knife.circle") { showingMealLibrary = true }
+        Button("From a Photo or PDF…", systemImage: "doc.viewfinder") { showingFileImporter = true }
         #endif
+        Button("Write Your Own", systemImage: "square.and.pencil") { showingNew = true }
+        Menu("Save an Idea", systemImage: "lightbulb") {
+            Button("Just a Name", systemImage: "character.cursor.ibeam") { ideaDraft = IdeaDraft() }
+            #if os(iOS)
+            if MealCamera.isAvailable {
+                Button("Photo of a Meal", systemImage: "camera") { showingMealCamera = true }
+            }
+            #endif
+            Button("Meal from My Photos", systemImage: "photo") { showingMealLibrary = true }
+        }
     }
 
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
@@ -531,10 +542,14 @@ private struct RecipeActionsModifier: ViewModifier {
             progressMessage = nil
             switch result {
             case .success(let text):
+                let recipe = RecipeTextParser.parse(text)
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     scanError = "No text found."
+                } else if !reviewImports, !recipe.title.isEmpty, !recipe.ingredients.isEmpty, !recipe.steps.isEmpty {
+                    await library.save(recipe.standardized())
+                    selection = recipe.id
                 } else {
-                    draft = ScanDraft(recipe: RecipeTextParser.parse(text), text: text)
+                    draft = ScanDraft(recipe: recipe, text: text)
                 }
             case .failure(let error):
                 scanError = error.localizedDescription
