@@ -116,6 +116,7 @@ enum AppSettings {
         static let mealieSyncGroceries = "mealieSyncGroceries"
         static let appearance = "appearance"
         static let colorTheme = "colorTheme"
+        static let darkColorTheme = "colorThemeDark"
         static let fontStyle = "fontStyle"
         static let accentColor = "accentColorHex"
         static let customThemeCanvas = "customThemeCanvasHex"

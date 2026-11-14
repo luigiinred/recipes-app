@@ -91,7 +91,7 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.reminders) { Label("Reminders", systemImage: "bell") }
         }
         Section {
-            NavigationLink(value: SettingsPage.theme) { Label("Theme", systemImage: "paintpalette") }
+            NavigationLink(value: SettingsPage.theme) { Label("Appearance", systemImage: "paintpalette") }
         }
         Section {
             NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
@@ -154,7 +154,7 @@ struct SettingsView: View {
         case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
         case .reminders: RemindersSettingsPage()
-        case .theme: ThemeSettingsPage()
+        case .theme: AppearanceSettingsPage()
         case .feeds: RecipeFeedsPage(showsTabToggle: true)
         case .mealie: MealieSettingsPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
@@ -553,126 +553,6 @@ struct RemindersSettingsPage: View {
         #else
         URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
         #endif
-    }
-}
-
-struct ThemeSettingsPage: View {
-    @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
-    @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
-    @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
-    @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
-    @Environment(\.self) private var environment
-    @Environment(\.colorScheme) private var scheme
-    private var custom = StoredCustomTheme()
-
-    private var theme: ColorTheme { ColorTheme(rawValue: themeRaw) ?? .classic }
-    private var font: FontStyle { FontStyle(rawValue: fontStyle) ?? .serif }
-
-    private var customAccent: Binding<Color> {
-        Binding(
-            get: { Color(hex: accentHex) ?? Theme.defaultAccent },
-            set: { accentHex = $0.hex(in: environment) }
-        )
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                ThemePreview().themedRow(raised: true)
-            }
-            Section {
-                ThemeTileRow {
-                    ForEach(Appearance.allCases) { mode in
-                        ThemeTile(title: mode.title, isSelected: appearance == mode.rawValue) {
-                            appearance = mode.rawValue
-                        } thumbnail: {
-                            appearanceThumbnail(mode)
-                        }
-                    }
-                }
-                .themedRow(raised: true)
-            } header: {
-                Text("Appearance")
-            } footer: {
-                Text("Auto follows your device between light and dark.")
-            }
-            Section {
-                ThemeTileRow {
-                    ForEach(ColorTheme.colors + [.custom]) { option in
-                        ThemeTile(title: option.title, isSelected: theme == option) {
-                            themeRaw = option.rawValue
-                        } thumbnail: {
-                            ThemeThumbnail(swatch: preview(option, scheme), scheme: scheme)
-                        }
-                    }
-                }
-                .themedRow(raised: true)
-                NavigationLink { CustomThemePage() } label: { Label("Theme Creator", systemImage: "slider.horizontal.3") }
-                    .themedRow(raised: true)
-            } header: {
-                Text("Color")
-            } footer: {
-                Text("Classic is plain white or black with an accent you pick. The other colors tint the page and cards and bring their own accent. Theme Creator makes a Custom one.")
-            }
-            if theme == .classic {
-                Section {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
-                        ForEach(AccentPreset.all) { preset in
-                            Button { accentHex = preset.hex } label: {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 36, height: 36)
-                                    .overlay {
-                                        if accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame {
-                                            Image(systemName: "checkmark").appFont(.footnote, weight: .bold).foregroundStyle(.white)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(preset.name)
-                            .accessibilityAddTraits(accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? .isSelected : [])
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    ColorPicker("Custom color", selection: customAccent, supportsOpacity: false)
-                    Button("Reset to Tomato") { accentHex = Theme.defaultAccentHex }
-                        .disabled(accentHex.caseInsensitiveCompare(Theme.defaultAccentHex) == .orderedSame)
-                } header: {
-                    Text("Accent color")
-                } footer: {
-                    Text("Buttons, links, highlights and ratings.")
-                }
-            }
-            Section {
-                NavigationLink { FontSettingsPage() } label: {
-                    LabeledContent {
-                        Text(font.title)
-                    } label: {
-                        Label("Font", systemImage: "textformat")
-                    }
-                }
-                .themedRow(raised: true)
-            } footer: {
-                Text("Used for recipes, lists and settings throughout the app.")
-            }
-        }
-        .formStyle(.grouped)
-        .settingsPage("Theme")
-    }
-
-    private func preview(_ theme: ColorTheme, _ scheme: ColorScheme) -> Swatch {
-        theme.previewSwatch(for: scheme, classicAccent: accentHex, custom: custom.colors)
-    }
-
-    @ViewBuilder
-    private func appearanceThumbnail(_ mode: Appearance) -> some View {
-        switch mode {
-        case .light: ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
-        case .dark: ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark)
-        case .system:
-            ThemeThumbnail(swatch: preview(theme, .light), scheme: .light)
-                .overlay { ThemeThumbnail(swatch: preview(theme, .dark), scheme: .dark).mask(DiagonalHalf()) }
-        }
     }
 }
 

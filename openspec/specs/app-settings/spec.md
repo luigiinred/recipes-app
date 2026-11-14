@@ -14,7 +14,7 @@ The system SHALL open Settings from a Settings tab on iPhone (pages pushed onto 
 - **THEN** the page list appears beside the Recipes settings page
 
 ### Requirement: Settings pages
-The system SHALL list these pages: Recipes, Planner, Cooking, Groceries, Reminders; Theme; Mealie (under "Sync"); Apple Intelligence; and Data & Developer. Below them it shows a Feedback section with Report a Bug and Suggest a Change (see app-feedback), Show Welcome Tour (replays the tour; see onboarding), and a Source Code link to https://github.com/luigiinred/recipes-app.
+The system SHALL list these pages: Recipes, Planner, Cooking, Groceries, Reminders; Appearance; Mealie (under "Sync"); Apple Intelligence; and Data & Developer. Below them it shows a Feedback section with Report a Bug and Suggest a Change (see app-feedback), Show Welcome Tour (replays the tour; see onboarding), and a Source Code link to https://github.com/luigiinred/recipes-app.
 
 #### Scenario: Replay the tour
 - **WHEN** the user taps Show Welcome Tour
@@ -71,16 +71,20 @@ The system SHALL offer "Sync with Reminders" on the Groceries page, which keeps 
 - **WHEN** the user opens the Reminders page
 - **THEN** Turn All Off is disabled
 
-### Requirement: Theme page
-The system SHALL offer on the Theme page, below a live preview: an Appearance choice of Light, Dark or Auto (key `appearance`, values `light`, `dark`, `system`; default Auto), shown as thumbnails of the app in the current color; a Color choice (key `colorTheme`, default Classic) of Classic, Paper, Tomato, Pear, Blueberry, Plum and Custom, shown as thumbnails drawn in the current light or dark appearance, with a Theme Creator link; an Accent color, shown only while Classic is chosen (key `accentColorHex`, a six-digit hex), picked from presets Tomato (DB4738, the default), Rust, Orange, Saffron, Pear, Basil, Teal, Blueberry, Plum, Rose and Graphite or a custom color, with "Reset to Tomato" disabled while Tomato is selected; and a Font row that opens the Font page. Settings saved before appearance and color were separate are mapped to the closest color and appearance on launch.
+### Requirement: Appearance page
+The system SHALL offer Settings → Appearance with, in order:
+- Color scheme: three cards, Light, Dark and System (key `appearance`, values `light`, `dark`, `system`; default System), each with a miniature phone drawn in the chosen light or dark theme, System showing the two side by side; the chosen card has an accent border.
+- Themes: a two-column grid of theme cards, Coconut (plain white or black with the accent chosen below), Oat, Tomato, Pear, Blueberry, Plum and Custom, each with a light orb and a dark orb drawn from the theme's page, card and accent colors. Tapping a card uses the theme for both modes; tapping one orb uses it for that mode only. The light theme is stored in `colorTheme` (default Coconut, stored as `classic`) and a different dark theme in `colorThemeDark`, which is empty while dark follows light. The orb in use for each mode has an accent ring and a sun or moon badge, and a card used for both has an accent border. Theme Creator follows the grid.
+- Coconut accent, only while Coconut is in use for either mode: accent presets (key `accentColorHex`, default Tomato) and a custom color picker.
+- Text: a live preview and a Font row that opens the Font page; text size follows the device.
+
+#### Scenario: Different themes for light and dark
+- **WHEN** the user taps Tomato's card, then Blueberry's dark orb
+- **THEN** the app uses Tomato in light mode and Blueberry in dark mode
 
 #### Scenario: Pick an accent preset
-- **WHEN** Classic is chosen and the user taps the Basil swatch
+- **WHEN** Coconut is in use and the user taps the Basil swatch
 - **THEN** `accentColorHex` becomes 3E8E5A and the swatch shows a checkmark
-
-#### Scenario: Colored themes bring their own accent
-- **WHEN** the user picks Blueberry
-- **THEN** the Accent color section is hidden and the app uses Blueberry's accent, lighter in dark
 
 ### Requirement: Font page
 The system SHALL show the live preview at the top of the Font page and list fonts (key `fontStyle`, default New York) in sections: System (New York, San Francisco, Rounded, Monospaced), Serif (Georgia, Charter, Iowan Old Style, Palatino, Baskerville), Sans Serif (Avenir Next, Gill Sans, Futura, Optima) and Typewriter (American Typewriter), each drawn in its own font, with a checkmark on the chosen one.
