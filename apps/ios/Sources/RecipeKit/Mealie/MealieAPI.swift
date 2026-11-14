@@ -41,6 +41,13 @@ public struct MealieShoppingList: Sendable, Equatable {
 public struct MealieUser: Sendable, Equatable {
     public var id: String
     public var username: String
+    public var groupSlug: String?
+
+    public init(id: String, username: String, groupSlug: String? = nil) {
+        self.id = id
+        self.username = username
+        self.groupSlug = groupSlug
+    }
 }
 
 /// The part of Mealie's REST API the sync uses.
@@ -91,6 +98,14 @@ public struct MealieClient: MealieAPI {
         self.session = session
     }
 
+    /// A recipe's page in Mealie's web app: `/g/<group>/r/<slug>`, or the older `/recipe/<slug>` when the group isn't known.
+    public static func recipePageURL(server: URL, groupSlug: String?, slug: String) -> URL {
+        if let groupSlug, !groupSlug.isEmpty {
+            return server.appendingPathComponent("g").appendingPathComponent(groupSlug).appendingPathComponent("r").appendingPathComponent(slug)
+        }
+        return server.appendingPathComponent("recipe").appendingPathComponent(slug)
+    }
+
     /// Accepts what people paste: a bare host, a trailing slash, or the `/api` address. Nil when it isn't an http(s) URL.
     public static func normalizedServer(_ text: String) -> URL? {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,7 +132,7 @@ public struct MealieClient: MealieAPI {
             throw MealieError.notMealie
         }
         guard let id = object["id"] as? String else { throw MealieError.notMealie }
-        return MealieUser(id: id, username: object["username"] as? String ?? "")
+        return MealieUser(id: id, username: object["username"] as? String ?? "", groupSlug: object["groupSlug"] as? String)
     }
 
     /// Makes a new API token for the signed-in user and returns its secret, which Mealie shows only once.

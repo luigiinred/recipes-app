@@ -45,6 +45,16 @@ final class MealieSyncTests: XCTestCase {
         XCTAssertEqual((remote["tags"] as? [MealieObject])?.compactMap { $0.string("name") }, ["Dinner"])
     }
 
+    func testASyncedRecipeHasAPageInMealie() async throws {
+        let pasta = try save(Recipe(title: "Pasta", steps: ["Boil."]))
+        XCTAssertNil(MealieSync.slug(forRecipe: pasta.id, stateURL: state, server: server))
+        try await makeSync().sync()
+        let slug = try XCTUnwrap(MealieSync.slug(forRecipe: pasta.id, stateURL: state, server: server))
+        XCTAssertNil(MealieSync.slug(forRecipe: pasta.id, stateURL: state, server: URL(string: "http://other.test")!))
+        XCTAssertEqual(MealieClient.recipePageURL(server: server, groupSlug: "home", slug: slug).absoluteString, "http://mealie.test/g/home/r/\(slug)")
+        XCTAssertEqual(MealieClient.recipePageURL(server: server, groupSlug: nil, slug: slug).absoluteString, "http://mealie.test/recipe/\(slug)")
+    }
+
     func testASecondPassWithNothingNewDoesNothing() async throws {
         try save(Recipe(title: "Pasta", steps: ["Boil."]))
         mealie.add(name: "Stew", steps: ["Simmer."])

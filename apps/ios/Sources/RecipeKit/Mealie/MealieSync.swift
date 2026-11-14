@@ -96,6 +96,13 @@ public struct MealieSync: Sendable {
         return base.appendingPathComponent("MealieSync", isDirectory: true).appendingPathComponent("\(key).json")
     }
 
+    /// The Mealie slug a recipe was last synced as on this device, if it has been.
+    public static func slug(forRecipe id: UUID, stateURL: URL, server: URL) -> String? {
+        guard let data = try? Data(contentsOf: stateURL), let state = try? JSONDecoder().decode(State.self, from: data),
+              state.server == server.absoluteString else { return nil }
+        return state.recipes[id.uuidString]?.slug
+    }
+
     @discardableResult
     public func sync() async throws -> Report {
         var state = loadState()
