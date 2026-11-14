@@ -69,10 +69,33 @@ public enum IngredientGrouper {
         return order.map { Group(title: $0, members: members[$0.lowercased()] ?? []) }
     }
 
+    /// Words for a part of a meal made on its own and then combined or served with the rest.
+    static let componentWords = [
+        "dressing", "vinaigrette", "sauce", "gravy", "marinade", "glaze", "frosting", "icing", "ganache", "filling",
+        "crust", "pastry", "topping", "streusel", "crumble", "salsa", "slaw", "dip", "syrup", "rub", "custard", "dough",
+    ]
+
+    /// Sections are for the rare recipe that makes a distinct part separately: a long list whose method names one.
+    static func shouldConsider(ingredients: [String], steps: [String]) -> Bool {
+        guard ingredients.count >= 6 else { return false }
+        let method = steps.joined(separator: " ").lowercased()
+        return componentWords.contains { method.range(of: "\\b\($0)\\b", options: .regularExpression) != nil }
+    }
+
+    /// Two or three real parts, each with at least two ingredients, nothing left over, and named the way the method names them.
+    static func accepts(_ groups: [Group], steps: [String]) -> Bool {
+        guard (2...3).contains(groups.count), groups.allSatisfy({ $0.members.count >= 2 }),
+              !groups.contains(where: { $0.title.caseInsensitiveCompare("Other") == .orderedSame }) else { return false }
+        let method = steps.joined(separator: " ").lowercased()
+        return groups.contains { group in
+            group.title.lowercased().split(separator: " ").contains { word in word.count > 2 && method.contains(word) }
+        }
+    }
+
     public static func group(title: String, ingredients: [String], steps: [String]) async -> Outcome {
         let status = AppleIntelligence.status
         guard status.isAvailable else { return .unavailable(status) }
-        guard ingredients.count >= 4 else { return .unchanged }
+        guard shouldConsider(ingredients: ingredients, steps: steps) else { return .unchanged }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
             let session = LanguageModelSession(instructions: AIAction.groupIngredients.instructions())
@@ -84,6 +107,7 @@ public enum IngredientGrouper {
                     generating: GeneratedGrouping.self
                 )
                 let groups = groups(from: response.content.assignments.map { ($0.number - 1, $0.section) }, count: ingredients.count)
+                guard accepts(groups, steps: steps) else { return .unchanged }
                 if let result = apply(groups, to: ingredients) { return .grouped(ingredients: result.ingredients, sections: result.sections) }
                 return .unchanged
             } catch let error as LanguageModelSession.GenerationError {
