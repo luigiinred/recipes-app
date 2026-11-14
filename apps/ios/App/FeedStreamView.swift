@@ -151,6 +151,7 @@ struct FeedStreamView: View {
     @Environment(\.appAccent) private var accent
     @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
     @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
+    @AppStorage(AppSettings.Key.feedDiscoverDismissed) private var discoverDismissed = false
     /// Viewed posts taken out of the list, updated only while the list is on screen so an open post's link never disappears under it.
     @State private var hidden: Set<String> = []
     @State private var isVisible = false
@@ -174,24 +175,12 @@ struct FeedStreamView: View {
             .onChange(of: showViewed) { refreshHidden() }
             .onChange(of: layout) { refreshHidden() }
             .toolbar {
-                if layout == .swipe {
-                    ToolbarItem(placement: .navigation) {
-                        NavigationLink { FeedDiscoverPage() } label: { Label("Discover", systemImage: "sparkle.magnifyingglass") }
-                    }
+                ToolbarItem(placement: .navigation) {
+                    NavigationLink { FeedDiscoverPage() } label: { Label("Discover", systemImage: "sparkle.magnifyingglass") }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Picker("View", selection: $layout) {
-                            ForEach(FeedLayout.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
-                        }
-                        Section {
-                            Toggle(isOn: $showViewed) { Label("Show Viewed", systemImage: "eye") }
-                            Button(action: markAllViewed) { Label("Mark All as Viewed", systemImage: "checkmark.circle") }
-                                .disabled(newIDs.isEmpty)
-                        }
-                    } label: {
-                        Label("View", systemImage: layout.symbol)
-                    }
+                    Button(action: markAllViewed) { Label("Mark All as Viewed", systemImage: "checkmark.circle") }
+                        .disabled(newIDs.isEmpty)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     // Destination links, so this page works inside any stack, including Home's typed path.
@@ -217,7 +206,7 @@ struct FeedStreamView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 36) {
-                discoverLink
+                if !discoverDismissed { discoverLink }
                 if library.feeds.isEmpty {
                     Text("Follow recipe sites, blogs and YouTube channels from Discover and their newest posts show up here.")
                         .appFont(.subheadline)
@@ -241,21 +230,35 @@ struct FeedStreamView: View {
     }
 
     private var discoverLink: some View {
-        NavigationLink { FeedDiscoverPage() } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "sparkle.magnifyingglass").appFont(.title2).foregroundStyle(accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Discover").appFont(.headline)
-                    Text("Popular recipe sites by kind of cooking").appFont(.subheadline).foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            NavigationLink { FeedDiscoverPage() } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "sparkle.magnifyingglass").appFont(.title2).foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Discover").appFont(.headline)
+                        Text("Popular recipe sites by kind of cooking").appFont(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+                .contentShape(Rectangle())
             }
-            .padding(16)
-            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .buttonStyle(.plain)
+            Button {
+                withAnimation(.snappy) { discoverDismissed = true }
+            } label: {
+                Image(systemName: "xmark")
+                    .appFont(.body, weight: .semibold)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Dismiss")
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal)
     }
 
@@ -831,11 +834,29 @@ struct RecipeFeedsPage: View {
 /// How posts open, when they count as viewed, and a way to see them all again.
 private struct ReadingFeedsSection: View {
     @EnvironmentObject private var loader: FeedLoader
+    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
+    @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
+    @AppStorage(AppSettings.Key.feedDiscoverDismissed) private var discoverDismissed = false
     @AppStorage(AppSettings.Key.feedReader) private var opensInReader = true
     @AppStorage(AppSettings.Key.feedMarkViewed) private var markMode = FeedMarkMode.onClose
     @State private var confirmingReset = false
 
     var body: some View {
+        Section {
+            Picker(selection: $layout) {
+                ForEach(FeedLayout.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
+            } label: {
+                Label("Layout", systemImage: layout.symbol)
+            }
+            Toggle(isOn: $showViewed) { Label("Show Viewed Posts", systemImage: "eye") }
+            Toggle(isOn: Binding(get: { !discoverDismissed }, set: { discoverDismissed = !$0 })) {
+                Label("Discover Card", systemImage: "sparkle.magnifyingglass")
+            }
+        } header: {
+            Text("View")
+        } footer: {
+            Text("Discover is always in the Feeds toolbar; the card at the top of Feeds is a bigger way in.")
+        }
         Section {
             Toggle(isOn: $opensInReader) { Label("Open Articles in Reader", systemImage: "doc.plaintext") }
             Picker(selection: $markMode) {
