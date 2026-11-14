@@ -44,12 +44,17 @@ The system SHALL show a five-star rating control in the header when the rating s
 - **THEN** no star control is shown in the header
 
 ### Requirement: Tags under the title
-The system SHALL show the recipe's tags as chips directly under the title (nested ones shown with " › "), followed by an "Add" chip, or "Add Tags" when the recipe has none. Tapping a tag chip or the Add chip opens a "Tags" sheet with the tag editor (see recipe-editor) and Cancel and Done. Done saves the tags only if they changed; Cancel discards the edits.
+The system SHALL show the recipe's tags as chips directly under the title (nested ones shown with " › "), followed by an "Add" chip, or "Add Tags" when the recipe has none. Tapping a tag chip opens a list of every recipe with that tag, where tapping a recipe opens it; a tag chip's context menu also offers Edit Tags…. Tapping the Add chip opens a "Tags" sheet with the tag editor (see recipe-editor) and Cancel and Done. Done saves the tags only if they changed; Cancel discards the edits.
 
 #### Scenario: Add the first tag
 - **GIVEN** a recipe with no tags
 - **WHEN** the user taps Add Tags, adds "Soup" and taps Done
 - **THEN** the recipe is saved with the tag "Soup" and a Soup chip shows under the title
+
+#### Scenario: Browse a tag
+- **GIVEN** a recipe tagged "Breakfast"
+- **WHEN** the user taps the Breakfast chip
+- **THEN** a "Breakfast" page lists every recipe tagged Breakfast
 
 #### Scenario: Cancel keeps tags
 - **GIVEN** a recipe tagged "Soup"
