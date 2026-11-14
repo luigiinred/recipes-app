@@ -55,8 +55,8 @@ enum ColorTheme: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .classic: "Classic"
-        case .paper: "Paper"
+        case .classic: "Coconut"
+        case .paper: "Oat"
         case .tomato: "Tomato"
         case .pear: "Pear"
         case .blueberry: "Blueberry"
@@ -65,7 +65,14 @@ enum ColorTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Classic is plain white or black and takes the accent chosen in Settings; the others bring their own.
+    /// The theme for one appearance: dark mode has its own choice, and follows the light one until it's set.
+    static func selected(for scheme: ColorScheme, light: String, dark: String) -> ColorTheme {
+        let lightTheme = ColorTheme(rawValue: light) ?? .classic
+        guard scheme == .dark, let darkTheme = ColorTheme(rawValue: dark) else { return lightTheme }
+        return darkTheme
+    }
+
+    /// Coconut is plain white or black and takes the accent chosen in Settings; the others bring their own.
     func swatch(for scheme: ColorScheme, custom: CustomThemeColors = .init()) -> Swatch? {
         let dark = scheme == .dark
         return switch self {
@@ -344,15 +351,16 @@ extension Color {
 private struct AppThemeModifier: ViewModifier {
     @AppStorage(AppSettings.Key.appearance) private var appearanceRaw = Appearance.system.rawValue
     @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
+    @AppStorage(AppSettings.Key.darkColorTheme) private var darkThemeRaw = ""
     @AppStorage(AppSettings.Key.fontStyle) private var fontRaw = FontStyle.serif.rawValue
     @AppStorage(AppSettings.Key.accentColor) private var classicAccent = Theme.defaultAccentHex
     private var custom = StoredCustomTheme()
     @Environment(\.colorScheme) private var systemScheme
 
     func body(content: Content) -> some View {
-        let theme = ColorTheme(rawValue: themeRaw) ?? .classic
         let mode = (Appearance(rawValue: appearanceRaw) ?? .system).colorScheme
         let scheme = mode ?? systemScheme
+        let theme = ColorTheme.selected(for: scheme, light: themeRaw, dark: darkThemeRaw)
         let swatch = theme.swatch(for: scheme, custom: custom.colors)
         let palette = ThemePalette(colorScheme: mode, canvas: swatch?.canvas, surface: swatch?.surface)
         let resolvedHex = swatch?.accentHex ?? classicAccent

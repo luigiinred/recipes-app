@@ -246,6 +246,7 @@ struct OnboardingDiscoverPage: View {
 struct OnboardingLookPage: View {
     @AppStorage(AppSettings.Key.appearance) private var appearance = Appearance.system.rawValue
     @AppStorage(AppSettings.Key.colorTheme) private var themeRaw = ColorTheme.classic.rawValue
+    @AppStorage(AppSettings.Key.darkColorTheme) private var darkThemeRaw = ""
     @AppStorage(AppSettings.Key.accentColor) private var accentHex = Theme.defaultAccentHex
     @Environment(\.colorScheme) private var scheme
 
@@ -273,7 +274,7 @@ struct OnboardingLookPage: View {
                 ThemeTileRow {
                     ForEach(ColorTheme.colors) { option in
                         ThemeTile(title: option.title, isSelected: theme == option) {
-                            themeRaw = option.rawValue
+                            themeRaw = option.rawValue; darkThemeRaw = ""
                         } thumbnail: {
                             ThemeThumbnail(swatch: option.previewSwatch(for: scheme, classicAccent: accentHex), scheme: scheme)
                         }

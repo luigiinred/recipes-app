@@ -19,12 +19,12 @@ struct ThemeSnapshotTests {
 
     @Test("theme settings")
     func settings() {
-        assertPageSnapshots(of: ThemeSettingsPage(), macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: AppearanceSettingsPage(), macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
     @Test("a colored theme hides the accent choice")
     func coloredSettings() {
-        with(.system, .blueberry) { assertPageSnapshots(of: ThemeSettingsPage(), macSize: SnapshotEnvironment.macSheetSize) }
+        with(.system, .blueberry) { assertPageSnapshots(of: AppearanceSettingsPage(), macSize: SnapshotEnvironment.macSheetSize) }
     }
 
     @Test("font page")
