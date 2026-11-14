@@ -42,9 +42,9 @@ struct GroceriesView: View {
         }
         .overlay {
             if layout == .completed, completed.isEmpty {
-                MascotEmptyState(scene: .idle, title: "Nothing completed", message: "Things you check off end up here.")
+                EmptyStateView(symbol: "checkmark.circle", title: "Nothing completed", message: "Things you check off end up here.")
             } else if layout == .toBuy, toBuy.isEmpty {
-                MascotEmptyState(scene: .hop, title: "Nothing to buy", message: "Add ingredients from any recipe.")
+                EmptyStateView(symbol: "cart", title: "Nothing to buy", message: "Add ingredients from any recipe.")
             }
         }
         .modifier(GroceriesChrome(embedded: embedded, title: layout == .completed ? "Completed" : "Groceries", showsMenu: layout != .completed))

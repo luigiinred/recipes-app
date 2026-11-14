@@ -35,6 +35,7 @@ struct OnboardingTests {
         #expect(Set(picks.map(\.kind)) == Set(PopularFeed.Kind.allCases))
     }
 
+    #if os(iOS)
     @Test("showing and hiding a Home section keeps the others as they were")
     func homeSections() {
         var (order, hidden) = HomeSection.showing(.tags, false, order: "", hidden: "")
@@ -43,6 +44,7 @@ struct OnboardingTests {
         #expect(HomeSection.hidden(hidden, order: order) == [.tags])
         #expect(HomeSection.order(order) == HomeSection.allCases)
     }
+    #endif
 
     @Test("showing and hiding a tab")
     func tabs() {

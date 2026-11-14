@@ -153,7 +153,7 @@ struct ShareView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .follow(let url, let title, let following):
                 VStack(spacing: 14) {
-                    MascotView(character: .tomato, scene: .wave, height: 130)
+                    StateSymbol(name: "dot.radiowaves.up.forward")
                     Text(following ? "Already following" : "Follow \(title)?").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
                     Text(following ? "\(title) is already in your Feeds." : "Its newest recipes and videos will show up in your Feeds tab.")
                         .appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -173,7 +173,7 @@ struct ShareView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .followed(let title):
                 VStack(spacing: 14) {
-                    MascotCluster(height: 150)
+                    StateSymbol(name: "checkmark.circle.fill")
                     Text("Following \(title)").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
                     Text("New posts will show up in your Feeds tab.").appFont(.subheadline).foregroundStyle(.secondary)
                     Button("Done", action: finish)
@@ -187,7 +187,7 @@ struct ShareView: View {
                 .sensoryFeedback(.success, trigger: title)
             case .incomplete:
                 VStack(spacing: 14) {
-                    MascotView(character: .tomato, scene: .wave, height: 120)
+                    StateSymbol(name: "doc.text.magnifyingglass")
                     Text(model.isVideo ? "No written recipe yet" : "Only part of a recipe").appFont(.title3, weight: .bold).multilineTextAlignment(.center)
                     Text(model.isVideo
                          ? "Save the video now, and open it in Recipes to find its recipe later. Or check the draft from its description and captions."
@@ -225,13 +225,13 @@ struct ShareView: View {
                 }
             case .saving:
                 VStack(spacing: 8) {
-                    MascotLoader(height: 150)
+                    ProgressView().controlSize(.large)
                     Text("Saving…").appFont(.title3, weight: .bold)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .saved(let recipe, let note):
                 VStack(spacing: 14) {
-                    MascotCluster(height: 150)
+                    StateSymbol(name: "checkmark.circle.fill")
                     Text("Recipe added!").appFont(.title, weight: .bold)
                     Text("\(recipe.title) has been added to your cookbook.")
                         .appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -253,7 +253,7 @@ struct ShareView: View {
                 .sensoryFeedback(.success, trigger: recipe.id)
             case .failed(let message):
                 VStack(spacing: 12) {
-                    MascotView(character: .lemon, scene: .sour, height: 130)
+                    StateSymbol(name: "exclamationmark.triangle.fill")
                     Text("Couldn't import that").appFont(.title3, weight: .bold)
                     Text(message).appFont(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     VStack(spacing: 10) {

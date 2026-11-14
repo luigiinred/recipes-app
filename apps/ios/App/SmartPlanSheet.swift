@@ -134,7 +134,7 @@ struct SmartPlanSheet: View {
         }
         .overlay {
             if suggestions.isEmpty {
-                MascotEmptyState(scene: .sour, character: .lemon, title: "Nothing to plan",
+                EmptyStateView(symbol: "calendar.badge.exclamationmark", title: "Nothing to plan",
                                  message: "Every slot for those meals is already filled, or there are no recipes to use.") {
                     Button("Back") { phase = .options }.buttonStyle(PaperButtonStyle()).frame(maxWidth: 240)
                 }
