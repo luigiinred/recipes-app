@@ -1,7 +1,7 @@
 import RecipeKit
 import SwiftUI
 
-/// Sits above the keyboard while an ingredient's quantity or unit is being typed: fractions to tap, units to search, and Next.
+/// Sits above the keyboard while an ingredient's quantity is being typed: fractions to tap, and Next to the ingredient.
 struct IngredientEntryBar: View {
     @Binding var line: EditableIngredient
     let field: EditorField
@@ -11,20 +11,14 @@ struct IngredientEntryBar: View {
     var body: some View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if case .quantity = field { fractionChips } else { unitChips }
-                }
-                .padding(.horizontal, 12)
+                HStack(spacing: 6) { fractionChips }.padding(.horizontal, 12)
             }
             .scrollClipDisabled()
             Button(action: onNext) {
-                Label(isQuantity ? "Unit" : "Item", systemImage: "arrow.right")
-                    .labelStyle(.titleAndIcon)
-                    .appFont(.subheadline, weight: .semibold)
+                Label("Next", systemImage: "arrow.right").labelStyle(.titleAndIcon).appFont(.subheadline, weight: .semibold)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
-            .accessibilityLabel(isQuantity ? "Next: unit" : "Next: ingredient")
             #if os(iOS)
             Button(action: onDone) { Image(systemName: "keyboard.chevron.compact.down") }
                 .buttonStyle(.borderless)
@@ -36,11 +30,6 @@ struct IngredientEntryBar: View {
         .padding(.trailing, 12)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
-    }
-
-    private var isQuantity: Bool {
-        if case .quantity = field { return true }
-        return false
     }
 
     private static let fractions = ["1/2", "1/4", "3/4", "1/3", "2/3", "1/8"]
@@ -56,34 +45,13 @@ struct IngredientEntryBar: View {
             .accessibilityLabel("Range")
     }
 
-    @ViewBuilder
-    private var unitChips: some View {
-        let typed = line.unitText.trimmingCharacters(in: .whitespaces)
-        let known = IngredientUnit.matching(typed)
-        let custom = CustomUnits.matching(typed)
-        if !typed.isEmpty, line.unit == nil, !custom.contains(where: { $0.caseInsensitiveCompare(typed) == .orderedSame }) {
-            chip("Use “\(typed)”", selected: true) { onNext() }
-        }
-        if !typed.isEmpty || line.unit != nil {
-            chip("No unit") { line.unitText = ""; onNext() }
-        }
-        ForEach(custom, id: \.self) { name in
-            chip(name, selected: name.caseInsensitiveCompare(typed) == .orderedSame) { line.unitText = name; onNext() }
-        }
-        ForEach(known) { unit in
-            chip(unit.abbreviation, selected: unit == line.unit) { line.unitText = unit.abbreviation; onNext() }
-                .accessibilityLabel(unit.title)
-        }
-    }
-
-    private func chip(_ title: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
+    private func chip(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .appFont(.callout, weight: .medium)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .background(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary.opacity(0.15)), in: Capsule())
+                .background(Color.secondary.opacity(0.15), in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -99,6 +67,95 @@ struct IngredientEntryBar: View {
             return text.trimmingCharacters(in: .whitespaces) + " " + fraction
         }
         return text + " " + fraction
+    }
+}
+
+/// The unit as a dropdown: a small popover with a search field, units matching it, units used before, and any typed unit.
+struct UnitPicker: View {
+    @Binding var unitText: String
+    let onPick: () -> Void
+    @State private var isOpen = false
+
+    private var unit: IngredientUnit? { IngredientUnit(alias: unitText.trimmingCharacters(in: .whitespaces)) }
+
+    var body: some View {
+        Button { isOpen = true } label: {
+            Text(unit?.abbreviation ?? (unitText.isEmpty ? "unit" : unitText))
+                .foregroundStyle(unitText.isEmpty ? AnyShapeStyle(Color.secondary.opacity(0.6)) : AnyShapeStyle(Theme.accent))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Unit")
+        .accessibilityValue(unitText.isEmpty ? "None" : unitText)
+        .popover(isPresented: $isOpen) {
+            UnitSearchList(current: unitText) { picked in
+                unitText = picked
+                isOpen = false
+                onPick()
+            }
+            .frame(minWidth: 260, idealWidth: 280, minHeight: 320, idealHeight: 380)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+private struct UnitSearchList: View {
+    let current: String
+    let pick: (String) -> Void
+    @State private var query = ""
+    @FocusState private var searching: Bool
+
+    var body: some View {
+        let typed = query.trimmingCharacters(in: .whitespaces)
+        let known = IngredientUnit.matching(typed)
+        let custom = CustomUnits.matching(typed)
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search or type a unit", text: $query)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($searching)
+                    .onSubmit {
+                        guard !typed.isEmpty else { return }
+                        pick(IngredientUnit(alias: typed)?.abbreviation ?? custom.first ?? known.first?.abbreviation ?? typed)
+                    }
+            }
+            .padding(12)
+            Divider()
+            List {
+                if typed.isEmpty { row("No unit", detail: nil, value: "") }
+                ForEach(custom, id: \.self) { row($0, detail: "Used before", value: $0) }
+                ForEach(known) { unit in row(unit.abbreviation, detail: unit.title, value: unit.abbreviation) }
+                if !typed.isEmpty, IngredientUnit(alias: typed) == nil, !custom.contains(where: { $0.caseInsensitiveCompare(typed) == .orderedSame }) {
+                    row("Use “\(typed)”", detail: "Any unit you type", value: typed)
+                }
+            }
+            .listStyle(.plain)
+        }
+        .onAppear { searching = true }
+    }
+
+    private func row(_ title: String, detail: String?, value: String) -> some View {
+        Button { pick(value) } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).foregroundStyle(.primary)
+                    if let detail, detail.lowercased() != title.lowercased() {
+                        Text(detail).appFont(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if value.caseInsensitiveCompare(current) == .orderedSame { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
