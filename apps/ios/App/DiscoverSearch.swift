@@ -323,6 +323,6 @@ struct FeatureFlagToggle: View {
             }
         }
         .padding(.leading, flag.parent == nil ? 0 : 16)
-        .disabled(!parentIsOn)
+        .disabled(flag.parent != nil && !parentIsOn)
     }
 }
