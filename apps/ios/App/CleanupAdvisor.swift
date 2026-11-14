@@ -26,9 +26,11 @@ final class CleanupAdvisor {
         UserDefaults.standard.object(forKey: AppSettings.Key.suggestCleanups) as? Bool ?? true
     }
 
+    /// The cleanup waiting for a recipe, with only the kinds of change switched on in AI Improvements.
     func suggestion(for recipe: Recipe) -> RecipeCleanup? {
         guard let found = suggestions[recipe.id], found.fingerprint == recipe.cleanupFingerprint else { return nil }
-        return found.cleanup
+        let filtered = found.cleanup.keeping { CleanupKind($0).isOn }
+        return filtered.isEmpty ? nil : filtered
     }
 
     /// Recipes with a cleanup waiting, in library order.
@@ -380,5 +382,138 @@ private struct CleanupScanning: ViewModifier {
                 CleanupAdvisor.shared.stopScanning()
             }
         }
+    }
+}
+
+/// A kind of change a cleanup can offer, each with its own switch in AI Improvements.
+enum CleanupKind: String, CaseIterable, Identifiable {
+    case ingredients, sections, steps, notes
+
+    init(_ kind: RecipeCleanup.Change.Kind) {
+        switch kind {
+        case .ingredient: self = .ingredients
+        case .sections: self = .sections
+        case .step: self = .steps
+        case .notes: self = .notes
+        }
+    }
+
+    var id: String { rawValue }
+    var key: String { "cleanup.\(rawValue)" }
+    var isOn: Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+
+    var title: String {
+        switch self {
+        case .ingredients: "Tidy ingredients"
+        case .sections: "Ingredient sections"
+        case .steps: "Split and tidy steps"
+        case .notes: "Move loose text into Notes"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .ingredients: "Write amounts and units one way, like “1/2 cup” and “2 tbsp”."
+        case .sections: "Turn labels like “Dressing:” into sections, and rarely group a salad and its dressing."
+        case .steps: "Break run-together and numbered steps apart, and tidy their wording."
+        case .notes: "Text before the steps, like tips, goes to Notes."
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .ingredients: "list.bullet"
+        case .sections: "square.stack.3d.up"
+        case .steps: "list.number"
+        case .notes: "note.text"
+        }
+    }
+}
+
+/// Everything about AI improvements in one place: the switches, the background queue, and the recipes waiting.
+struct AIImprovementsPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
+    @AppStorage(AppSettings.Key.scanForCleanups) private var scansLibrary = true
+    private let advisor = CleanupAdvisor.shared
+
+    var body: some View {
+        let tidy = advisor.recipesToTidy(in: library.recipes)
+        let waiting = advisor.waiting(in: library.recipes)
+        Form {
+            Section {
+                Toggle(isOn: $suggestsCleanups) { Label("Suggest Improvements", systemImage: "sparkles") }
+                Toggle(isOn: $scansLibrary) { Label("Check in the Background", systemImage: "arrow.triangle.2.circlepath") }
+                    .disabled(!suggestsCleanups)
+            } footer: {
+                Text("Improvements are only ever suggested: each one is shown as a before and after for you to keep or skip. "
+                     + "The background check works through every recipe while the app is open, and checks a recipe again whenever you change it.")
+            }
+            Section("Improvements") {
+                ForEach(CleanupKind.allCases) { CleanupKindToggle(kind: $0) }
+            }
+            .disabled(!suggestsCleanups)
+            Section {
+                NavigationLink { RecipesToTidyView() } label: {
+                    LabeledContent { Text("\(tidy.count)").monospacedDigit() } label: { Label("Recipes to Tidy", systemImage: "wand.and.stars") }
+                }
+                NavigationLink { WaitingRecipesView() } label: {
+                    LabeledContent { Text("\(waiting.count)").monospacedDigit() } label: { Label("Waiting to Be Checked", systemImage: "hourglass") }
+                }
+                if let progress = advisor.scanProgress {
+                    LabeledContent("Checking now") { Text("\(progress.done) of \(progress.total)").monospacedDigit() }
+                }
+            } header: {
+                Text("Your recipes")
+            } footer: {
+                if !AppleIntelligence.status.isAvailable {
+                    Text("Without Apple Intelligence, ingredients, labels and numbered steps are still tidied. Grouping ingredients and splitting long steps need it. " + AppleIntelligence.status.explanation)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("AI Improvements")
+    }
+}
+
+private struct CleanupKindToggle: View {
+    let kind: CleanupKind
+    @AppStorage private var isOn: Bool
+
+    init(kind: CleanupKind) {
+        self.kind = kind
+        _isOn = AppStorage(wrappedValue: true, kind.key)
+    }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kind.title)
+                    Text(kind.detail).appFont(.caption).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: kind.symbol)
+            }
+        }
+    }
+}
+
+/// Recipes the background check hasn't reached yet, in the order it will check them.
+private struct WaitingRecipesView: View {
+    @EnvironmentObject private var library: RecipeLibrary
+
+    var body: some View {
+        let waiting = CleanupAdvisor.shared.waiting(in: library.recipes)
+        List(waiting) { recipe in
+            Text(recipe.title)
+        }
+        .overlay {
+            if waiting.isEmpty {
+                ContentUnavailableView("All Checked", systemImage: "checkmark.circle",
+                                       description: Text("Every recipe has been checked. New and changed recipes show up here until they are."))
+            }
+        }
+        .navigationTitle("Waiting to Be Checked")
     }
 }
