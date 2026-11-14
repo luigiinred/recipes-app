@@ -21,7 +21,7 @@ The system SHALL edit Title, Summary, Servings, Prep minutes, Cook minutes, Sour
 - **THEN** the recipe is saved without a servings value
 
 ### Requirement: Structured ingredient rows
-The system SHALL edit each ingredient as three parts: a quantity field ("Qty"), a unit field, and an item field. Add Ingredient focuses the new row's quantity, and Return (or Next) moves from quantity to unit to item. While the quantity or unit is focused, a bar above the keyboard offers Next and a button to hide the keyboard: for the quantity it offers fraction buttons (½ ¼ ¾ ⅓ ⅔ ⅛, where a second tap replaces the last fraction rather than adding to it) and "to" for a range; for the unit it lists units matching what has been typed (common ones first when empty), units the user typed before, "No unit", and "Use “…”" for a unit the app doesn't know. Any text can be a unit; a unit the app doesn't know is saved at the front of the item and read back into the unit field when the editor opens if the user has used it before. Leaving the quantity writes it in standard form (see recipe-format) and leaving the unit writes a known unit as its abbreviation ("Tablespoons" becomes "tbsp"). An item typed or pasted as a whole line with no quantity or unit (such as "2 cups flour") is still split into its parts when saved. Empty ingredient rows are dropped on save.
+The system SHALL edit each ingredient as three parts: a quantity field ("Qty"), a unit dropdown, and an item field, top-aligned so a long item wraps beneath its own field. The ingredient list always ends with one blank row to type into (there is no Add Ingredient button); typing in it adds another blank row below, and the blank row can't be deleted or moved. Return moves through the rows like a form: from a quantity to its item, and from an item to the next row's quantity. While a quantity is focused, a bar above the keyboard offers fraction buttons (½ ¼ ¾ ⅓ ⅔ ⅛, where a second tap replaces the last fraction rather than adding to it), "to" for a range, Next, and a button to hide the keyboard. The unit dropdown opens a small popover with a search field that lists "No unit", units the user typed before, the units matching the search (common ones first when empty), and "Use “…”" for a unit the app doesn't know; Return picks the top match, and picking one moves to the item. Any text can be a unit; a unit the app doesn't know is saved at the front of the item and read back into the unit when the editor opens if the user has used it before. Leaving the quantity writes it in standard form (see recipe-format). An item typed or pasted as a whole line with no quantity or unit (such as "2 cups flour") is still split into its parts when saved. Empty ingredient rows are dropped on save.
 
 #### Scenario: Pasted whole line
 - **GIVEN** an ingredient row with no quantity or unit
@@ -29,8 +29,8 @@ The system SHALL edit each ingredient as three parts: a quantity field ("Qty"), 
 - **THEN** the saved ingredient is "2 cups flour", and reopening the editor shows 2, cups and flour in their own fields
 
 #### Scenario: A unit the app doesn't know
-- **WHEN** the user types 1, "knob" and "ginger" and saves
-- **THEN** the saved ingredient is "1 knob ginger", and reopening the editor shows knob in the unit field
+- **WHEN** the user types 1, chooses Use “knob” in the unit dropdown, types "ginger" and saves
+- **THEN** the saved ingredient is "1 knob ginger", and reopening the editor shows knob as the unit
 
 ### Requirement: Ingredient sections
 The system SHALL let the user add a section heading among the ingredients with "Add Section", name it, drag it to a new position, and delete it, so the ingredients after a heading belong to that section until the next one. The footer advises adding a section only for a distinct part of the meal, like a salad's dressing.
@@ -71,7 +71,7 @@ When the Source URL is a YouTube video, the system SHALL show an "m:ss" time fie
 - **THEN** no time field is shown on the steps
 
 ### Requirement: Recipe photo
-The system SHALL let the user add or change the recipe photo from the photo library ("Add Photo" / "Change Photo"), create one with Image Playground where available ("Create with Image Playground"; see recipe-photos), and remove it ("Remove Photo"). The change is applied only when the recipe is saved.
+The system SHALL let the user add or change the recipe photo from the photo library ("Add Photo" / "Change Photo"), and remove it ("Remove Photo"). The change is applied only when the recipe is saved.
 
 #### Scenario: Remove photo then cancel
 - **GIVEN** a recipe with a photo

@@ -1,4 +1,3 @@
-import ImagePlayground
 import PhotosUI
 import RecipeKit
 import SwiftUI
@@ -33,8 +32,6 @@ struct RecipeEditorView: View {
     @State private var ingredients: [EditableIngredient]
     @State private var steps: [EditableLine]
     @FocusState private var focused: EditorField?
-    @State private var generatingImage = false
-    @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var tags: [String]
     @State private var source: String
     @State private var notes: String
@@ -61,7 +58,7 @@ struct RecipeEditorView: View {
         _servings = State(initialValue: recipe.servings.map(String.init) ?? "")
         _prep = State(initialValue: recipe.prepMinutes.map(String.init) ?? "")
         _cook = State(initialValue: recipe.cookMinutes.map(String.init) ?? "")
-        _ingredients = State(initialValue: Self.rows(for: recipe))
+        _ingredients = State(initialValue: Self.withTrailingBlank(Self.rows(for: recipe)))
         _steps = State(initialValue: recipe.steps.enumerated().map { index, text in
             var line = EditableLine(text: text, time: recipe.timestamp(forStep: index).map(Recipe.clock) ?? "")
             line.imageID = recipe.stepImage(forStep: index)
@@ -110,15 +107,10 @@ struct RecipeEditorView: View {
                     .onDelete { ingredients.remove(atOffsets: $0) }
                     .onMove { ingredients.move(fromOffsets: $0, toOffset: $1) }
                     .alwaysReorderable()
-                    addButton("Add Ingredient") {
-                        let line = EditableIngredient()
-                        focused = .quantity(line.id)
-                        ingredients.append(line)
-                    }
                     addButton("Add Section") {
                         let line = EditableIngredient(heading: "")
                         focused = .line(line.id)
-                        ingredients.append(line)
+                        ingredients.insert(line, at: max(0, ingredients.count - 1))
                     }
                 } header: {
                     Text("Ingredients")
@@ -169,6 +161,10 @@ struct RecipeEditorView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { ingredientBar }
             .onChange(of: focused) { old, _ in tidyIngredient(leaving: old) }
+            .onChange(of: ingredients) { _, rows in
+                let padded = Self.withTrailingBlank(rows)
+                if padded.count != rows.count { ingredients = padded }
+            }
             .navigationTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -254,45 +250,59 @@ struct RecipeEditorView: View {
 
     private func plainIngredientRow(line: Binding<EditableIngredient>) -> some View {
         let id = line.wrappedValue.id
-        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let isBlank = line.wrappedValue.isBlank && ingredients.last?.id == id
+        return HStack(alignment: .top, spacing: 10) {
             PlainField("Qty", text: line.quantity)
-                .multilineTextAlignment(.trailing)
                 #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
                 #endif
                 .submitLabel(.next)
                 .focused($focused, equals: .quantity(id))
-                .onSubmit { focused = .unit(id) }
-                .frame(width: 46)
-                .accessibilityLabel("Quantity")
-            PlainField("unit", text: line.unitText)
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                #endif
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-                .foregroundStyle(Theme.accent)
-                .focused($focused, equals: .unit(id))
                 .onSubmit { focused = .line(id) }
-                .frame(width: 58)
-                .accessibilityLabel("Unit")
+                .frame(width: 48, alignment: .leading)
+                .accessibilityLabel("Quantity")
+            UnitPicker(unitText: line.unitText) { focused = .line(id) }
+                .frame(width: 58, alignment: .leading)
             PlainField("Ingredient", text: line.item, axis: .vertical)
+                .submitLabel(.next)
                 .focused($focused, equals: .line(id))
+                .onChange(of: line.wrappedValue.item) { _, text in
+                    guard text.contains("\n") else { return }
+                    line.wrappedValue.item = text.replacingOccurrences(of: "\n", with: "")
+                    focusRow(after: id)
+                }
             #if os(macOS)
-            Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Remove")
+            if !isBlank {
+                Button(role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } label: { Image(systemName: "minus.circle") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Remove")
+            }
             #endif
         }
-        .contextMenu { Button("Delete", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } }
+        .deleteDisabled(isBlank)
+        .moveDisabled(isBlank)
+        .contextMenu { if !isBlank { Button("Delete", role: .destructive) { ingredients.removeAll { $0.id == line.wrappedValue.id } } } }
+    }
+
+    /// Return in an ingredient moves to the next row's quantity, like the next field of a form.
+    private func focusRow(after id: UUID) {
+        guard let index = ingredients.firstIndex(where: { $0.id == id }) else { return }
+        let next = ingredients[(index + 1)...].first { !$0.isHeading }
+        focused = next.map { .quantity($0.id) }
+    }
+
+    /// The editor always ends with an empty ingredient row to type into; empty rows are dropped on save.
+    static func withTrailingBlank(_ rows: [EditableIngredient]) -> [EditableIngredient] {
+        if let last = rows.last, last.isBlank { return rows }
+        return rows + [EditableIngredient()]
     }
 
     private var focusedIngredient: (index: Int, field: EditorField)? {
         guard let field = focused else { return nil }
         let id: UUID
         switch field {
-        case .quantity(let line), .unit(let line): id = line
+        case .quantity(let line): id = line
         case .line: return nil
         }
         return ingredients.firstIndex { $0.id == id }.map { ($0, field) }
@@ -304,13 +314,13 @@ struct RecipeEditorView: View {
             IngredientEntryBar(
                 line: $ingredients[focus.index],
                 field: focus.field,
-                onNext: { focused = focus.field.next },
+                onNext: { focused = .line(ingredients[focus.index].id) },
                 onDone: { focused = nil }
             )
         }
     }
 
-    /// Leaving a field writes it the standard way: "0.5" as "1/2", "Tablespoons" as "tbsp".
+    /// Leaving the quantity writes it the standard way: "0.5" as "1/2".
     private func tidyIngredient(leaving field: EditorField?) {
         switch field {
         case .quantity(let id):
@@ -318,13 +328,6 @@ struct RecipeEditorView: View {
             let line = ingredients[index]
             let tidy = Ingredient.standardQuantity(line.quantity, unit: line.unit)
             if tidy != line.quantity { ingredients[index].quantity = tidy }
-        case .unit(let id):
-            guard let index = ingredients.firstIndex(where: { $0.id == id }) else { return }
-            let line = ingredients[index]
-            let tidy = line.unit?.abbreviation ?? line.unitText.trimmingCharacters(in: .whitespaces)
-            if tidy != line.unitText { ingredients[index].unitText = tidy }
-            let quantity = Ingredient.standardQuantity(line.quantity, unit: line.unit)
-            if quantity != line.quantity { ingredients[index].quantity = quantity }
         default:
             break
         }
@@ -380,10 +383,6 @@ struct RecipeEditorView: View {
                     PhotosPicker(selection: $pickedItem, matching: .images) {
                         Label(hasPhoto ? "Change Photo" : "Add Photo", systemImage: "photo")
                     }
-                    if supportsImagePlayground {
-                        Button { generatingImage = true } label: { Label("Create with Image Playground", systemImage: "apple.image.playground") }
-                            .buttonStyle(.borderless)
-                    }
                     if hasPhoto {
                         Button("Remove Photo", role: .destructive) { imageChange = .remove }
                             .buttonStyle(.borderless)
@@ -391,7 +390,6 @@ struct RecipeEditorView: View {
                 }
             }
         }
-        .recipeImageGenerator(isPresented: $generatingImage, recipe: assembled()) { imageChange = .set($0) }
         .onChange(of: pickedItem) { _, item in
             guard let item else { return }
             Task {
@@ -491,14 +489,6 @@ enum EditorField: Hashable {
     /// A step, a section heading, or an ingredient's item.
     case line(UUID)
     case quantity(UUID)
-    case unit(UUID)
-
-    var next: EditorField {
-        switch self {
-        case .quantity(let id): .unit(id)
-        case .unit(let id), .line(let id): .line(id)
-        }
-    }
 }
 
 struct EditableIngredient: Identifiable, Hashable {
@@ -532,6 +522,8 @@ struct EditableIngredient: Identifiable, Hashable {
     }
 
     var unit: IngredientUnit? { IngredientUnit(alias: unitText.trimmingCharacters(in: .whitespaces)) }
+
+    var isBlank: Bool { !isHeading && quantity.isEmpty && unitText.isEmpty && item.isEmpty }
 
     /// A typed unit the app doesn't know.
     var customUnit: String? {

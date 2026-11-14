@@ -44,7 +44,7 @@ When the app scales a photo, it SHALL crop black bars that appear on both opposi
 - **THEN** the image is left at 120×90
 
 ### Requirement: Cover photo in the editor
-The recipe editor SHALL have a Photo section with "Add Photo" (or "Change Photo") from the photo library, "Remove Photo" when there is one, and "Create with Image Playground" where Image Playground is supported. Photo changes are saved with the recipe and discarded on cancel.
+The recipe editor SHALL have a Photo section with "Add Photo" (or "Change Photo") from the photo library and "Remove Photo" when there is one. Photo changes are saved with the recipe and discarded on cancel.
 
 #### Scenario: Removing a photo
 - **GIVEN** a recipe with a cover photo
@@ -59,7 +59,7 @@ Each step in the editor SHALL have a control to add or change a step photo from 
 - **THEN** step 2 shows that photo on the recipe page
 
 ### Requirement: Create a photo with Image Playground
-Where Image Playground is supported, the system SHALL let the user create a cover photo from the editor, and from the recipe page's More menu as "Create a Photo…" when the recipe has no photo. The sheet is seeded with the recipe title and a description of the dish: the title, summary, up to eight main ingredients (skipping pantry staples such as salt, pepper, water, oils, sugar, flour, butter and "to taste"), up to two cooking methods found in the steps (for example "baked", "roasted"), the last serving or garnish sentence ("Presented: …"), and the recipe's categories other than YouTube. The chosen image is saved as the cover photo.
+Where Image Playground is supported, the system SHALL let the user create a cover photo from the recipe page's More menu as "Create a Photo…" when the recipe has no photo; the editor doesn't offer it. The sheet is seeded with the recipe title and a description of the dish: the title, summary, up to eight main ingredients (skipping pantry staples such as salt, pepper, water, oils, sugar, flour, butter and "to taste"), up to two cooking methods found in the steps (for example "baked", "roasted"), the last serving or garnish sentence ("Presented: …"), and the recipe's categories other than YouTube. The chosen image is saved as the cover photo.
 
 #### Scenario: Seeded description
 - **GIVEN** a recipe "Roast Chicken" with "1 whole chicken", "2 tsp salt", "1 lemon" and a step "Roast for 1 hour, then serve with greens."
