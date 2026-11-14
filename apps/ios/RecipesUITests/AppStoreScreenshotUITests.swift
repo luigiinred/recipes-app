@@ -118,11 +118,11 @@ final class AppStoreScreenshotUITests: XCTestCase {
             _ = app.buttons["Add to Discover"].firstMatch.waitForExistence(timeout: 20)
             tapButton("Add to Discover")
             let browse = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Browse Shared Recipes'")).firstMatch
-            let entry = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Discover' OR label BEGINSWITH 'Browse Shared Recipes'")).firstMatch
+            let entry = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Shared Recipes' OR label BEGINSWITH 'Browse Shared Recipes'")).firstMatch
             XCTAssertTrue(entry.waitForExistence(timeout: 20), "Discover should appear once the server is added")
             sleep(2)
             if regular, !browse.exists {
-                tab("Discover")
+                tab("Shared Recipes")
             } else {
                 for _ in 0..<12 where !(browse.exists && browse.isHittable) { app.swipeUp(velocity: .default); usleep(400_000) }
                 XCTAssertTrue(browse.exists, "No Discover entry")

@@ -326,3 +326,59 @@ struct FeatureFlagToggle: View {
         .disabled(flag.parent != nil && !parentIsOn)
     }
 }
+
+extension View {
+    /// With Discover Search on, a search box whose submitted query swaps the page for online results.
+    func discoverSearch() -> some View { modifier(DiscoverSearchModifier()) }
+}
+
+private struct DiscoverSearchModifier: ViewModifier {
+    @AppStorage(FeatureFlag.discoverSearch.key) private var enabled = false
+    @State private var query = ""
+    @State private var submitted = ""
+
+    func body(content: Content) -> some View {
+        if enabled {
+            Group {
+                if submitted.isEmpty { content } else { DiscoverSearchResults(query: submitted) }
+            }
+            .searchable(text: $query, prompt: "Search Recipes Online")
+            .onSubmit(of: .search) { submitted = query.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
+        } else {
+            content
+        }
+    }
+}
+
+/// The last row of a library search: the same words searched online, when Discover Search is on.
+struct SearchOnlineLink: View {
+    @AppStorage(FeatureFlag.discoverSearch.key) private var enabled = false
+    @Environment(\.appAccent) private var accent
+    let query: String
+
+    var body: some View {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if enabled, !text.isEmpty {
+            NavigationLink {
+                DiscoverSearchResults(query: text)
+                    .themedCanvas()
+                    .navigationTitle("“\(text)”")
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe").foregroundStyle(accent)
+                    Text("Search Recipes Online for “\(text)”").foregroundStyle(.primary)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+                }
+                .padding(14)
+                .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}

@@ -107,7 +107,7 @@ struct RootView: View {
                     .defaultVisibility(.hidden, for: .tabBar)
             }
             if !discover.sources.isEmpty {
-                Tab("Discover", systemImage: "binoculars", value: AppTab.discover) { RecipesTab(root: .discoverHome(discover.sources)) }
+                Tab("Shared Recipes", systemImage: "binoculars", value: AppTab.discover) { RecipesTab(root: .discoverHome(discover.sources)) }
                     .defaultVisibility(.hidden, for: .tabBar)
             }
             ForEach(library.categoryTree) { node in
@@ -514,7 +514,7 @@ struct SidebarView: View {
                 }
             }
             if !discover.sources.isEmpty {
-                Section("Discover") {
+                Section("Shared Recipes") {
                     ForEach(discover.sources) { source in
                         Label(source.name, systemImage: "binoculars").lineLimit(1).tag(AppSection.discover(source.id))
                     }

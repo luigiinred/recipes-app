@@ -158,7 +158,7 @@ struct OnboardingFeedsPage: View {
     var body: some View {
         VStack(spacing: 24) {
             OnboardingHeader(character: .lemon, scene: .idle, title: "Follow some cooks",
-                             subtitle: "Their newest recipes show up in Feeds. Tap a few to follow them.")
+                             subtitle: "Their newest recipes show up in Discover. Tap a few to follow them.")
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(PopularFeed.Kind.allCases, id: \.self) { kind in
                     let feeds = OnboardingFeeds.picks.filter { $0.kind == kind }
@@ -406,7 +406,7 @@ struct OnboardingSummaryPage: View {
                 OnboardingFeature(symbol: "house", title: "Home", detail: home)
                 #endif
                 OnboardingFeature(symbol: "square.grid.2x2", title: "Tabs", detail: tabs)
-                OnboardingFeature(symbol: "dot.radiowaves.up.forward", title: "Feeds", detail: feeds)
+                OnboardingFeature(symbol: "safari", title: "Discover", detail: feeds)
                 OnboardingFeature(symbol: "binoculars", title: "Discover", detail: discoverSummary)
                 OnboardingFeature(symbol: "paintpalette", title: "Look", detail: look)
                 OnboardingFeature(symbol: "bell", title: "Reminders", detail: reminders)
