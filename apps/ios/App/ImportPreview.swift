@@ -74,11 +74,11 @@ struct RecipePreviewContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if let imageData, let image = RecipeImageProcessing.thumbnail(from: imageData, maxPixelSize: 1200) {
-                    Image(decorative: image, scale: 1)
-                        .resizable()
-                        .scaledToFill()
+                    // An overlay, so a filled photo can't widen the page past the screen.
+                    Color.clear
                         .frame(maxWidth: .infinity)
                         .frame(height: 220)
+                        .overlay { Image(decorative: image, scale: 1).resizable().scaledToFill() }
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 VStack(alignment: .leading, spacing: 8) {
