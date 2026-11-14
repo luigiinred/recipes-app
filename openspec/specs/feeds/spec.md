@@ -89,3 +89,11 @@ Each section appears as soon as its source answers. Tapping any result opens the
 - **GIVEN** Discover Search is off in Developer Tools
 - **WHEN** the user opens Discover
 - **THEN** there is no search box
+
+### Requirement: End of the feed
+When every loaded post has been viewed and older pages remain, Feeds SHALL load older pages before deciding there is nothing new. At the end of the new posts, in every layout, it shows "You're All Caught Up" with how many feeds the user follows, "Browse Viewed Posts (N)" when any are viewed, and "Find More Feeds". Browse Viewed Posts opens a Viewed Posts page listing viewed posts newest first; it doesn't change the Show Viewed Posts setting, so the feed keeps showing only what's new.
+
+#### Scenario: Everything viewed
+- **GIVEN** every post in every followed feed has been viewed
+- **WHEN** the user opens Feeds
+- **THEN** the caught-up card shows with Browse Viewed Posts, and no viewed post appears in the feed
