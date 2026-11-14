@@ -88,7 +88,7 @@ The system SHALL show an idea (a recipe with no ingredients or steps) as a note,
 - **THEN** the idea note and Add Ingredients and Steps button appear instead of ingredients and directions
 
 ### Requirement: More menu
-The system SHALL give the recipe page a More (⋯) menu with Favorite / Remove Favorite, Rate, Add to / Remove from Up Next, Timeline (see cooking-timeline), Create a Photo… (only when Image Playground is available and the recipe has no photo; see recipe-photos), Print…, Share, Find Step Timestamps (only for a YouTube recipe with steps; see youtube-import), Clean Up (not for ideas; checks the recipe again even after a dismissed suggestion), and Edit (see recipe-editor). Deleting the recipe from the editor closes the page.
+The system SHALL give the recipe page a More (⋯) menu with Favorite / Remove Favorite, Rate, Add to / Remove from Up Next, Timeline (see cooking-timeline), Create a Photo… (only when Image Playground is available and the recipe has no photo; see recipe-photos), Print…, Share (see Share options), Find Step Timestamps (only for a YouTube recipe with steps; see youtube-import), Clean Up (not for ideas; checks the recipe again even after a dismissed suggestion), and Edit (see recipe-editor). Deleting the recipe from the editor closes the page.
 
 #### Scenario: Create a Photo hidden when there is one
 - **GIVEN** a recipe that has a photo
@@ -108,12 +108,21 @@ About a second after a recipe page opens, when "Suggest cleanups on recipes" is 
 - **WHEN** they open the recipe again without changing it
 - **THEN** no card appears
 
-### Requirement: Print
-The system SHALL print a recipe as a page with the title, the summary in italics, a facts line ("Serves N · Prep N min · Cook N min"), "Ingredients" with section subheadings, a numbered "Method", "Notes" and the source URL, using the system print dialog on iPhone, iPad and Mac.
+### Requirement: Recipe PDF and Print
+The system SHALL lay a recipe out as a PDF on US Letter at actual size, always in light mode on a white page with no background fills: the title, the summary, a facts line ("Serves N · Prep N min · Cook N min · Total N min"), a small photo when the recipe has one, and an accent rule; then "Ingredients" in a narrow left column (amounts in bold, preparation in grey italics, section subheadings) beside a numbered "Method", followed by "Notes". Type is the font chosen in Settings at 11–12pt, and the accent color appears only in rules, labels and step numbers. No ingredient or step is split across pages; a later page repeats the title and, once the ingredients are done, runs the steps full width. Each page's footer shows the source site and, on a recipe of more than one page, "N of M". The PDF reflects the scale the recipe is shown at. Print… prints this same PDF with the system print dialog on iPhone, iPad and Mac.
 
-#### Scenario: Print layout
-- **WHEN** the user chooses Print… for a recipe with 4 servings and two steps
-- **THEN** the print dialog opens with "Serves 4" and a numbered two-item Method
+#### Scenario: Long recipe
+- **GIVEN** a recipe with 19 ingredients and 12 steps
+- **WHEN** the user shares it as a PDF
+- **THEN** page 1 holds the header, every ingredient and the first steps, page 2 the rest of the steps and the notes, and the footers read "1 of 2" and "2 of 2"
+
+### Requirement: Share options
+The More menu's Share SHALL offer: "As a PDF" (the recipe PDF, named after the recipe), "As Text" (Markdown, below), "Original Recipe Link" when the recipe has a web source, and "Link in My Mealie" once the recipe has synced to the user's Mealie server from this device, which opens its page there (`/g/<group>/r/<slug>`, or `/recipe/<slug>` when the group isn't known).
+
+#### Scenario: Not synced yet
+- **GIVEN** Mealie is connected but the recipe hasn't synced from this device
+- **WHEN** the user opens Share
+- **THEN** "Link in My Mealie" is not listed
 
 ### Requirement: Share as Markdown
 The system SHALL share a recipe as Markdown text: "# Title", the summary, a facts line ("Servings: N · Prep: N min · Cook: N min"), "Tags: …", "## Ingredients" as a bullet list with "### Section" subheadings, "## Steps" as a numbered list, "## Notes", and "Source: URL". For a YouTube recipe, a step with a timestamp ends with a link to that moment in the video ("[▶ m:ss](https://youtu.be/<id>?t=<seconds>)").

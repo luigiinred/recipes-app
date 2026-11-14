@@ -16,6 +16,9 @@ struct RecipeDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
+    @State private var shareThumbnail: CGImage?
+    @State private var mealieURL: URL?
+    @AppStorage(AppSettings.Key.fontStyle) private var fontStyleRaw = FontStyle.serif.rawValue
     @State private var findingVideoRecipe = false
     @StateObject private var player = YouTubePlayerController()
     @State private var findingTimestamps = false
@@ -38,6 +41,10 @@ struct RecipeDetailView: View {
     @AppStorage(AppSettings.Key.suggestCleanups) private var suggestsCleanups = true
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
     private var scaled: Recipe { recipe.scaled(by: scale) }
+    private var pdfStyle: RecipePDF.Style {
+        let font = FontStyle(rawValue: fontStyleRaw) ?? .serif
+        return RecipePDF.Style(accent: accent, fontFamily: font.family, fontDesign: font.design)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -82,8 +89,20 @@ struct RecipeDetailView: View {
                         if supportsImagePlayground, !library.hasImage(recipe.id) {
                             Button("Create a Photo…", systemImage: "apple.image.playground") { generatingImage = true }
                         }
-                        Button("Print…", systemImage: "printer") { RecipePrinter.print(recipe) }
-                        ShareLink(item: recipe.markdown)
+                        Button("Print…", systemImage: "printer") { RecipePrinter.print(scaled, photo: shareThumbnail, style: pdfStyle) }
+                        Menu {
+                            ShareLink(item: RecipePDFDocument(recipe: scaled, photo: shareThumbnail, accent: accent, fontFamily: pdfStyle.fontFamily, fontDesign: pdfStyle.fontDesign),
+                                      preview: SharePreview(recipe.title)) { Label("As a PDF", systemImage: "doc.richtext") }
+                            ShareLink(item: scaled.markdown, preview: SharePreview(recipe.title)) { Label("As Text", systemImage: "text.alignleft") }
+                            if let source = recipe.sourceURL.flatMap(URL.init(string:)), source.scheme?.hasPrefix("http") == true {
+                                ShareLink(item: source) { Label("Original Recipe Link", systemImage: "link") }
+                            }
+                            if let mealieURL {
+                                ShareLink(item: mealieURL) { Label("Link in My Mealie", systemImage: "server.rack") }
+                            }
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
                         if recipe.youTubeVideoID != nil, !recipe.steps.isEmpty {
                             Button(findingTimestamps ? "Finding Timestamps…" : "Find Step Timestamps", systemImage: "clock.badge.checkmark") {
                                 findTimestamps()
@@ -118,6 +137,11 @@ struct RecipeDetailView: View {
             if previewSave == nil, let cleanup = CleanupAdvisor.shared.suggestion(for: recipe) {
                 CleanupSuggestionCard(recipe: recipe, cleanup: cleanup)
             }
+        }
+        .task(id: recipe.id) {
+            guard previewSave == nil else { return }
+            shareThumbnail = await library.loadThumbnail(for: recipe.id)
+            mealieURL = await MealieRecipeLink.url(for: recipe)
         }
         .task(id: recipe.cleanupFingerprint) {
             guard previewSave == nil, suggestsCleanups else { return }
