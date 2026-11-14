@@ -64,3 +64,25 @@ final class RecipeCleanupChoicesTests: XCTestCase {
                        [.same("2"), .removed("Tablespoons"), .added("tbsp"), .same("butter")])
     }
 }
+
+final class IngredientGroupingGateTests: XCTestCase {
+    private let salad = (1...9).map { "\($0) thing" }
+
+    func testOnlyLongListsWhoseMethodMakesAPart() {
+        XCTAssertTrue(IngredientGrouper.shouldConsider(ingredients: salad, steps: ["Toss the greens.", "Whisk the dressing and pour it over."]))
+        XCTAssertFalse(IngredientGrouper.shouldConsider(ingredients: salad, steps: ["Brown the beef.", "Add everything and simmer."]))
+        XCTAssertTrue(IngredientGrouper.shouldConsider(ingredients: Array(salad.prefix(6)), steps: ["Toss the salad.", "Whisk the dressing."]))
+        XCTAssertFalse(IngredientGrouper.shouldConsider(ingredients: Array(salad.prefix(5)), steps: ["Whisk the dressing."]))
+        XCTAssertFalse(IngredientGrouper.shouldConsider(ingredients: salad, steps: ["Add the dipped bread."]))
+    }
+
+    func testRejectsWeakGroupings() {
+        let steps = ["Toss the salad.", "Whisk the dressing."]
+        func group(_ title: String, _ members: [Int]) -> IngredientGrouper.Group { .init(title: title, members: members) }
+        XCTAssertTrue(IngredientGrouper.accepts([group("Salad", [0, 1, 2]), group("Dressing", [3, 4])], steps: steps))
+        XCTAssertFalse(IngredientGrouper.accepts([group("Salad", [0, 1, 2, 3, 4])], steps: steps))
+        XCTAssertFalse(IngredientGrouper.accepts([group("Salad", [0, 1, 2, 3]), group("Dressing", [4])], steps: steps))
+        XCTAssertFalse(IngredientGrouper.accepts([group("Salad", [0, 1]), group("Other", [2, 3])], steps: steps))
+        XCTAssertFalse(IngredientGrouper.accepts([group("Spices", [0, 1]), group("Produce", [2, 3])], steps: steps))
+    }
+}
