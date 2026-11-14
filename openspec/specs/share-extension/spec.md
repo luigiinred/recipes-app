@@ -30,15 +30,15 @@ The extension SHALL import the link the same way the app does (see web-import an
 - **WHEN** the shared page has no recipe data
 - **THEN** the extension shows "Couldn't import that" and "No recipe found on that page."
 
-### Requirement: Save, or decide what to do with part of a recipe
-After importing, the extension SHALL save a complete recipe straight away, with its cover photo and step photos, and show the saved screen; a link already in the library (same source URL) shows the saved screen for that recipe with "It was already in your cookbook." An incomplete import instead shows a choice: "Find Recipe Later" for a YouTube video, or "Save as an Idea" for anything else, which saves the title, summary, source link and photo as an idea (see recipe-detail for finding a video's recipe later); "Review the Draft", which opens the app's recipe editor with the draft, its notice and photos; and Cancel, which closes the share sheet without saving.
+### Requirement: Preview before saving
+After importing, the extension SHALL show the recipe as a read-only page (photo, title, summary, servings and times, ingredients under their section headings, numbered steps and notes) with Cancel in the navigation bar, the incomplete-import notice in a banner when there is one ("No full recipe was found. Check the details below." when it has no message), and Edit and Save Recipe floating at the bottom. Save Recipe saves the recipe with its photos and shows the saved screen; Edit opens the app's recipe editor with the draft; Cancel closes the share sheet without saving. A link already in the library (same source URL) shows the saved screen for that recipe with "It was already in your cookbook."
 
 #### Scenario: Incomplete video
-- **WHEN** a YouTube video without a written recipe is shared and the model couldn't fill it in
-- **THEN** the extension offers Find Recipe Later and Review the Draft
+- **WHEN** a YouTube video without a written recipe is shared
+- **THEN** the preview shows what was found under the notice, and Save keeps it so the app can find its recipe later
 
 ### Requirement: Follow the source
-While importing a post or video, the extension SHALL look for the feed of whoever made it: a video's YouTube channel, or the feed a page links to (comment feeds are skipped), falling back to the site's front page. When one is found, the saved, incomplete and failed screens offer "Follow <name>", which adds it to Feeds and then reads "Following <name>". A shared link to a channel, playlist, subreddit, site front page or feed itself still asks to follow it instead of importing.
+While importing a post or video, the extension SHALL look for the feed of whoever made it: a video's YouTube channel, or the feed a page links to (comment feeds are skipped), falling back to the site's front page. When one is found, the saved and failed screens offer "Follow <name>", which adds it to Feeds and then reads "Following <name>". A shared link to a channel, playlist, subreddit, site front page or feed itself still asks to follow it instead of importing.
 
 #### Scenario: Recipe from a blog
 - **WHEN** the user shares a recipe post from a blog that has a feed

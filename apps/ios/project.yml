@@ -87,6 +87,8 @@ targets:
       - App/RecipeEditorView.swift
       - App/IngredientEntryBar.swift
       - App/EmptyStateView.swift
+      - App/ImportPreview.swift
+      - App/IngredientLine.swift
       - App/TagEditor.swift
       - App/ChipFlow.swift
       - App/RecipeActions.swift

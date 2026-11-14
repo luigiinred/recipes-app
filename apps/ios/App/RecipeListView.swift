@@ -377,7 +377,6 @@ private struct RecipeActionsModifier: ViewModifier {
     @State private var mealPhotoItem: PhotosPickerItem?
     @State private var progressMessage: String?
     @State private var scanError: String?
-    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
 
     func body(content: Content) -> some View {
         if scope == nil { actions(content) } else { content }
@@ -434,15 +433,11 @@ private struct RecipeActionsModifier: ViewModifier {
                         recipe: result.recipe, text: result.sourceText, textTitle: result.sourceTitle,
                         notice: result.message, imageData: result.imageData, stepImages: result.stepImageData
                     )
-                },
-                onSaved: { selection = $0.id }
+                }
             )
         }
         .sheet(item: $draft) { draft in
-            RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice, initialImage: draft.imageData, initialStepImages: draft.stepImages) { saved, image, steps in
-                Task { await library.save(saved, image: image, steps: steps) }
-                selection = saved.id
-            }
+            ImportPreviewSheet(draft: draft) { selection = $0.id }
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showingScanner) {
@@ -545,11 +540,10 @@ private struct RecipeActionsModifier: ViewModifier {
                 let recipe = RecipeTextParser.parse(text)
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     scanError = "No text found."
-                } else if !reviewImports, !recipe.title.isEmpty, !recipe.ingredients.isEmpty, !recipe.steps.isEmpty {
-                    await library.save(recipe.standardized())
-                    selection = recipe.id
                 } else {
-                    draft = ScanDraft(recipe: recipe, text: text)
+                    let complete = !recipe.title.isEmpty && !recipe.ingredients.isEmpty && !recipe.steps.isEmpty
+                    draft = ScanDraft(recipe: recipe.standardized(), text: text,
+                                      notice: complete ? nil : "Only part of a recipe was read. Tap Edit to fill in the rest.")
                 }
             case .failure(let error):
                 scanError = error.localizedDescription

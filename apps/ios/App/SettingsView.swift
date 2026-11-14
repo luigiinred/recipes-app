@@ -166,7 +166,6 @@ struct SettingsView: View {
 private struct RecipesSettingsPage: View {
     @AppStorage(AppSettings.Key.listStyle) private var listStyle = RecipeListStyle.list
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
-    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
     @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
     #if os(iOS)
@@ -237,13 +236,6 @@ private struct RecipesSettingsPage: View {
                 Text("Swipe actions")
             } footer: {
                 Text("Swipe a recipe left for Up Next and Favorite. Turn this on to add Delete, which always asks before removing anything.")
-            }
-            Section {
-                Toggle("Review before saving", isOn: $reviewImports)
-            } header: {
-                Text("Importing")
-            } footer: {
-                Text("Off: an import opens straight on its recipe page, which offers a cleanup if it needs one. On: every import opens in the editor first, including from the Share sheet.")
             }
         }
         .formStyle(.grouped)

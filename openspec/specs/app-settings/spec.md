@@ -41,12 +41,12 @@ The system SHALL show a "Help Support Us" section with Leave a Review (the App S
 - **THEN** the Help Support Us section is not shown
 
 ### Requirement: Recipes page
-The system SHALL offer on the Recipes page: "Recipe list" (Photo Cards or Compact List; key `recipeListStyle`), "Mark recipes with" (Favorites or Star Ratings; key `ratingStyle`), "Show Delete" under Swipe actions (key `showDeleteInSwipeActions`), and "Review before saving" under Importing (key `reviewImports`). See recipe-browsing for list style, rating style and swipe actions, and web-import and share-extension for the review step.
+The system SHALL offer on the Recipes page: "Recipe list" (Photo Cards or Compact List; key `recipeListStyle`), "Mark recipes with" (Favorites or Star Ratings; key `ratingStyle`), "Show Delete" under Swipe actions (key `showDeleteInSwipeActions`). See recipe-browsing for list style, rating style and swipe actions.
 
 #### Scenario: Defaults
 - **GIVEN** a fresh install
 - **WHEN** the user opens the Recipes page
-- **THEN** Recipe list is Compact List, Mark recipes with is Favorites, Show Delete is off and Review before saving is off
+- **THEN** Recipe list is Compact List, Mark recipes with is Favorites, Show Delete is off
 
 ### Requirement: Planner page
 The system SHALL offer on the Planner page: "Add recipes as" (the default meal, including Automatic, which picks breakfast, lunch, a snack or dinner by time of day; key `defaultMeal`), "Week starts on" (System Default, Sunday, Monday or Saturday; key `weekStart`), and a "Meals to plan" toggle for each meal, stored as a comma-separated list of hidden meals (key `hiddenMeals`). Their effect is described in meal-planning.
