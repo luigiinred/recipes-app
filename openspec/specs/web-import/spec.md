@@ -100,18 +100,12 @@ In the app, a web import SHALL standardize the draft (see recipe-format) and pas
 - **WHEN** a page with one 900-character step is imported
 - **THEN** the draft keeps that single step
 
-### Requirement: Review or save
-The app SHALL open a finished import in the recipe editor for review, with the photo and step photos attached, when the "Review before saving" setting (Settings → Recipes → Importing, off by default) is on or the import is incomplete. With the setting off and a complete import, the app saves the recipe directly, closes the sheet and opens the new recipe's page, which offers a cleanup if it needs one (see recipe-detail). A scanned photo or PDF follows the same rule when it reads as a title, ingredients and steps.
+### Requirement: Preview before saving
+The app SHALL open every finished import on a preview of its recipe page, with the photo, Cancel in the navigation bar, the import's notice in a banner when it is incomplete, and Edit and Save Recipe floating at the bottom. Save Recipe saves the recipe with its photo and step photos and opens it; Edit opens the recipe editor with the draft, and saving there saves and opens it; Cancel saves nothing. A scanned photo or PDF opens the same way, with "Only part of a recipe was read. Tap Edit to fill in the rest." when it didn't read as a title, ingredients and steps.
 
-#### Scenario: Review off
-- **GIVEN** "Review before saving" is off
-- **WHEN** a page with full recipe data is imported
-- **THEN** the recipe is saved without opening the editor and is selected in the list
-
-#### Scenario: Review on
-- **GIVEN** "Review before saving" is on
-- **WHEN** a page is imported
-- **THEN** the editor opens with the draft and nothing is saved until the user saves
+#### Scenario: Save from the preview
+- **WHEN** a page with full recipe data is imported and the user taps Save Recipe
+- **THEN** the recipe is saved and its page opens
 
 ### Requirement: Apple Intelligence fallback for pages without recipe data
 When a web import fails with "No recipe found on that page.", the app SHALL offer "Try with Apple Intelligence". The button is disabled, with the reason shown beneath it, when Apple Intelligence isn't available. Using it fetches the page, reads its visible text with the on-device model, and opens the result in the editor for review, as described in apple-intelligence.

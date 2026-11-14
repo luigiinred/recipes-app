@@ -12,6 +12,8 @@ struct RecipeDetailView: View {
     var previewImage: Data?
     var previewSaveTitle = "Save Recipe"
     var previewSaved = false
+    /// Off when the page sits inside a frame that has its own Save.
+    var previewSaveInToolbar = true
     var reservesArtwork = false
 
     @Environment(\.dismiss) private var dismiss
@@ -70,9 +72,11 @@ struct RecipeDetailView: View {
         #endif
         .toolbar {
             if let previewSave {
-                ToolbarItem {
-                    Button(previewSaved ? "Added" : previewSaveTitle, systemImage: previewSaved ? "checkmark.circle.fill" : "plus.circle.fill", action: previewSave)
-                        .disabled(previewSaved)
+                if previewSaveInToolbar {
+                    ToolbarItem {
+                        Button(previewSaved ? "Added" : previewSaveTitle, systemImage: previewSaved ? "checkmark.circle.fill" : "plus.circle.fill", action: previewSave)
+                            .disabled(previewSaved)
+                    }
                 }
             } else {
                 ToolbarItem {

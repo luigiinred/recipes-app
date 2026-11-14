@@ -4,9 +4,7 @@ import SwiftUI
 struct ImportURLView: View {
     @Environment(\.dismiss) private var dismiss
     let onReview: (ImportResult) -> Void
-    var onSaved: (Recipe) -> Void = { _ in }
     @EnvironmentObject private var library: RecipeLibrary
-    @AppStorage(AppSettings.Key.reviewImports) private var reviewImports = false
 
     @State private var address = ""
     @State private var isLoading = false
@@ -96,13 +94,8 @@ struct ImportURLView: View {
                 let result = usingAppleIntelligence
                     ? try await RecipeImporter.importResultWithAppleIntelligence(from: url, progress: progress.report)
                     : try await RecipeImporter.importResult(from: url, progress: progress.report)
-                if !reviewImports, result.isComplete, let saved = await library.add(result) {
-                    dismiss()
-                    onSaved(saved)
-                } else {
-                    dismiss()
-                    onReview(result)
-                }
+                dismiss()
+                onReview(result)
             } catch {
                 errorMessage = error.localizedDescription
                 offersAppleIntelligence = (error as? RecipeError) == .invalid(RecipeImporter.noRecipeMessage)
