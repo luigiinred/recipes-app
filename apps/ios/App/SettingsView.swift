@@ -255,6 +255,8 @@ private struct RecipesSettingsPage: View {
 struct HomeSettingsPage: View {
     @AppStorage(AppSettings.Key.homeSections) private var orderRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenRaw = ""
+    @AppStorage(AppSettings.Key.dismissedHomeCards) private var dismissedCardsRaw = ""
+    @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
 
     private var listed: [HomeSection] { HomeSection.order(orderRaw) }
 
@@ -292,6 +294,10 @@ struct HomeSettingsPage: View {
                     withAnimation { orderRaw = ""; hiddenRaw = "" }
                 }
                 .disabled(orderRaw.isEmpty && hiddenRaw.isEmpty)
+                Button("Show Dismissed Cards") {
+                    withAnimation { dismissedCardsRaw = ""; homeTipDismissed = false }
+                }
+                .disabled(dismissedCardsRaw.isEmpty && !homeTipDismissed)
             }
         }
         .environment(\.editMode, .constant(.active))

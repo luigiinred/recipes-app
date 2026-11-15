@@ -225,6 +225,8 @@ struct RecipesTab: View {
     @State private var localPath: [RecipesRoute] = []
     @State private var selection: Recipe.ID?
     @FocusState private var isTyping: Bool
+    /// Stays on until the search is cancelled, so scrolling (which drops the keyboard) keeps the results.
+    @State private var isSearchOpen = false
     @Binding private var query: String
     private let sharedPath: Binding<[RecipesRoute]>?
     private let root: RecipesRoute?
@@ -269,10 +271,10 @@ struct RecipesTab: View {
             Group {
                 if let root { destination(root) }
                 else {
-                    RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty,
+                    RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isSearchOpen || isTyping || !query.isEmpty,
                                     searchFieldAtBottom: searchAtBottom && isTyping,
                                     showsAllRecipes: showsAllRecipes, isTabRoot: true, showsPages: searchAtBottom) { isTyping = false }
-                        .searchable(text: $query, placement: searchPlacement, prompt: "Search My Recipes")
+                        .searchable(text: $query, isPresented: $isSearchOpen, placement: searchPlacement, prompt: "Search My Recipes")
                         .searchFocused($isTyping)
                 }
             }

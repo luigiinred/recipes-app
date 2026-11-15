@@ -332,9 +332,9 @@ private struct DiscoverCatalogMatches: View {
 /// The Mealie servers you browse, on the Discover tab: each opens read-only, nested in the tab.
 struct MealieServersShelf: View {
     @EnvironmentObject private var discover: DiscoverController
-    @EnvironmentObject private var mealie: MealieSyncController
     @State private var adding = false
 
+    /// Only servers already added show; Mealie stays out of Discover for anyone not using it.
     var body: some View {
         Group {
             if !discover.sources.isEmpty {
@@ -357,12 +357,6 @@ struct MealieServersShelf: View {
                             }
                     }
                 }
-                .padding(.horizontal)
-            } else if mealie.isConnected {
-                Button { adding = true } label: {
-                    MealieServerTile(title: "Browse a Mealie Server", detail: "Read-only, with Add to My Recipes", symbol: "plus.circle")
-                }
-                .buttonStyle(.plain)
                 .padding(.horizontal)
             }
         }
