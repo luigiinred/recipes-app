@@ -586,6 +586,8 @@ enum RecipesRoute: Hashable {
     case feeds
     case feedPost(FeedEntry)
     case upNext
+    case plan
+    case groceries
     case homeSettings
 }
 

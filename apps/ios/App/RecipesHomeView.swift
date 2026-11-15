@@ -295,12 +295,16 @@ struct RecipesHomeView: View {
     @Binding var selection: Recipe.ID?
     var query = ""
     var showsQuickFilters = false
+    /// The open search field floats at the bottom, so the filter chips sit above it.
+    var searchFieldAtBottom = false
     /// Shows one tag's page with its own filters instead of the shared home.
     var tag: String?
     /// Lists every recipe instead of the home's first few.
     var showsAllRecipes = false
     /// The first tab's own page, which carries the Settings gear on iPhone.
     var isTabRoot = false
+    /// Home Screen mode: a link to every other page, in place of the tab bar.
+    var showsPages = false
     var onScroll: (() -> Void)?
 
     private var filter: HomeFilter {
@@ -411,7 +415,7 @@ struct RecipesHomeView: View {
         .task(id: onlineQuery) { await searchOnline() }
         .toolbar {
             #if os(iOS)
-            if isTabRoot, query.isEmpty, !isRegular, !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
+            if isTabRoot, query.isEmpty, !isRegular, showsPages || !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }
@@ -445,6 +449,14 @@ struct RecipesHomeView: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: margin, bottom: 12, trailing: margin))
                     .listRowSeparator(.hidden)
                     .themedRow()
+                #if os(iOS)
+                if isHome, showsPages {
+                    HomePages()
+                        .listRowInsets(EdgeInsets(top: 0, leading: margin, bottom: Self.sectionGap, trailing: margin))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
+                #endif
                 if isHome, !homeTipDismissed {
                     customizeTip
                         .listRowInsets(EdgeInsets(top: 0, leading: margin, bottom: Self.sectionGap, trailing: margin))
@@ -997,8 +1009,10 @@ struct RecipesHomeView: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.vertical, 6)
+        .padding(.top, 6)
+        .padding(.bottom, searchFieldAtBottom ? 70 : 6)
         .animation(.snappy, value: filter)
+        .animation(.snappy, value: searchFieldAtBottom)
     }
 
     private var sortMenu: some View {
@@ -1535,3 +1549,57 @@ private struct TimeHistogram: View {
 }
 
 #endif
+
+#if os(iOS)
+/// Home Screen mode's way around the app: a tile for each page chosen in Settings → Tabs, in that order.
+struct HomePages: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
+    @Environment(\.openRecipesRoute) private var open
+    @Environment(\.appAccent) private var accent
+
+    private var pages: [TabItem] { AppSettings.tabs(tabOrderRaw).filter { $0 != .home && $0 != .settings } }
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(pages) { page in
+                Button { open(route(page)) } label: { tile(page) }
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func tile(_ page: TabItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: page.symbol)
+                .appFont(.title2)
+                .foregroundStyle(accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(page.title).appFont(.headline).foregroundStyle(.primary)
+                Text(detail(page)).appFont(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func route(_ page: TabItem) -> RecipesRoute {
+        page.feature.map(RootView.route) ?? .allRecipes
+    }
+
+    private func detail(_ page: TabItem) -> String {
+        let queued = RecipeCollection.wantToCook.filter(library.recipes).count
+        return switch page {
+        case .recipes: "\(library.recipes.count) \(library.recipes.count == 1 ? "recipe" : "recipes")"
+        case .feeds: "Feeds and search"
+        case .upNext: queued == 0 ? "Nothing queued" : "\(queued) to cook"
+        case .plan: "Your week of meals"
+        case .groceries: "Your shopping list"
+        case .home, .settings: ""
+        }
+    }
+}
+#endif
+

@@ -32,6 +32,14 @@ On iPhone and iPad, the system SHALL offer Settings → Tabs → Arrange Tabs, a
 - **WHEN** the user opens Arrange Tabs
 - **THEN** Recipes can't be removed
 
+### Requirement: Home Screen navigation
+On iPhone, Arrange Tabs SHALL start with "Navigate With: Tabs | Home Screen" (key `navigationStyle`, Tabs by default). With Home Screen there is no tab bar: the app is one stack rooted at Home, whose search field sits at the bottom, and Home shows a tile for each page in the Arrange Tabs list other than Home and Settings (Recipes, Discover, Up Next, Plan, Groceries), in that order, each opening that page on the same stack. Settings opens from the gear on Home. The list is headed "On Home", has no five-page limit, and its additions sit under "More Pages". Links, widgets and reminders that would switch to a tab open that page on Home's stack instead. iPad keeps its sidebar.
+
+#### Scenario: Open a page from Home
+- **GIVEN** Navigate With is Home Screen
+- **WHEN** the user taps the Plan tile on Home
+- **THEN** Plan opens with a back button to Home, and there is no tab bar
+
 ### Requirement: Help Support Us section
 The system SHALL show a "Help Support Us" section with Leave a Review (the App Store write-review page) and Tell a Friend Who Cooks (shares the App Store listing with a message) only when the app has an App Store ID configured, and hide it otherwise.
 
