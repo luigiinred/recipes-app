@@ -7,8 +7,14 @@ struct DiscoverSource: Codable, Identifiable, Hashable {
     var server: String
     var token: String
     var username: String?
+    var label: String?
+    /// Set for a public group, browsed without a token.
+    var group: String?
 
-    var name: String { URL(string: server)?.host() ?? server }
+    var host: String { URL(string: server)?.host() ?? server }
+    var name: String { label?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? host }
+    var link: MealieLink? { MealieClient.normalizedServer(server).map { MealieLink(server: $0, token: token, kind: .discover, group: group) } }
+    var browser: MealieBrowser? { MealieClient.normalizedServer(server).map { MealieBrowser(server: $0, token: token, group: group) } }
 }
 
 /// The servers shown in Discover on the Recipes tab, each with the recipes read from it so far.
@@ -38,22 +44,44 @@ final class DiscoverController: ObservableObject {
         return catalog
     }
 
-    /// Checks the token against the server first. Adding a server that's already here replaces its token.
+    /// Checks the token against the server first. A server can be added more than once, even the one you sync with,
+    /// so each entry is its own way in.
     @discardableResult
-    func add(address: String, token: String) async throws -> DiscoverSource {
-        guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
+    /// With no token, reads the public recipes of the group the address names (`…/g/<group>`), or the server's default group.
+    func add(address: String, token: String, label: String? = nil) async throws -> DiscoverSource {
         let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        let user = try await MealieBrowser(server: url, token: token).currentUser()
-        var source = DiscoverSource(server: url.absoluteString, token: token, username: user.username)
-        if let index = sources.firstIndex(where: { $0.server == source.server }) {
-            source.id = sources[index].id
-            sources[index] = source
-            catalogs[source.id] = nil
+        let server: URL
+        var group: String?
+        if token.isEmpty {
+            if let page = MealieClient.publicPage(address) {
+                (server, group) = (page.server, page.group)
+            } else {
+                guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
+                server = url
+                group = await MealieClient(server: url, token: "").defaultGroup()
+            }
         } else {
-            sources.append(source)
+            guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
+            server = url
         }
+        var source = DiscoverSource(
+            server: server.absoluteString, token: token, label: label?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty, group: group
+        )
+        source.username = try await source.browser?.check()
+        sources.append(source)
         save()
         return source
+    }
+
+    func rename(_ source: DiscoverSource, to label: String) {
+        guard let index = sources.firstIndex(where: { $0.id == source.id }) else { return }
+        sources[index].label = label.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        save()
+    }
+
+    func move(from offsets: IndexSet, to destination: Int) {
+        sources.move(fromOffsets: offsets, toOffset: destination)
+        save()
     }
 
     func remove(_ source: DiscoverSource) {
@@ -100,7 +128,7 @@ final class DiscoverCatalog: ObservableObject {
 
     init(source: DiscoverSource) {
         self.source = source
-        let browser = MealieClient.normalizedServer(source.server).map { MealieBrowser(server: $0, token: source.token) }
+        let browser = source.browser
         self.browser = browser
         library = RecipeLibrary(browsing: { id in await browser?.image(for: id, thumbnail: true) })
     }
@@ -157,4 +185,8 @@ final class DiscoverCatalog: ObservableObject {
             problem = error.localizedDescription
         }
     }
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
 }

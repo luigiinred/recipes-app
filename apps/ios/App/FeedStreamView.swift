@@ -111,8 +111,32 @@ struct FeedStreamItem: Identifiable {
 struct FeedStreamTab: View {
     @EnvironmentObject private var router: AppRouter
     @State private var opened: FeedEntry?
+    #if os(iOS)
+    @State private var path: [RecipesRoute] = []
+    @State private var selection: Recipe.ID?
+    #endif
 
     var body: some View {
+        #if os(iOS)
+        NavigationStack(path: $path) {
+            FeedStreamView()
+                .navigationDestination(item: $opened) { FeedEntryPreview(entry: $0) }
+                .navigationDestination(for: RecipesRoute.self) { route in
+                    RecipesRouteDestination(route: route, selection: $selection) { path.append($0) }
+                }
+        }
+        .environment(\.openRecipesRoute) { path.append($0) }
+        .onChange(of: selection) { _, id in
+            guard let id else { return }
+            path.append(.recipe(id))
+            selection = nil
+        }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            guard let entry else { return }
+            opened = entry
+            router.feedPost = nil
+        }
+        #else
         NavigationStack {
             FeedStreamView().navigationDestination(item: $opened) { FeedEntryPreview(entry: $0) }
         }
@@ -121,6 +145,7 @@ struct FeedStreamTab: View {
             opened = entry
             router.feedPost = nil
         }
+        #endif
     }
 }
 
@@ -208,6 +233,9 @@ struct FeedStreamView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 36) {
                 if !discoverDismissed { discoverLink }
+                #if os(iOS)
+                MealieServersShelf()
+                #endif
                 if library.feeds.isEmpty {
                     Text("Follow recipe sites, blogs and YouTube channels from Popular Feeds and their newest posts show up here.")
                         .appFont(.subheadline)

@@ -102,7 +102,7 @@ struct RecipeDetailView: View {
                                 ShareLink(item: source) { Label("Original Recipe Link", systemImage: "link") }
                             }
                             if let mealieURL {
-                                ShareLink(item: mealieURL) { Label("Link in My Mealie", systemImage: "server.rack") }
+                                ShareLink(item: mealieURL) { Label("Link in My Mealie", image: "MealieLogo") }
                             }
                         } label: {
                             Label("Share", systemImage: "square.and.arrow.up")

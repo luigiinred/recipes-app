@@ -49,8 +49,7 @@ final class MealieSyncController: ObservableObject {
 
     var address: String? { previewAddress ?? connection?.server }
     var username: String? { previewUsername ?? connection?.username }
-    /// False in previews, which have no real connection to mint a token from.
-    var canShareAccess: Bool { connection != nil }
+    var canShareAccess: Bool { isConnected }
 
     var isConnected: Bool { previewAddress != nil || connection != nil }
 
@@ -69,12 +68,21 @@ final class MealieSyncController: ObservableObject {
     }
 
     /// Makes a token just for this share, so access can be revoked without disconnecting any of your own devices.
+    /// An invite link carries a one-use invitation instead, which signs up a new user of their own.
     func makeShareLink(kind: MealieLink.Kind = .sync) async throws -> MealieLink {
         guard let connection, let server = MealieClient.normalizedServer(connection.server) else { throw MealieError.notMealie }
+        let client = MealieClient(server: server, token: connection.token)
+        if kind == .invite { return MealieLink(server: server, token: try await client.createInvitation(), kind: .invite) }
         let purpose = kind == .discover ? "Recipes Discover" : "Recipes"
         let name = "\(purpose) shared \(Date().formatted(date: .abbreviated, time: .shortened))"
-        let token = try await MealieClient(server: server, token: connection.token).createAPIToken(name: name)
-        return MealieLink(server: server, token: token, kind: kind)
+        return MealieLink(server: server, token: try await client.createAPIToken(name: name), kind: kind)
+    }
+
+    /// Signs up with an invitation, then connects this device as the new user.
+    func join(_ link: MealieLink, as registration: MealieClient.Registration) async throws {
+        let name = "Recipes \(Date().formatted(date: .abbreviated, time: .shortened))"
+        let token = try await MealieClient.join(server: link.server, invitation: link.token, as: registration, tokenName: name)
+        try await connect(address: link.server.absoluteString, token: token)
     }
 
     /// Stops syncing and forgets the token on every device. Recipes already copied either way stay where they are.
