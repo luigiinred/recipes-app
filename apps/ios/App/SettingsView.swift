@@ -1094,15 +1094,31 @@ extension View {
 /// The tab bar as a list to reorder, with the tabs that aren't in it below to add.
 struct TabsSettingsPage: View {
     @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
+    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.tabs
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    private var onHome: Bool { sizeClass != .regular && navigationStyle == .home }
     private var shown: [TabItem] { AppSettings.tabs(tabOrderRaw) }
-    private var isFull: Bool { sizeClass != .regular && shown.count >= AppSettings.tabBarLimit }
+    private var isFull: Bool { sizeClass != .regular && !onHome && shown.count >= AppSettings.tabBarLimit }
 
     var body: some View {
         let shown = shown
         let others = TabItem.allCases.filter { !shown.contains($0) && !(sizeClass == .regular && $0 == .settings) }
         Form {
+            if sizeClass != .regular {
+                Section {
+                    Picker("Navigate With", selection: $navigationStyle) {
+                        ForEach(NavigationStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                } footer: {
+                    Text(onHome
+                         ? "No tab bar. Home has a tile for each page below, search sits at the bottom, and the gear opens Settings."
+                         : "A tab bar along the bottom, with a tab for each page below.")
+                }
+            }
             Section {
                 ForEach(shown) { item in
                     Label(item.title, systemImage: item.symbol)
@@ -1119,14 +1135,16 @@ struct TabsSettingsPage: View {
                     tabOrderRaw = AppSettings.encode(list)
                 }
             } header: {
-                Text("In the Tab Bar")
+                Text(onHome ? "On Home" : "In the Tab Bar")
             } footer: {
                 Text(sizeClass == .regular
                      ? "Drag to reorder. Keep Home, Recipes, or both. Settings is always in the sidebar."
+                     : onHome
+                     ? "Drag to reorder the tiles on Home."
                      : "Drag to reorder. Keep Home, Recipes, or both. The tab bar holds five tabs; without Settings in it, the gear on Home or Recipes opens it.")
             }
             if !others.isEmpty {
-                Section("More Tabs") {
+                Section(onHome ? "More Pages" : "More Tabs") {
                     ForEach(others) { item in
                         Button {
                             tabOrderRaw = AppSettings.encode(shown + [item])

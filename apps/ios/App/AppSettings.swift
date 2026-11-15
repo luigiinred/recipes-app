@@ -25,6 +25,18 @@ enum MainTab: String, CaseIterable {
     }
 }
 
+/// How the iPhone gets between pages: a tab bar, or Home with a link to each page and search at the bottom.
+enum NavigationStyle: String, CaseIterable {
+    case tabs, home
+
+    var title: String {
+        switch self {
+        case .tabs: "Tabs"
+        case .home: "Home Screen"
+        }
+    }
+}
+
 /// When a feed post counts as viewed.
 enum FeedMarkMode: String, CaseIterable {
     case onClose, onOpen, manual
@@ -138,6 +150,7 @@ enum AppSettings {
         static let settingsInTabBar = "settingsInTabBar"
         static let firstTab = "firstTab"
         static let tabOrder = "tabOrder"
+        static let navigationStyle = "navigationStyle"
         static let suggestCleanups = "suggestCleanups"
         static let scanForCleanups = "scanLibraryForCleanups"
 

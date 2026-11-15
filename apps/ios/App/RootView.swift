@@ -21,6 +21,7 @@ struct RootView: View {
     @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
+    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.tabs
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -129,14 +130,23 @@ struct RootView: View {
         }
     }
 
+    /// In Home Screen mode the iPhone has no tab bar: Home links to every page, and its search sits at the bottom.
+    private var usesHomeScreen: Bool { sizeClass != .regular && navigationStyle == .home }
+
     /// The tab bar and the sidebar are one component on iPad. Collections and categories filter the library tabs.
     var body: some View {
-        TabView(selection: $tab) {
-            if sizeClass == .regular { sidebarTabs } else { phoneTabs }
+        Group {
+            if usesHomeScreen {
+                RecipesTab(path: $recipesPath, query: $query, searchAtBottom: true)
+            } else {
+                TabView(selection: $tab) {
+                    if sizeClass == .regular { sidebarTabs } else { phoneTabs }
+                }
+                .tabViewStyle(.sidebarAdaptable)
+                .sidebarFirst()
+            }
         }
         .environment(browsing)
-        .tabViewStyle(.sidebarAdaptable)
-        .sidebarFirst()
         .reviewPrompt()
         .toastHost()
         .cleanupScanning()
@@ -156,7 +166,8 @@ struct RootView: View {
             case .groceries: .groceries
             case .feeds: .feeds
             }
-            if inBar(target) { tab = Self.appTab(TabItem(target)) }
+            if usesHomeScreen { recipesPath = [Self.route(target)] }
+            else if inBar(target) { tab = Self.appTab(TabItem(target)) }
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
@@ -164,17 +175,27 @@ struct RootView: View {
         }
         .onChange(of: router.feedPost, initial: true) { _, entry in
             guard let entry else { return }
-            if inBar(.feeds) { tab = .feeds; return }
+            if !usesHomeScreen, inBar(.feeds) { tab = .feeds; return }
             tab = libraryTab
             recipesPath = [.feedPost(entry)]
             router.feedPost = nil
         }
         .onChange(of: router.reminder, initial: true) { _, kind in
             switch kind {
-            case .logDinner, .planWeek: if inBar(.plan) { tab = .plan }
+            case .logDinner, .planWeek:
+                if usesHomeScreen { recipesPath = [.plan] } else if inBar(.plan) { tab = .plan }
             case .addRecipe: tab = libraryTab
             case nil: break
             }
+        }
+    }
+
+    static func route(_ page: MainTab) -> RecipesRoute {
+        switch page {
+        case .feeds: .feeds
+        case .upNext: .upNext
+        case .plan: .plan
+        case .groceries: .groceries
         }
     }
 
@@ -208,6 +229,7 @@ struct RecipesTab: View {
     private let sharedPath: Binding<[RecipesRoute]>?
     private let root: RecipesRoute?
     private var showsAllRecipes = false
+    private var searchAtBottom = false
 
     init(root: RecipeCollection) {
         self.init(root: .collection(root))
@@ -219,16 +241,18 @@ struct RecipesTab: View {
         _query = .constant("")
     }
 
-    init(path: Binding<[RecipesRoute]>, query: Binding<String>, showsAllRecipes: Bool = false) {
+    init(path: Binding<[RecipesRoute]>, query: Binding<String>, showsAllRecipes: Bool = false, searchAtBottom: Bool = false) {
         root = nil
         sharedPath = path
         _query = query
         self.showsAllRecipes = showsAllRecipes
+        self.searchAtBottom = searchAtBottom
     }
 
     private var searchPlacement: SearchFieldPlacement {
         #if os(iOS)
-        sizeClass == .regular ? .automatic : .navigationBarDrawer(displayMode: .always)
+        // Automatic puts an iPhone's search field in the bottom toolbar.
+        sizeClass == .regular || searchAtBottom ? .automatic : .navigationBarDrawer(displayMode: .always)
         #else
         .automatic
         #endif
@@ -246,7 +270,8 @@ struct RecipesTab: View {
                 if let root { destination(root) }
                 else {
                     RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty,
-                                    showsAllRecipes: showsAllRecipes, isTabRoot: true) { isTyping = false }
+                                    searchFieldAtBottom: searchAtBottom && isTyping,
+                                    showsAllRecipes: showsAllRecipes, isTabRoot: true, showsPages: searchAtBottom) { isTyping = false }
                         .searchable(text: $query, placement: searchPlacement, prompt: "Search My Recipes")
                         .searchFocused($isTyping)
                 }
@@ -278,6 +303,7 @@ struct RecipesTab: View {
 /// Where a pushed `RecipesRoute` lands, in any stack that pushes them.
 struct RecipesRouteDestination: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
     let route: RecipesRoute
     @Binding var selection: Recipe.ID?
     let push: (RecipesRoute) -> Void
@@ -302,6 +328,24 @@ struct RecipesRouteDestination: View {
             FeedEntryPreview(entry: entry)
         case .upNext:
             QueueView { push(.recipe($0)) }.navigationTitle("Up Next")
+        case .plan:
+            MyWeekView(open: { push(.recipe($0)) })
+                .navigationTitle("Plan")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { router.add = .plan } label: { Label("Add", systemImage: "plus") }
+                    }
+                }
+        case .groceries:
+            GroceriesView(layout: .combined)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { router.add = .groceries } label: { Label("Add", systemImage: "plus") }
+                    }
+                }
         case .homeSettings:
             HomeSettingsPage()
         }
