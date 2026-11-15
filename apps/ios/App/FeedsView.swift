@@ -10,16 +10,23 @@ struct FeedEntryPreview: View {
     let entry: FeedEntry
 
     @State private var errorMessage: String?
+    @StateObject private var earlyPlayer = YouTubePlayerController()
+    /// A video's recipe waits for this, so a video being watched hands its place to the recipe page's player.
+    @State private var showsRecipe = false
+    @State private var resumeAt: Int?
+
+    private var videoID: String? { YouTubeImporter.videoID(from: entry.link) }
 
     var body: some View {
         Group {
-            if let result = loader.results[entry.id] {
+            if let result = loader.results[entry.id], showsRecipe || videoID == nil {
                 RecipeDetailView(recipe: result.recipe, previewSave: {
                     Task {
                         guard let saved = await library.add(result) else { return }
                         ToastCenter.shared.show("Added \(saved.title) to My Recipes") { await library.delete(saved) }
                     }
-                }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe))
+                }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe),
+                   resumesVideoAt: resumeAt)
                 .transition(.opacity)
             } else if errorMessage != nil {
                 if VideoRecipeFinder.isVideo(entry.link) {
@@ -38,11 +45,22 @@ struct FeedEntryPreview: View {
                             }
                         }
                 }
+            } else if let videoID {
+                VideoWhileReading(entry: entry, videoID: videoID, controller: earlyPlayer)
             } else {
                 RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
             }
         }
         .animation(.recipeArrives, value: loader.results[entry.id] != nil)
+        .animation(.recipeArrives, value: showsRecipe)
+        .onChange(of: loader.results[entry.id] != nil, initial: true) { _, found in
+            guard found, !showsRecipe else { return }
+            Task {
+                resumeAt = await earlyPlayer.currentSeconds()
+                earlyPlayer.pause()
+                showsRecipe = true
+            }
+        }
         .task(id: entry.id) {
             errorMessage = nil
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
@@ -64,6 +82,32 @@ struct FeedEntryPreview: View {
     private func isSaved(_ recipe: Recipe) -> Bool {
         let source = recipe.sourceURL ?? entry.link.absoluteString
         return library.recipes.contains { $0.sourceURL == source }
+    }
+}
+
+/// A video opened before its recipe is read: the player right away, ready to watch, above the page still loading.
+private struct VideoWhileReading: View {
+    let entry: FeedEntry
+    let videoID: String
+    @ObservedObject var controller: YouTubePlayerController
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                YouTubeEmbed(recipe: Recipe(title: entry.title, sourceURL: entry.link.absoluteString), videoID: videoID, controller: controller)
+                Label("Reading the recipe from the video…", systemImage: "sparkles")
+                    .appFont(.subheadline)
+                    .foregroundStyle(.secondary)
+                RecipeDetailSkeleton(hasPhoto: false)
+                    .frame(height: 600)
+                    .allowsHitTesting(false)
+            }
+            .padding(.horizontal)
+        }
+        .navigationTitle(entry.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

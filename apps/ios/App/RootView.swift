@@ -245,7 +245,7 @@ struct RecipesTab: View {
             Group {
                 if let root { destination(root) }
                 else {
-                    RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty, isSearching: isTyping,
+                    RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isTyping || !query.isEmpty,
                                     showsAllRecipes: showsAllRecipes, isTabRoot: true) { isTyping = false }
                         .searchable(text: $query, placement: searchPlacement, prompt: "Search My Recipes")
                         .searchFocused($isTyping)

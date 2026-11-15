@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case tabs, home, recipes, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
+    case tabs, home, recipes, search, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
 }
 
 struct SettingsView: View {
@@ -87,6 +87,7 @@ struct SettingsView: View {
         }
         Section {
             NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
+            NavigationLink(value: SettingsPage.search) { Label("Search", systemImage: "magnifyingglass") }
             NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
             NavigationLink(value: SettingsPage.reminders) { Label("Reminders", systemImage: "bell") }
         }
@@ -153,6 +154,7 @@ struct SettingsView: View {
             EmptyView()
             #endif
         case .recipes: RecipesSettingsPage()
+        case .search: SearchSettingsPage()
         case .upNext: UpNextSettingsPage()
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()

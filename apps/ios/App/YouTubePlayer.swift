@@ -30,6 +30,13 @@ final class YouTubePlayerController: ObservableObject {
         isShown = true
     }
 
+    /// Where a shown video is, in whole seconds.
+    func currentSeconds() async -> Int? {
+        guard isShown, let webView else { return nil }
+        let value = try? await webView.evaluateJavaScript("player && player.getCurrentTime ? player.getCurrentTime() : 0")
+        return (value as? NSNumber).map { Int($0.doubleValue) }
+    }
+
     func pause() {
         webView?.evaluateJavaScript("if (player && player.pauseVideo) { player.pauseVideo(); }")
     }
@@ -279,7 +286,15 @@ struct YouTubeEmbed: View {
                 if library.hasImage(recipe.id) {
                     RecipeImageView(recipe: recipe)
                 } else {
-                    Color.black
+                    // The thumbnail letterboxes a 16:9 picture in 4:3; filling 16:9 crops the bars away.
+                    AsyncImage(url: URL(string: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg")) { image in
+                        Color.clear
+                            .aspectRatio(16 / 9, contentMode: .fit)
+                            .overlay { image.resizable().scaledToFill() }
+                            .clipped()
+                    } placeholder: {
+                        Color.black
+                    }
                 }
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: isCompact ? 32 : 64))

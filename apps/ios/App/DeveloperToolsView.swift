@@ -40,13 +40,6 @@ struct DeveloperToolsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(FeatureFlag.allCases) { FeatureFlagToggle(flag: $0) }
-            } header: {
-                Text("Experimental features")
-            } footer: {
-                Text("Features still being tried out. They're off unless you turn them on here.")
-            }
-            Section {
                 Button { addSamples() } label: { Label("Add Sample Recipes, Plan and Groceries", systemImage: "square.stack.3d.up") }
                     .sensoryFeedback(.success, trigger: addedSamples)
             } header: {

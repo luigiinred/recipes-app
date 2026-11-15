@@ -876,13 +876,6 @@ struct RecipeFeedsPage: View {
         List {
             if showsTabToggle {
                 TabVisibilitySection(tab: .feeds)
-                Section {
-                    FeatureFlagToggle(flag: .discoverSearch)
-                } header: {
-                    Text("Discover Search")
-                } footer: {
-                    Text("Experimental. Its sources can be switched on and off in Settings → Data & Developer → Developer Tools.")
-                }
                 ReadingFeedsSection()
                 OfflineFeedsSection()
             }

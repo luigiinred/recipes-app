@@ -9,15 +9,21 @@ public struct RecipeSearchResult: Identifiable, Hashable, Sendable {
     public var source: String
     public var imageURL: URL?
     public var kind: Kind
+    /// A video's running time, such as "12:04".
+    public var duration: String?
+    /// A video's views and age, such as "1.2M views · 3 years ago".
+    public var detail: String?
 
     public var id: String { link.absoluteString }
 
-    public init(title: String, link: URL, source: String, imageURL: URL? = nil, kind: Kind) {
+    public init(title: String, link: URL, source: String, imageURL: URL? = nil, kind: Kind, duration: String? = nil, detail: String? = nil) {
         self.title = title
         self.link = link
         self.source = source
         self.imageURL = imageURL
         self.kind = kind
+        self.duration = duration
+        self.detail = detail
     }
 }
 
@@ -127,8 +133,10 @@ public enum RecipeSearch {
                   let title = YouTubeChannels.text(video["title"]),
                   let link = URL(string: "https://www.youtube.com/watch?v=\(id)") else { return }
             let channel = YouTubeChannels.text(video["ownerText"]) ?? "YouTube"
+            let detail = [video["shortViewCountText"] ?? video["viewCountText"], video["publishedTimeText"]].compactMap(YouTubeChannels.text)
             found.append(RecipeSearchResult(title: title, link: link, source: channel,
-                                            imageURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"), kind: .video))
+                                            imageURL: URL(string: "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"), kind: .video,
+                                            duration: YouTubeChannels.text(video["lengthText"]), detail: detail.isEmpty ? nil : detail.joined(separator: " · ")))
         }
         return found
     }
