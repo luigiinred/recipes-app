@@ -29,22 +29,25 @@ public struct FeedWidgetSnapshot: Codable, Equatable, Sendable {
 
     public var feeds: [Feed]
     public var posts: [Post]
+    /// Viewed posts still in the feeds, so a refresh in the widget keeps them hidden.
+    public var viewed: Set<String>
     public var accentHex: String?
     public var updatedAt: Date?
 
-    public init(feeds: [Feed] = [], posts: [Post] = [], accentHex: String? = nil, updatedAt: Date? = nil) {
+    public init(feeds: [Feed] = [], posts: [Post] = [], viewed: Set<String> = [], accentHex: String? = nil, updatedAt: Date? = nil) {
         self.feeds = feeds
         self.posts = posts
+        self.viewed = viewed
         self.accentHex = accentHex
         self.updatedAt = updatedAt
     }
 
     public static let empty = FeedWidgetSnapshot()
 
-    /// The newest posts of each feed, newest first across all of them.
-    public static func make(feeds: [Feed], entries: [String: [FeedEntry]], updatedAt: Date? = nil) -> FeedWidgetSnapshot {
+    /// The newest unviewed posts of each feed, newest first across all of them.
+    public static func make(feeds: [Feed], entries: [String: [FeedEntry]], viewed: Set<String> = [], updatedAt: Date? = nil) -> FeedWidgetSnapshot {
         let posts = feeds.flatMap { feed in
-            (entries[feed.url] ?? []).prefix(postsPerFeed).map {
+            (entries[feed.url] ?? []).filter { !viewed.contains($0.id) }.prefix(postsPerFeed).map {
                 Post(title: $0.title, link: $0.link, feedURL: feed.url, source: feed.title, published: $0.published, imageURL: $0.imageURL)
             }
         }
@@ -59,7 +62,8 @@ public struct FeedWidgetSnapshot: Codable, Equatable, Sendable {
         }
         var seen = Set<String>()
         let unique = sorted.map(\.element).filter { seen.insert($0.id).inserted }
-        return FeedWidgetSnapshot(feeds: feeds, posts: Array(unique.prefix(maxPosts)), updatedAt: updatedAt)
+        let present = Set(feeds.flatMap { entries[$0.url] ?? [] }.map(\.id))
+        return FeedWidgetSnapshot(feeds: feeds, posts: Array(unique.prefix(maxPosts)), viewed: viewed.intersection(present), updatedAt: updatedAt)
     }
 
     /// Posts from one feed, or from every feed when `feedURL` is nil.
@@ -82,7 +86,7 @@ public struct FeedWidgetSnapshot: Codable, Equatable, Sendable {
             for await (url, entries) in group { all[url] = entries ?? saved[url] }
             return all
         }
-        var snapshot = Self.make(feeds: feeds, entries: fetched, updatedAt: date)
+        var snapshot = Self.make(feeds: feeds, entries: fetched, viewed: viewed, updatedAt: date)
         snapshot.accentHex = accentHex
         return snapshot
     }

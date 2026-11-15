@@ -150,7 +150,7 @@ extension FeedLoader {
     func publishWidget(_ feeds: [Feed]) async {
         #if os(iOS)
         let loaded = states.compactMapValues(\.entries)
-        await FeedWidgetSync.publish(feeds, loaded: loaded)
+        await FeedWidgetSync.publish(feeds, loaded: loaded, viewed: viewed)
         #endif
     }
 }
