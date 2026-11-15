@@ -40,6 +40,14 @@ On iPhone, Arrange Tabs SHALL start with "Navigate With: Tabs | Home Screen" (ke
 - **WHEN** the user taps the Plan tile on Home
 - **THEN** Plan opens with a back button to Home, and there is no tab bar
 
+### Requirement: Home sections
+Every Home section SHALL open with the same header: its title and at most one accessory, a tinted text link with a small chevron ("View Plan" on Today, "View All" on Up Next, Favorites, Feeds and Recipes, "Show All"/"Show Less" on Tags). A section with nothing in it shows a prompt card with an X; a dismissed card stays hidden until Settings → Home → Show Dismissed Cards. Discover shows Mealie servers only once one has been added; it never prompts to set Mealie up.
+
+#### Scenario: Dismiss an empty section's card
+- **GIVEN** nothing is planned for today
+- **WHEN** the user taps the X on Today's card
+- **THEN** the card goes away and stays away
+
 ### Requirement: Help Support Us section
 The system SHALL show a "Help Support Us" section with Leave a Review (the App Store write-review page) and Tell a Friend Who Cooks (shares the App Store listing with a message) only when the app has an App Store ID configured, and hide it otherwise.
 

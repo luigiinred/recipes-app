@@ -15,18 +15,26 @@ private struct ImportPreviewChrome: ViewModifier {
     let cancel: () -> Void
     let edit: () -> Void
     let save: () -> Void
+    @State private var noticeDismissed = false
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
-                if let notice {
-                    Label(notice, systemImage: "exclamationmark.triangle.fill")
-                        .appFont(.footnote, weight: .medium)
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .padding(.horizontal, 16).padding(.vertical, 8)
+                if let notice, !noticeDismissed {
+                    HStack(alignment: .top, spacing: 8) {
+                        Label(notice, systemImage: "exclamationmark.triangle.fill")
+                            .appFont(.footnote, weight: .medium)
+                            .foregroundStyle(.orange)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button { withAnimation(.snappy) { noticeDismissed = true } } label: {
+                            Image(systemName: "xmark").appFont(.footnote, weight: .semibold).foregroundStyle(.orange)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Dismiss")
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 16).padding(.vertical, 8)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

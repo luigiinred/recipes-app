@@ -115,6 +115,7 @@ enum AppSettings {
         static let homeSections = "homeSections"
         static let hiddenHomeSections = "hiddenHomeSections"
         static let homeTipDismissed = "homeCustomizeTipDismissed"
+        static let dismissedHomeCards = "dismissedHomeCards"
         static let recipeDetails = "recipeDetails"
         static let reminders = "syncGroceriesWithReminders"
         static let ratingStyle = "ratingStyle"

@@ -284,6 +284,7 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.homeSections) private var homeSectionsRaw = ""
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
+    @AppStorage(AppSettings.Key.dismissedHomeCards) private var dismissedCardsRaw = ""
     @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     @AppStorage(SearchSetting.discoverSearch.key) private var searchesOnline = true
     @State private var online = OnlineRecipeSearch()
@@ -660,30 +661,8 @@ struct RecipesHomeView: View {
 
     private func heroSection(_ section: HomeSection, picks: [HeroPick]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                if section == .upNext {
-                    Button { openRoute(.upNext) } label: {
-                        HStack(alignment: .firstTextBaseline) {
-                            sectionTitle(section.title)
-                            Spacer()
-                            Image(systemName: "chevron.right").appFont(.subheadline, weight: .semibold).foregroundStyle(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Opens Up Next to reorder it")
-                } else if section == .favorites {
-                    sectionTitle(section.title)
-                    Spacer()
-                    sectionLink("View All") { openRoute(.collection(.favorites)) }
-                        .accessibilityLabel("View All Favorites")
-                } else {
-                    sectionTitle(section.title)
-                    Spacer()
-                    if section == .today { sectionLink("View Plan") { router.destination = .plan } }
-                }
-            }
-            .padding(.horizontal, margin)
+            HomeSectionHeader(title: section.title, accessory: heroAccessory(section))
+                .padding(.horizontal, margin)
             HeroCarousel(picks: picks, margin: margin) { id in
                 if library.recipe(id: id) != nil { selection = id } else { router.destination = .plan }
             } actions: { recipe in
@@ -705,7 +684,7 @@ struct RecipesHomeView: View {
 
     /// What a Home section says when it has nothing to show yet, and where its tap leads.
     private func emptyCard(_ section: HomeSection) -> AnyView? {
-        guard isHome else { return nil }
+        guard isHome, !dismissedCardsRaw.split(separator: ",").contains(Substring(section.rawValue)) else { return nil }
         switch section {
         case .today where shows(.plan):
             return AnyView(emptyCard(section, symbol: "calendar.badge.plus", heading: "Nothing planned for today",
@@ -735,20 +714,32 @@ struct RecipesHomeView: View {
                 Text(message).appFont(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            if action != nil {
-                Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
-            }
         }
-        .padding(16)
-        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
         return VStack(alignment: .leading, spacing: 10) {
             sectionTitle(section.title)
-            if let action {
-                Button(action: action) { card }.buttonStyle(.plain)
-            } else {
-                card
+            HStack(alignment: .top, spacing: 8) {
+                if let action {
+                    Button(action: action) { card }.buttonStyle(.plain)
+                } else {
+                    card
+                }
+                Button {
+                    withAnimation(.snappy) { dismissedCardsRaw = (dismissedCardsRaw.split(separator: ",").map(String.init) + [section.rawValue]).joined(separator: ",") }
+                } label: {
+                    Image(systemName: "xmark")
+                        .appFont(.body, weight: .semibold)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Dismiss")
             }
+            .padding(.vertical, 16)
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -793,25 +784,10 @@ struct RecipesHomeView: View {
     private var tagsRow: some View {
         let pages = tagPages
         return VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                tagsTitle
-                Spacer()
-                if pages.count > 1 {
-                    Button { toggleTags() } label: {
-                        HStack(spacing: 4) {
-                            Text(tagsExpanded ? "Show Less" : "Show All")
-                            Image(systemName: "chevron.down")
-                                .appFont(.caption, weight: .semibold)
-                                .rotationEffect(.degrees(tagsExpanded ? 180 : 0))
-                        }
-                        .appFont(.subheadline, weight: .medium)
-                        .foregroundStyle(.tint)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(tagsExpanded ? "Show Fewer Tags" : "Show All Tags")
-                }
-            }
+            HomeSectionHeader(title: "Tags", accessory: pages.count > 1
+                ? .init(title: tagsExpanded ? "Show Less" : "Show All", symbol: "chevron.down", turned: tagsExpanded,
+                        accessibilityLabel: tagsExpanded ? "Show Fewer Tags" : "Show All Tags") { toggleTags() }
+                : nil)
             .padding(.horizontal, margin)
             if tagsExpanded {
                 tagGrid(tagRows)
@@ -872,56 +848,30 @@ struct RecipesHomeView: View {
 
     private var feedsRow: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                sectionTitle(HomeSection.feeds.title)
-                Spacer()
-                Button { openRoute(.feeds) } label: {
-                    HStack(spacing: 4) {
-                        Text("View All")
-                        Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
-                    }
-                    .appFont(.subheadline, weight: .medium)
-                    .foregroundStyle(.tint)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("View All Feeds")
-            }
-            .padding(.horizontal, margin)
+            HomeSectionHeader(title: HomeSection.feeds.title,
+                              accessory: .init(title: "View All", accessibilityLabel: "View All Feeds") { openRoute(.feeds) })
+                .padding(.horizontal, margin)
             FeedShelf(margin: margin, cardWidth: isRegular ? 300 : 260)
         }
     }
 
-    private var tagsTitle: some View {
-        sectionTitle("Tags")
+    private func sectionTitle(_ text: String) -> some View {
+        HomeSectionHeader(title: text)
     }
 
-    private func sectionTitle(_ text: String) -> some View {
-        Text(text).appFont(.title3, weight: .semibold).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
+    private func heroAccessory(_ section: HomeSection) -> HomeSectionHeader.Accessory? {
+        switch section {
+        case .today: .init(title: "View Plan") { router.destination = .plan }
+        case .upNext: .init(title: "View All", accessibilityLabel: "View All of Up Next") { openRoute(.upNext) }
+        case .favorites: .init(title: "View All", accessibilityLabel: "View All Favorites") { openRoute(.collection(.favorites)) }
+        default: nil
+        }
     }
 
     private func recipesHeader(count: Int) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            sectionTitle("Recipes")
-            Spacer()
-            if count > Self.homeRecipeLimit {
-                sectionLink("View All") { openRoute(.allRecipes) }
-                    .accessibilityLabel("View All Recipes")
-            }
-        }
-    }
-
-    private func sectionLink(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(title)
-                Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
-            }
-            .appFont(.subheadline, weight: .medium)
-            .foregroundStyle(.tint)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
+        HomeSectionHeader(title: "Recipes", accessory: count > Self.homeRecipeLimit
+            ? .init(title: "View All", accessibilityLabel: "View All Recipes") { openRoute(.allRecipes) }
+            : nil)
     }
 
     private func countLabel(_ count: Int) -> some View {
@@ -1603,3 +1553,41 @@ struct HomePages: View {
 }
 #endif
 
+#if os(iOS)
+/// Every Home section's heading: the title, and at most one accessory, always a tinted link with a small chevron.
+struct HomeSectionHeader: View {
+    struct Accessory {
+        let title: String
+        var symbol = "chevron.right"
+        /// Turns the chevron over, for a Show All that's open.
+        var turned = false
+        var accessibilityLabel: String?
+        let action: () -> Void
+    }
+
+    let title: String
+    var accessory: Accessory?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).appFont(.title3, weight: .semibold).foregroundStyle(.primary).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            if let accessory {
+                Button(action: accessory.action) {
+                    HStack(spacing: 4) {
+                        Text(accessory.title)
+                        Image(systemName: accessory.symbol)
+                            .appFont(.caption, weight: .semibold)
+                            .rotationEffect(.degrees(accessory.turned ? 180 : 0))
+                    }
+                    .appFont(.subheadline, weight: .medium)
+                    .foregroundStyle(.tint)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(accessory.accessibilityLabel ?? accessory.title)
+            }
+        }
+    }
+}
+#endif
