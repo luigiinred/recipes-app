@@ -288,6 +288,7 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
     @AppStorage(SearchSetting.discoverSearch.key) private var searchesOnline = true
     @State private var online = OnlineRecipeSearch()
+    @State private var keyboardShown = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
@@ -414,6 +415,8 @@ struct RecipesHomeView: View {
         #endif
         .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
         .task(id: onlineQuery) { await searchOnline() }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardShown = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardShown = false }
         .toolbar {
             #if os(iOS)
             if isTabRoot, query.isEmpty, !isRegular, showsPages || !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
@@ -960,7 +963,8 @@ struct RecipesHomeView: View {
             }
         }
         .padding(.top, 6)
-        .padding(.bottom, searchFieldAtBottom ? 70 : 6)
+        // A bottom search field lifted by the on-screen keyboard is already in the safe area; without that keyboard it floats over it.
+        .padding(.bottom, searchFieldAtBottom && !keyboardShown ? 70 : 6)
         .animation(.snappy, value: filter)
         .animation(.snappy, value: searchFieldAtBottom)
     }
