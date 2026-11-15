@@ -13,10 +13,6 @@ struct MealieSettingsPage: View {
     @State private var isConnecting = false
     @State private var connectError: String?
     @State private var isConfirmingDisconnect = false
-    @State private var shareError: String?
-    @State private var shareLink: MealieLink?
-    @State private var sharingKind: MealieLink.Kind?
-    @State private var addingDiscover = false
 
     var body: some View {
         Form {
@@ -33,42 +29,21 @@ struct MealieSettingsPage: View {
         .confirmationDialog("Disconnect from Mealie?", isPresented: $isConfirmingDisconnect, titleVisibility: .visible) {
             Button("Disconnect", role: .destructive) { mealie.disconnect() }
         }
-        .sheet(item: $shareLink) { link in
-            ShareAccessSheet(link: link)
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $addingDiscover) { AddDiscoverSheet() }
-    }
-
-    private func share(_ kind: MealieLink.Kind) async {
-        sharingKind = kind
-        shareError = nil
-        defer { sharingKind = nil }
-        do {
-            shareLink = try await mealie.makeShareLink(kind: kind)
-        } catch {
-            shareError = error.localizedDescription
-        }
     }
 
     // MARK: - Discover
 
     private var discoverSection: some View {
         Section {
-            ForEach(discover.sources) { source in
-                LabeledContent(source.name, value: source.username ?? "")
-                    .swipeActions { Button("Remove", role: .destructive) { discover.remove(source) } }
-                    .contextMenu { Button("Remove", systemImage: "trash", role: .destructive) { discover.remove(source) } }
+            NavigationLink { MealieSharingPage() } label: {
+                LabeledContent {
+                    if !discover.sources.isEmpty { Text("\(discover.sources.count)") }
+                } label: {
+                    Label("Sharing and Discover Servers", systemImage: "person.2")
+                }
             }
-            Button {
-                addingDiscover = true
-            } label: {
-                Label("Add Discover Server", systemImage: "plus")
-            }
-        } header: {
-            Text("Discover")
         } footer: {
-            Text("Browse someone else's Mealie recipes under Discover on the Recipes tab, and add the ones you like to your own. Recipes only reads from these servers.")
+            Text("Invite someone, share this account or a read-only link, and choose the servers you browse on the Discover tab.")
         }
     }
 
@@ -159,27 +134,6 @@ struct MealieSettingsPage: View {
         } footer: {
             Text("Groceries go to one Mealie shopping list, made for you if it doesn't exist. Grocery items can also sync with Reminders.")
         }
-        if mealie.canShareAccess {
-            Section {
-                Button {
-                    Task { await share(.sync) }
-                } label: {
-                    if sharingKind == .sync { ProgressView() } else { Label("Share Access", systemImage: "square.and.arrow.up") }
-                }
-                Button {
-                    Task { await share(.discover) }
-                } label: {
-                    if sharingKind == .discover { ProgressView() } else { Label("Share as Discover", systemImage: "binoculars") }
-                }
-            } footer: {
-                if let shareError {
-                    Text(shareError).foregroundStyle(.red)
-                } else {
-                    Text("Each makes a new API token and a link for it. Share Access connects Recipes on another device to this server to sync. Share as Discover lets someone browse your recipes and copy the ones they like; Recipes never changes anything with it, but the token itself could, so send either only to people you trust. Delete the token under API Tokens in Mealie to revoke it.")
-                }
-            }
-            .disabled(sharingKind != nil)
-        }
         Section {
             Button("Disconnect", role: .destructive) { isConfirmingDisconnect = true }
         } footer: {
@@ -208,44 +162,13 @@ struct MealieSettingsPage: View {
     }
 }
 
-private struct ShareAccessSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let link: MealieLink
-
-    private var isDiscover: Bool { link.kind == .discover }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: isDiscover ? "binoculars" : "key.horizontal").appFont(.largeTitle).foregroundStyle(.tint)
-                Text(isDiscover
-                     ? "A new token was made for this link. Whoever opens it can browse your Mealie recipes in Recipes and copy them. The token could also change them outside the app, so send it only to people you trust."
-                     : "A new token was made for this link. Anyone who opens it can read and change your Mealie recipes, so send it only to people you trust.")
-                    .multilineTextAlignment(.center)
-                ShareLink(item: link.url, message: Text(isDiscover ? "Open this on a phone with Recipes to browse my recipes." : "Open this on a phone with Recipes to sync with my Mealie server.")) {
-                    Label("Send Link", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-            .navigationTitle(isDiscover ? "Share as Discover" : "Share Access")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
-        }
-    }
-}
-
-extension MealieLink: Identifiable {
-    public var id: String { token }
-}
-
 struct AddDiscoverSheet: View {
     @EnvironmentObject private var discover: DiscoverController
+    @EnvironmentObject private var mealie: MealieSyncController
     @Environment(\.dismiss) private var dismiss
     @State private var address = ""
     @State private var token = ""
+    @State private var label = ""
     @State private var isAdding = false
     @State private var failure: String?
 
@@ -260,16 +183,36 @@ struct AddDiscoverSheet: View {
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         #endif
-                    SecureField("API token", text: $token)
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
+                    TextField("Name (optional)", text: $label)
                 } footer: {
                     if let failure {
                         Text(failure).foregroundStyle(.red)
                     } else {
-                        Text("Ask whoever runs the server for an API token, or for a Share as Discover link, which fills this in for you.")
+                        Text("No account needed: Recipes shows the server's public recipes. Paste a group's page (…/g/name) to browse that group. A name tells apart servers added more than once.")
+                    }
+                }
+                Section {
+                    SecureField("API token (optional)", text: $token)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+                } header: {
+                    Text("Private Recipes")
+                } footer: {
+                    Text("With a token, or a Share Read-Only link that fills it in, you see everything that user can see, not only public recipes.")
+                }
+                if let connection = mealie.connection {
+                    Section {
+                        Button {
+                            address = connection.server
+                            token = connection.token
+                            if label.isEmpty { label = "My Mealie" }
+                        } label: {
+                            Label("Use the Server I Sync With", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    } footer: {
+                        Text("Browses your own server read-only, the way someone you share it with would see it.")
                     }
                 }
             }
@@ -284,7 +227,7 @@ struct AddDiscoverSheet: View {
                     if isAdding {
                         ProgressView()
                     } else {
-                        ConfirmButton(title: "Add", isDisabled: address.trimmingCharacters(in: .whitespaces).isEmpty || token.trimmingCharacters(in: .whitespaces).isEmpty) {
+                        ConfirmButton(title: "Add", isDisabled: address.trimmingCharacters(in: .whitespaces).isEmpty) {
                             Task { await add() }
                         }
                     }
@@ -301,7 +244,7 @@ struct AddDiscoverSheet: View {
         failure = nil
         defer { isAdding = false }
         do {
-            try await discover.add(address: address, token: token)
+            try await discover.add(address: address, token: token, label: label)
             dismiss()
         } catch {
             failure = error.localizedDescription

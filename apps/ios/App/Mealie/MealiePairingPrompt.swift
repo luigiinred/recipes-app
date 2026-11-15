@@ -15,6 +15,7 @@ private struct MealiePairingPrompt: ViewModifier {
             } message: { link in
                 Text(message(for: link))
             }
+            .sheet(item: invite) { link in JoinMealieSheet(link: link) }
             .alert("Couldn't Connect to Mealie", isPresented: isFailed) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -28,7 +29,11 @@ private struct MealiePairingPrompt: ViewModifier {
     }
 
     private var isAsking: Binding<Bool> {
-        Binding { router.mealieLink != nil } set: { if !$0 { router.mealieLink = nil } }
+        Binding { router.mealieLink.map { $0.kind != .invite } ?? false } set: { if !$0 { router.mealieLink = nil } }
+    }
+
+    private var invite: Binding<MealieLink?> {
+        Binding { router.mealieLink?.kind == .invite ? router.mealieLink : nil } set: { if $0 == nil { router.mealieLink = nil } }
     }
 
     private var isFailed: Binding<Bool> {
@@ -48,7 +53,10 @@ private struct MealiePairingPrompt: ViewModifier {
         do {
             switch link.kind {
             case .sync: try await mealie.connect(address: link.server.absoluteString, token: link.token)
-            case .discover: try await discover.add(address: link.server.absoluteString, token: link.token)
+            case .discover:
+                let address = link.group.map { link.server.appendingPathComponent("g").appendingPathComponent($0).absoluteString }
+                try await discover.add(address: address ?? link.server.absoluteString, token: link.token)
+            case .invite: break
             }
         } catch {
             failure = error.localizedDescription
@@ -57,6 +65,7 @@ private struct MealiePairingPrompt: ViewModifier {
 }
 
 extension View {
-    /// Asks before pairing with the server a `recipes://mealie` link points to, or adding a `recipes://discover` one to Discover.
+    /// Asks before pairing with the server a `recipes://mealie` link points to or adding a `recipes://discover` one to
+    /// Discover, and signs up a new user from a `recipes://mealie-invite` one.
     func mealiePairingPrompt() -> some View { modifier(MealiePairingPrompt()) }
 }

@@ -280,6 +280,134 @@ private struct DiscoverHomeView: View {
     }
 }
 
+/// The end of a library search: the same words matched on each Mealie server in Discover, read-only.
+struct DiscoverSearchMatches: View {
+    @EnvironmentObject private var discover: DiscoverController
+    let query: String
+
+    var body: some View {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(discover.sources) { source in
+                    if let catalog = discover.catalog(for: source.id) { DiscoverCatalogMatches(catalog: catalog, query: text) }
+                }
+            }
+        }
+    }
+}
+
+private struct DiscoverCatalogMatches: View {
+    @Environment(\.openRecipesRoute) private var openRoute
+    @ObservedObject var catalog: DiscoverCatalog
+    let query: String
+    private static let limit = 5
+
+    var body: some View {
+        let matches = catalog.library.recipes.filter { $0.matches(query) }
+        Group {
+            if !matches.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("On \(catalog.source.name)", systemImage: "binoculars").appFont(.headline)
+                        Spacer()
+                        if matches.count > Self.limit {
+                            Text("\(matches.count)").appFont(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                    }
+                    ForEach(matches.prefix(Self.limit)) { recipe in
+                        Button { openRoute(.discover(catalog.source.id, .recipe(recipe.id))) } label: {
+                            RecipeRow(recipe: recipe).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .environmentObject(catalog.library)
+            }
+        }
+        .task { await catalog.load() }
+    }
+}
+
+/// The Mealie servers you browse, on the Discover tab: each opens read-only, nested in the tab.
+struct MealieServersShelf: View {
+    @EnvironmentObject private var discover: DiscoverController
+    @EnvironmentObject private var mealie: MealieSyncController
+    @State private var adding = false
+
+    var body: some View {
+        Group {
+            if !discover.sources.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Mealie Servers").appFont(.title2, weight: .bold).accessibilityAddTraits(.isHeader)
+                        Spacer()
+                        Button { adding = true } label: { Label("Add Server", systemImage: "plus") }
+                            .labelStyle(.iconOnly)
+                            .appFont(.title3, weight: .semibold)
+                    }
+                    ForEach(discover.sources) { source in
+                        NavigationLink(value: RecipesRoute.discover(source.id, .home)) { MealieServerTile(source: source) }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                if let link = source.link {
+                                    Button("Copy Read-Only Link", systemImage: "link") { Pasteboard.copy(link.url.absoluteString) }
+                                }
+                                Button("Remove", systemImage: "trash", role: .destructive) { discover.remove(source) }
+                            }
+                    }
+                }
+                .padding(.horizontal)
+            } else if mealie.isConnected {
+                Button { adding = true } label: {
+                    MealieServerTile(title: "Browse a Mealie Server", detail: "Read-only, with Add to My Recipes", symbol: "plus.circle")
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+            }
+        }
+        .sheet(isPresented: $adding) { AddDiscoverSheet() }
+    }
+}
+
+private struct MealieServerTile: View {
+    @Environment(\.appearance) private var appearance
+    @Environment(\.appAccent) private var accent
+    let title: String
+    let detail: String
+    let symbol: String
+
+    init(title: String, detail: String, symbol: String) {
+        self.title = title
+        self.detail = detail
+        self.symbol = symbol
+    }
+
+    init(source: DiscoverSource) {
+        title = source.name
+        detail = [source.label == nil ? nil : source.host, source.username?.isEmpty == false ? source.username : nil,
+                  source.group.map { "public group \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        symbol = "binoculars"
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol).appFont(.title2).foregroundStyle(accent).frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).appFont(.headline).lineLimit(1)
+                if !detail.isEmpty { Text(detail).appFont(.subheadline).foregroundStyle(.secondary).lineLimit(1) }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
 extension RecipesRoute {
     /// Discover on the Recipes home: straight into the server when there's only one.
     static func discoverHome(_ sources: [DiscoverSource]) -> RecipesRoute {

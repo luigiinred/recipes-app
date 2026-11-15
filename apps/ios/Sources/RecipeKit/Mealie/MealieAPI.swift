@@ -9,6 +9,7 @@ public enum MealieError: LocalizedError, Equatable {
     case server(Int, String)
     case notMealie
     case tooManyDeletions(Int)
+    case notPublic
 
     public var errorDescription: String? {
         switch self {
@@ -17,6 +18,7 @@ public enum MealieError: LocalizedError, Equatable {
         case .server(let status, let message): "Mealie answered \(status): \(message)"
         case .notMealie: "That address doesn't look like a Mealie server."
         case .tooManyDeletions(let count): "This would delete \(count) items, which looks like a mistake. Nothing was changed."
+        case .notPublic: "That server has no public recipes to browse. Paste the page of a public group (…/g/name), or ask for a Share Read-Only link."
         }
     }
 }
@@ -140,6 +142,96 @@ public struct MealieClient: MealieAPI {
         let created = try await object("POST", "users/api-tokens", body: ["name": name])
         guard let token = created["token"] as? String, !token.isEmpty else { throw MealieError.notMealie }
         return token
+    }
+
+    /// An invitation to join the signed-in user's household, good for `uses` sign-ups. Falls back to the group
+    /// invitations of Mealie servers older than households.
+    public func createInvitation(uses: Int = 1) async throws -> String {
+        let created: MealieObject
+        do {
+            created = try await object("POST", "households/invitations", body: ["uses": uses])
+        } catch MealieError.server(404, _) {
+            created = try await object("POST", "groups/invitations", body: ["uses": uses])
+        }
+        guard let token = created["token"] as? String, !token.isEmpty else { throw MealieError.notMealie }
+        return token
+    }
+
+    public struct Registration: Sendable, Equatable {
+        public var fullName: String
+        public var email: String
+        public var username: String
+        public var password: String
+
+        public init(fullName: String, email: String, username: String, password: String) {
+            self.fullName = fullName
+            self.email = email
+            self.username = username
+            self.password = password
+        }
+    }
+
+    /// Signs up a new user with an invitation, signs in as them, and returns an API token for that user.
+    public static func join(
+        server: URL, invitation: String, as registration: Registration, tokenName: String, session: URLSession = .shared
+    ) async throws -> String {
+        let anonymous = MealieClient(server: server, token: "", session: session)
+        _ = try await anonymous.object("POST", "users/register", body: [
+            "groupToken": invitation,
+            "email": registration.email,
+            "username": registration.username,
+            "fullName": registration.fullName,
+            "password": registration.password,
+            "passwordConfirm": registration.password,
+            "advanced": false,
+            "private": false,
+            "seedData": false,
+            "locale": Locale.current.identifier(.bcp47),
+        ])
+        let access = try await anonymous.signIn(username: registration.username, password: registration.password)
+        return try await MealieClient(server: server, token: access, session: session).createAPIToken(name: tokenName)
+    }
+
+    private func signIn(username: String, password: String) async throws -> String {
+        let unreserved = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        func encoded(_ text: String) -> String { text.addingPercentEncoding(withAllowedCharacters: unreserved) ?? text }
+        let body = Data("username=\(encoded(username))&password=\(encoded(password))".utf8)
+        let (data, _) = try await send("POST", "auth/token", body: body, contentType: "application/x-www-form-urlencoded")
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? MealieObject,
+              let token = json["access_token"] as? String, !token.isEmpty else { throw MealieError.notMealie }
+        return token
+    }
+
+    // MARK: - Public pages
+
+    /// A group's public page, `https://host/g/<group>` or anything under it, as the server and group it names.
+    public static func publicPage(_ text: String) -> (server: URL, group: String)? {
+        guard let url = normalizedServer(text) else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard let index = parts.firstIndex(of: "g"), index + 1 < parts.count,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.path = parts[..<index].isEmpty ? "" : "/" + parts[..<index].joined(separator: "/")
+        guard let server = components.url else { return nil }
+        return (server, parts[index + 1])
+    }
+
+    /// The group a bare address browses: the server's default group, or Mealie's own default name.
+    public func defaultGroup() async -> String {
+        let about = try? await object("GET", "app/about")
+        return (about?["defaultGroupSlug"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "home"
+    }
+
+    /// What anyone can read without signing in: the recipes a public group's public households marked public.
+    public func publicRecipeSummaries(group: String) async throws -> [MealieObject] {
+        do {
+            return try await paged("explore/groups/\(group)/recipes")
+        } catch MealieError.server(404, _) {
+            throw MealieError.notPublic
+        }
+    }
+
+    public func publicRecipe(group: String, slug: String) async throws -> MealieObject {
+        try await object("GET", "explore/groups/\(group)/recipes/\(slug)")
     }
 
     // MARK: - Recipes
@@ -333,7 +425,7 @@ public struct MealieClient: MealieAPI {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = method
         request.httpBody = body
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if body != nil { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         let data: Data

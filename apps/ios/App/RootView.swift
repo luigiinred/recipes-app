@@ -270,8 +270,19 @@ struct RecipesTab: View {
         }
     }
 
-    @ViewBuilder
     private func destination(_ route: RecipesRoute) -> some View {
+        RecipesRouteDestination(route: route, selection: $selection) { path.append($0) }
+    }
+}
+
+/// Where a pushed `RecipesRoute` lands, in any stack that pushes them.
+struct RecipesRouteDestination: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let route: RecipesRoute
+    @Binding var selection: Recipe.ID?
+    let push: (RecipesRoute) -> Void
+
+    var body: some View {
         switch route {
         case .collection(let collection):
             RecipeListView(collection: .constant(collection), selection: $selection)
@@ -280,7 +291,7 @@ struct RecipesTab: View {
         case .discoverSources:
             DiscoverSourcesView()
         case .discover(let source, let route):
-            DiscoverPage(sourceID: source, route: route) { path.append(.discover(source, .recipe($0))) }
+            DiscoverPage(sourceID: source, route: route) { push(.discover(source, .recipe($0))) }
         case .tag(let path):
             RecipesHomeView(selection: $selection, tag: path).id(path)
         case .allRecipes:
@@ -290,7 +301,7 @@ struct RecipesTab: View {
         case .feedPost(let entry):
             FeedEntryPreview(entry: entry)
         case .upNext:
-            QueueView { path.append(.recipe($0)) }.navigationTitle("Up Next")
+            QueueView { push(.recipe($0)) }.navigationTitle("Up Next")
         case .homeSettings:
             HomeSettingsPage()
         }

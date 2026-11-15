@@ -8,15 +8,27 @@ The sync code is `MealieSync` in `apps/ios/Sources/RecipeKit/Mealie`, shared by 
 
 In Mealie, open your profile, choose **API Tokens** and create one. In the app, go to Settings, Mealie, and enter the server address and token. The address and token are kept in one iCloud Keychain item, so pairing one device pairs every device signed in to the same iCloud account, and disconnecting on one disconnects them all. Which things sync (planned meals, groceries, the shopping list name) is still chosen per device. Use `https://`; plain `http://` only works for servers on your local network.
 
-To pair another device, open Settings, Mealie and tap **Share Access**. The app makes a new API token named "Recipes shared <date>" and sends a `recipes://mealie?server=<address>&token=<token>` link for it; opening the link on a device with the app asks before connecting. Anyone who opens the link can read and change your Mealie recipes, so send it only to people you trust. To revoke it, delete that token under API Tokens in Mealie; your own devices keep working. The link only works once the app is installed; if it isn't, install the app and open the link again.
+## Sharing
+
+Settings, **Mealie Sharing** makes a link three ways. Each opens Recipes and sets everything up; the sheet that shows it can send it, copy it, or open it on the same device to try it.
+
+- **Add a New User** makes a one-use invitation to your household (`POST /api/households/invitations`, or `/api/groups/invitations` on older servers) and a `recipes://mealie-invite?server=<address>&token=<invitation>` link. Opening it asks for a name, email, username and password, signs the new user up, signs in as them, makes them an API token and syncs as them.
+- **Share This Account** makes a new API token named "Recipes shared <date>" and a `recipes://mealie?server=<address>&token=<token>` link. Opening it asks before connecting, and whoever opens it can read and change your Mealie recipes as you.
+- **Share Read-Only** makes a token named "Recipes Discover shared <date>" and a `recipes://discover?…` link that adds the server to Discover.
+
+Revoke an account or read-only link by deleting its token under API Tokens in Mealie; your own devices keep working. Links only work once the app is installed.
 
 ## Discover
 
-Discover browses someone else's Mealie server without syncing with it. On their device they open Settings, Mealie and tap **Share as Discover**, which makes an API token named "Recipes Discover shared <date>" and sends a `recipes://discover?server=<address>&token=<token>` link. Opening it asks before adding the server; Settings, Mealie, Discover can also add one by address and token. Servers are kept in the iCloud Keychain like your own connection, so they appear on every device.
+Discover browses a Mealie server without syncing with it. Servers come from a Share Read-Only link or from **Add Server** (Settings, Mealie Sharing, or the + on the Discover tab), by address and token. The same server can be added more than once, each with its own name, and **Use the Server I Sync With** fills in your own connection so you can see your recipes the way someone you share them with would. Servers are kept in the iCloud Keychain like your own connection, so they appear on every device.
 
-Once a server is added, a **Discover** row appears on the Recipes home under the built-in collections (a tile on iPad, a sidebar section on Mac). Inside, the server's recipes have the same collections, categories and recipe pages as your own, but nothing can be edited, rated, queued or planned. **Add to My Recipes** (a recipe's toolbar or a row's context menu) saves a copy with its photo as a new recipe of yours. The list is read from Mealie's recipe list and each recipe is read in full when it's opened. Ratings, favorites and the Up Next queue on the server belong to its owner and are left out.
+A server needs no token when its group is public: paste the group's page (`https://mealie.example.com/g/<group>`) and leave the token empty. Recipes then reads Mealie's public explore API (`/api/explore/groups/<group>/recipes`), which shows only recipes marked public in households that aren't private. A Share Read-Only link for such a server is `recipes://discover?server=<address>&group=<group>`.
 
-The app never writes with a Discover token, but Mealie tokens carry the full rights of the user who made them, so the token itself could change that user's recipes. Share it only with people you trust, and delete it under API Tokens in Mealie to revoke it.
+A library search also lists up to five matches from each Discover server after your own recipes, read from the server the first time you search.
+
+Added servers are listed under **Mealie Servers** on the Discover tab (and can also be a Home section, or a sidebar section on Mac). Inside, the server's recipes have the same collections, categories and recipe pages as your own, but nothing can be edited, rated, queued or planned. **Add to My Recipes** (a recipe's toolbar or a row's context menu) saves a copy with its photo as a new recipe of yours. The list is read from Mealie's recipe list and each recipe is read in full when it's opened. Ratings, favorites and the Up Next queue on the server belong to its owner and are left out.
+
+The app never writes with a Discover token, but Mealie tokens carry the full rights of the user who made them, so the token itself could change that user's recipes. Share it only with people you trust.
 
 From a terminal:
 

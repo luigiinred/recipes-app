@@ -10,20 +10,34 @@ public struct MealieBrowser: Sendable {
     }
 
     private let client: MealieClient
+    private let group: String?
 
-    public init(server: URL, token: String) {
-        client = MealieClient(server: server, token: token)
+    /// With a `group` and no token, reads that group's public recipes, as anyone without an account can.
+    public init(server: URL, token: String, group: String? = nil, session: URLSession = .shared) {
+        client = MealieClient(server: server, token: token, session: session)
+        self.group = group
     }
 
     public func currentUser() async throws -> MealieUser { try await client.currentUser() }
 
+    /// The signed-in user's name, or nil for a public group, once the server has answered.
+    public func check() async throws -> String? {
+        if let group {
+            _ = try await client.publicRecipeSummaries(group: group)
+            return nil
+        }
+        return try await client.currentUser().username
+    }
+
     /// Every recipe without its ingredients and steps, which `recipe(slug:)` fills in.
     public func recipes() async throws -> [Entry] {
-        try await client.recipeSummaries().compactMap(Self.entry)
+        let summaries = if let group { try await client.publicRecipeSummaries(group: group) } else { try await client.recipeSummaries() }
+        return summaries.compactMap(Self.entry)
     }
 
     public func recipe(slug: String) async throws -> Recipe? {
-        Self.entry(from: try await client.recipe(slug: slug))?.recipe
+        let remote = if let group { try await client.publicRecipe(group: group, slug: slug) } else { try await client.recipe(slug: slug) }
+        return Self.entry(from: remote)?.recipe
     }
 
     public func image(for id: UUID, thumbnail: Bool) async -> Data? {

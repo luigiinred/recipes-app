@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case tabs, home, recipes, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, intelligence, data
+    case tabs, home, recipes, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
 }
 
 struct SettingsView: View {
@@ -94,7 +94,8 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.theme) { Label("Appearance", systemImage: "paintpalette") }
         }
         Section {
-            NavigationLink(value: SettingsPage.mealie) { Label("Mealie", systemImage: "server.rack") }
+            NavigationLink(value: SettingsPage.mealie) { Label("Mealie", image: "MealieLogo") }
+            NavigationLink(value: SettingsPage.mealieSharing) { Label("Mealie Sharing", systemImage: "person.2") }
         } header: {
             Text("Sync")
         }
@@ -160,6 +161,7 @@ struct SettingsView: View {
         case .theme: AppearanceSettingsPage()
         case .feeds: RecipeFeedsPage(showsTabToggle: true)
         case .mealie: MealieSettingsPage()
+        case .mealieSharing: MealieSharingPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
         }
