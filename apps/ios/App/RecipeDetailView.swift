@@ -15,6 +15,8 @@ struct RecipeDetailView: View {
     /// Off when the page sits inside a frame that has its own Save.
     var previewSaveInToolbar = true
     var reservesArtwork = false
+    /// Starts the video here, so one already playing on the loading page carries on.
+    var resumesVideoAt: Int?
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
@@ -58,6 +60,7 @@ struct RecipeDetailView: View {
             }
         }
         .collapsesSidebarWhenUnfolded()
+        .task { if let resumesVideoAt, recipe.youTubeVideoID != nil { player.play(from: resumesVideoAt) } }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { sideInsets = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }

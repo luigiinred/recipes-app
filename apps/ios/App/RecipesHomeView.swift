@@ -285,6 +285,8 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.hiddenHomeSections) private var hiddenHomeSectionsRaw = ""
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
     @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
+    @AppStorage(SearchSetting.discoverSearch.key) private var searchesOnline = true
+    @State private var online = OnlineRecipeSearch()
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
@@ -293,7 +295,6 @@ struct RecipesHomeView: View {
     @Binding var selection: Recipe.ID?
     var query = ""
     var showsQuickFilters = false
-    var isSearching = false
     /// Shows one tag's page with its own filters instead of the shared home.
     var tag: String?
     /// Lists every recipe instead of the home's first few.
@@ -407,6 +408,7 @@ struct RecipesHomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
+        .task(id: onlineQuery) { await searchOnline() }
         .toolbar {
             #if os(iOS)
             if isTabRoot, query.isEmpty, !isRegular, !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
@@ -535,19 +537,14 @@ struct RecipesHomeView: View {
                     .draggable(RecipeDragItem(id: recipe.id))
                     .contextMenu { recipeMenu(recipe) }
                 }
-                if items.isEmpty { noMatches.listRowSeparator(.hidden).themedRow() }
+                if items.isEmpty, showsNoMatches { noMatches.listRowSeparator(.hidden).themedRow() }
                 if !query.isEmpty, !discover.sources.isEmpty {
                     DiscoverSearchMatches(query: query)
                         .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 12, trailing: margin))
                         .listRowSeparator(.hidden)
                         .themedRow()
                 }
-                if !query.isEmpty {
-                    SearchOnlineLink(query: query)
-                        .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 24, trailing: margin))
-                        .listRowSeparator(.hidden)
-                        .themedRow()
-                }
+                if !onlineQuery.isEmpty { onlineRows }
             }
         }
     }
@@ -597,11 +594,9 @@ struct RecipesHomeView: View {
                 }
             }
             .padding(.horizontal, margin)
-            if items.isEmpty { noMatches }
-            if !query.isEmpty {
-                DiscoverSearchMatches(query: query).padding(.horizontal, margin)
-                SearchOnlineLink(query: query).padding(.horizontal, margin)
-            }
+            if items.isEmpty, showsNoMatches { noMatches }
+            if !query.isEmpty, !discover.sources.isEmpty { DiscoverSearchMatches(query: query).padding(.horizontal, margin) }
+            if !onlineQuery.isEmpty { onlineGrid }
             }
         }
     }
@@ -1002,11 +997,8 @@ struct RecipesHomeView: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.top, 6)
-        // The open search field floats over the bottom safe area instead of shrinking it.
-        .padding(.bottom, isSearching ? 70 : 6)
+        .padding(.vertical, 6)
         .animation(.snappy, value: filter)
-        .animation(.snappy, value: isSearching)
     }
 
     private var sortMenu: some View {
@@ -1054,9 +1046,96 @@ struct RecipesHomeView: View {
         }
     }
 
+    /// What's searched online: the typed words, on the library's own search, while online search is on.
+    private var onlineQuery: String {
+        guard searchesOnline, tag == nil else { return "" }
+        return query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Online results stand in for "No Results" until they're in and there are none.
+    private var showsNoMatches: Bool {
+        onlineQuery.isEmpty || filter.isActive || (!online.isSearching && online.isEmpty)
+    }
+
+    /// Nothing in the library or online, so the empty state carries Search the Web.
+    private var nothingFound: Bool {
+        !onlineQuery.isEmpty && !filter.isActive && items.isEmpty && !online.isSearching && online.isEmpty
+    }
+
+    private func searchOnline() async {
+        let text = onlineQuery
+        guard !text.isEmpty else { online.clear(); return }
+        try? await Task.sleep(for: .milliseconds(500))
+        guard !Task.isCancelled else { return }
+        await online.run(text, feeds: library.feeds)
+    }
+
+    @ViewBuilder
+    private var onlineRows: some View {
+        ForEach(OnlineRecipeSearch.Group.allCases) { group in
+            let results = online.results(in: group)
+            if !results.isEmpty {
+                Text(group.rawValue)
+                    .appFont(.title3, weight: .bold)
+                    .accessibilityAddTraits(.isHeader)
+                    .listRowInsets(EdgeInsets(top: 24, leading: margin, bottom: 4, trailing: margin))
+                    .listRowSeparator(.hidden)
+                    .themedRow()
+                ForEach(results) { result in
+                    let isCard = style == .cards || result.kind == .video
+                    OnlineResultLink(result: result, asCard: style == .cards)
+                        .themedRow()
+                        .listRowSeparator(isCard || result.id == results.first?.id ? .hidden : .automatic, edges: .top)
+                        .listRowSeparator(isCard ? .hidden : .automatic, edges: .bottom)
+                        .listRowInsets(isCard ? EdgeInsets(top: 12, leading: margin, bottom: 20, trailing: margin) : EdgeInsets(top: 8, leading: margin, bottom: 8, trailing: margin))
+                }
+            }
+        }
+        if online.isSearching {
+            OnlineSearchProgress()
+                .listRowInsets(EdgeInsets(top: 16, leading: margin, bottom: 8, trailing: margin))
+                .listRowSeparator(.hidden)
+                .themedRow()
+        }
+        if !nothingFound {
+            SearchTheWebLink(query: onlineQuery)
+                .listRowInsets(EdgeInsets(top: 16, leading: margin, bottom: 24, trailing: margin))
+                .listRowSeparator(.hidden)
+                .themedRow()
+        }
+    }
+
+    @ViewBuilder
+    private var onlineGrid: some View {
+        ForEach(OnlineRecipeSearch.Group.allCases) { group in
+            let results = online.results(in: group)
+            if !results.isEmpty {
+                Text(group.rawValue)
+                    .appFont(.title3, weight: .bold)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.horizontal, margin)
+                GridSection(title: nil, minimum: 260, spacing: 24) {
+                    ForEach(results) { OnlineResultLink(result: $0, asCard: true) }
+                }
+                .padding(.horizontal, margin)
+            }
+        }
+        if online.isSearching { OnlineSearchProgress().padding(.horizontal, margin) }
+        if !nothingFound { SearchTheWebLink(query: onlineQuery, inList: false).padding(.horizontal, margin) }
+    }
+
     @ViewBuilder
     private var noMatches: some View {
-        if !filter.isActive, !query.isEmpty {
+        if nothingFound {
+            ContentUnavailableView {
+                Label("No Results for “\(onlineQuery)”", systemImage: "magnifyingglass")
+            } description: {
+                Text("Nothing in your recipes or online matches.")
+            } actions: {
+                SearchTheWebLink(query: onlineQuery, inList: !isRegular)
+            }
+            .frame(maxWidth: .infinity)
+        } else if !filter.isActive, !query.isEmpty {
             ContentUnavailableView.search(text: query).frame(maxWidth: .infinity)
         } else {
             filteredOut

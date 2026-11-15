@@ -2,26 +2,26 @@ import RecipeKit
 import SwiftUI
 import WebKit
 
-/// Features still being tried out, each with its own switch in Developer Tools. A source switch only matters with its parent on.
-enum FeatureFlag: String, CaseIterable, Identifiable {
+/// Online search and each of its sources, all on unless switched off in Settings → Search. A source only matters with search on.
+enum SearchSetting: String, CaseIterable, Identifiable {
     case discoverSearch, searchWeb, searchGoogle, searchFollowedSites, searchYouTube
 
     var id: String { rawValue }
     var key: String { "feature.\(rawValue)" }
 
-    var parent: FeatureFlag? { self == .discoverSearch ? nil : .discoverSearch }
-    var defaultValue: Bool { parent != nil }
+    var parent: SearchSetting? { self == .discoverSearch ? nil : .discoverSearch }
 
     var isOn: Bool {
-        let value = UserDefaults.standard.object(forKey: key) as? Bool ?? defaultValue
+        let defaults = UserDefaults.standard
+        let value = defaults.object(forKey: key) == nil || defaults.bool(forKey: key)
         return value && (parent?.isOn ?? true)
     }
 
     var title: String {
         switch self {
-        case .discoverSearch: "Discover Search"
+        case .discoverSearch: "Search Recipes Online"
         case .searchWeb: "Web Results"
-        case .searchGoogle: "Search Google in a Browser"
+        case .searchGoogle: "Search the Web"
         case .searchFollowedSites: "Sites You Follow"
         case .searchYouTube: "YouTube"
         }
@@ -29,86 +29,141 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .discoverSearch: "A search box on Discover for finding new recipes."
+        case .discoverSearch: "When you search Home, Recipes or Discover, recipes from the web show up under your own."
         case .searchWeb: "Google's results, read in a hidden browser, shown as a clean list. DuckDuckGo fills in when Google gives none."
-        case .searchGoogle: "A row that opens Google; tapping a result shows it as a recipe."
+        case .searchGoogle: "A last row that opens Google; tapping a result shows it as a recipe."
         case .searchFollowedSites: "Posts from the WordPress sites in your feeds."
         case .searchYouTube: "Recipe videos, with Find Recipe Later."
         }
     }
 }
 
-/// What a search on Discover found: a way into the web, then the sites you follow, then YouTube.
+struct SearchSettingsPage: View {
+    var body: some View {
+        Form {
+            Section { SearchSettingToggle(setting: .discoverSearch) }
+            Section {
+                ForEach(SearchSetting.allCases.filter { $0.parent != nil }) { SearchSettingToggle(setting: $0) }
+            } header: {
+                Text("Sources")
+            } footer: {
+                Text("None of these need an account or a key.")
+            }
+        }
+        .formStyle(.grouped)
+        .themedCanvas()
+        .navigationTitle("Search")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+/// Online recipes for a query, from each source that's switched on; each list fills in as its source answers.
+@MainActor @Observable
+final class OnlineRecipeSearch {
+    enum Group: String, CaseIterable, Identifiable {
+        case web = "From the Web"
+        case sites = "From Sites You Follow"
+        case videos = "YouTube"
+        var id: Self { self }
+    }
+
+    private(set) var results: [Group: [RecipeSearchResult]] = [:]
+    private(set) var isSearching = false
+
+    init(seed: [Group: [RecipeSearchResult]] = [:]) {
+        results = seed
+    }
+
+    var isEmpty: Bool { results.values.allSatisfy(\.isEmpty) }
+
+    func results(in group: Group) -> [RecipeSearchResult] { results[group] ?? [] }
+
+    func clear() {
+        results = [:]
+        isSearching = false
+    }
+
+    /// Call from a `.task(id:)` so a newer query cancels this one.
+    func run(_ query: String, feeds: [Feed]) async {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        results = [:]
+        guard !text.isEmpty, SearchSetting.discoverSearch.isOn else { isSearching = false; return }
+        isSearching = true
+        let wantsWeb = SearchSetting.searchWeb.isOn, wantsYouTube = SearchSetting.searchYouTube.isOn
+        let followed = SearchSetting.searchFollowedSites.isOn ? Array(Set(feeds.compactMap { RecipeSearch.site(ofFeed: $0.url) })).prefix(12) : []
+        await withTaskGroup(of: (Group, [RecipeSearchResult]).self) { group in
+            if wantsWeb { group.addTask { (.web, await GoogleResults.search(text)) } }
+            if wantsYouTube { group.addTask { (.videos, await RecipeSearch.youTube(text)) } }
+            if !followed.isEmpty {
+                group.addTask {
+                    await withTaskGroup(of: [RecipeSearchResult].self) { sites in
+                        for site in followed { sites.addTask { await RecipeSearch.wordPress(site: site, query: text) } }
+                        var all: [RecipeSearchResult] = []
+                        for await found in sites { all += found }
+                        return (.sites, all)
+                    }
+                }
+            }
+            for await (kind, found) in group {
+                guard !Task.isCancelled else { return }
+                withAnimation(.snappy) { results[kind] = found }
+            }
+        }
+        if !Task.isCancelled { withAnimation(.snappy) { isSearching = false } }
+    }
+}
+
+/// What a search on Discover found, grouped by where it came from, with Google at the end.
 struct DiscoverSearchResults: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.appAccent) private var accent
     let query: String
+    @State private var search: OnlineRecipeSearch
     private let seeded: Bool
 
-    @State private var web: [RecipeSearchResult] = []
-    @State private var sites: [RecipeSearchResult]
-    @State private var videos: [RecipeSearchResult]
-    @State private var isSearching = false
-    @AppStorage(FeatureFlag.searchWeb.key) private var showsWeb = true
-    @AppStorage(FeatureFlag.searchGoogle.key) private var showsGoogle = true
-    @AppStorage(FeatureFlag.searchFollowedSites.key) private var showsSites = true
-    @AppStorage(FeatureFlag.searchYouTube.key) private var showsYouTube = true
-
     /// `seed` shows fixed results without searching, for previews and snapshots.
-    init(query: String, seed: (web: [RecipeSearchResult], sites: [RecipeSearchResult], videos: [RecipeSearchResult])? = nil) {
+    init(query: String, seed: [OnlineRecipeSearch.Group: [RecipeSearchResult]]? = nil) {
         self.query = query
         seeded = seed != nil
-        _web = State(initialValue: seed?.web ?? [])
-        _sites = State(initialValue: seed?.sites ?? [])
-        _videos = State(initialValue: seed?.videos ?? [])
+        _search = State(initialValue: OnlineRecipeSearch(seed: seed ?? [:]))
     }
 
     var body: some View {
         List {
-            if showsWeb, !web.isEmpty {
-                Section("From the Web") { ForEach(web) { row($0) } }
-            }
-            if showsGoogle, let url = RecipeSearch.webSearchURL(query) {
-                Section {
-                    NavigationLink { RecipeWebBrowser(start: url, title: "“\(query)”") } label: {
-                        Label("Search Google for “\(query)”", systemImage: "globe")
+            ForEach(OnlineRecipeSearch.Group.allCases) { group in
+                let results = search.results(in: group)
+                if !results.isEmpty {
+                    Section(group.rawValue) {
+                        ForEach(results) { OnlineResultLink(result: $0).themedRow() }
                     }
-                } footer: {
-                    Text("Tap a result to see it as a recipe you can add.")
                 }
             }
-            if !sites.isEmpty {
-                Section("From Sites You Follow") { ForEach(sites) { row($0) } }
+            if search.isSearching {
+                Section { OnlineSearchProgress().themedRow() }
+            } else if search.isEmpty {
+                Section { Text("No recipes found.").foregroundStyle(.secondary).themedRow() }
             }
-            if !videos.isEmpty {
-                Section("YouTube") { ForEach(videos) { row($0) } }
-            }
-            if isSearching {
-                Section { HStack { ProgressView().controlSize(.small); Text("Searching…").foregroundStyle(.secondary) } }
-            } else if web.isEmpty, sites.isEmpty, videos.isEmpty {
-                Section { Text("No recipes found.").foregroundStyle(.secondary) }
-            }
+            Section { SearchTheWebLink(query: query).themedRow() }
         }
-        .task(id: query) { await search() }
+        .listStyle(.plain)
+        .task(id: query) { if !seeded { await search.run(query, feeds: library.feeds) } }
     }
+}
 
-    private func row(_ result: RecipeSearchResult) -> some View {
-        NavigationLink {
+/// An online result laid out like a recipe in the library list, opening in the app's recipe preview.
+struct OnlineResultLink: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    let result: RecipeSearchResult
+    var asCard = false
+
+    var body: some View {
+        PushLink(inList: !asCard) {
             FeedEntryPreview(entry: FeedEntry(title: result.title, link: result.link, imageURL: result.imageURL))
         } label: {
-            HStack(spacing: 12) {
-                AsyncImage(url: result.imageURL) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    accent.opacity(0.12).overlay(Image(systemName: result.kind == .video ? "play.rectangle" : "fork.knife").foregroundStyle(accent))
-                }
-                .frame(width: 64, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(result.title).lineLimit(2)
-                    Text(result.source).appFont(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
+            if result.kind == .video { VideoResultCard(result: result) }
+            else if asCard { OnlineResultCard(result: result) }
+            else { OnlineResultRow(result: result) }
         }
         .contextMenu {
             if result.kind == .video {
@@ -119,42 +174,215 @@ struct DiscoverSearchResults: View {
             Link(destination: result.link) { Label("Open in Browser", systemImage: "safari") }
         }
     }
+}
 
-    private func search() async {
-        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !seeded else { return }
-        isSearching = true
-        web = []
-        sites = []
-        videos = []
-        let (wantsWeb, wantsSites, wantsYouTube) = (showsWeb, showsSites, showsYouTube)
-        let followed = wantsSites ? Array(Set(library.feeds.compactMap { RecipeSearch.site(ofFeed: $0.url) })).prefix(12) : []
-        enum Found { case web([RecipeSearchResult]), sites([RecipeSearchResult]), videos([RecipeSearchResult]) }
-        await withTaskGroup(of: Found.self) { group in
-            if wantsWeb { group.addTask { .web(await GoogleResults.search(text)) } }
-            if wantsYouTube { group.addTask { .videos(await RecipeSearch.youTube(text)) } }
-            if !followed.isEmpty {
-                group.addTask {
-                    await withTaskGroup(of: [RecipeSearchResult].self) { sites in
-                        for site in followed { sites.addTask { await RecipeSearch.wordPress(site: site, query: text) } }
-                        var all: [RecipeSearchResult] = []
-                        for await results in sites { all += results }
-                        return .sites(all)
-                    }
-                }
+/// A link that pushes its page; in a list it leaves out the disclosure chevron, as library rows do.
+struct PushLink<Label: View, Destination: View>: View {
+    var inList = true
+    @ViewBuilder let destination: () -> Destination
+    @ViewBuilder let label: () -> Label
+
+    var body: some View {
+        if inList {
+            label().background { NavigationLink(destination: destination) { EmptyView() }.opacity(0) }
+        } else {
+            NavigationLink(destination: destination, label: label).buttonStyle(.plain)
+        }
+    }
+}
+
+/// Each result's page, read once as its row appears, for the photo and time a search engine leaves out.
+@MainActor
+final class OnlineResultPreviews {
+    static let shared = OnlineResultPreviews()
+    private var loading: [URL: Task<PagePreview?, Never>] = [:]
+
+    func preview(for result: RecipeSearchResult) async -> PagePreview? {
+        guard result.kind != .video else { return nil }
+        if let task = loading[result.link] { return await task.value }
+        let task = Task { await PagePreview.load(result.link) }
+        loading[result.link] = task
+        return await task.value
+    }
+}
+
+struct OnlineResultRow: View {
+    let result: RecipeSearchResult
+    @State private var preview: PagePreview?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            OnlineResultImage(result: result, preview: preview)
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(result.title).appFont(.headline).lineLimit(2)
+                OnlineResultSource(result: result, preview: preview)
             }
-            for await found in group {
-                guard !Task.isCancelled else { return }
-                withAnimation(.snappy) {
-                    switch found {
-                    case .web(let results): web = results
-                    case .sites(let results): sites = results
-                    case .videos(let results): videos = results
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
+    }
+}
+
+struct OnlineResultCard: View {
+    let result: RecipeSearchResult
+    @State private var preview: PagePreview?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Color.clear
+                .aspectRatio(16 / 10, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay { OnlineResultImage(result: result, preview: preview) }
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.title).appFont(.title3, weight: .semibold).lineLimit(2)
+                OnlineResultSource(result: result, preview: preview)
+            }
+            .padding(.horizontal, 4)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
+    }
+}
+
+/// A video as YouTube shows it: the picture first, at 16:9, with its running time, then the title and channel.
+struct VideoResultCard: View {
+    @Environment(\.appAccent) private var accent
+    let result: RecipeSearchResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // The thumbnail is 4:3 with the video letterboxed inside; filling 16:9 crops the bars away.
+            Color.clear
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    AsyncImage(url: result.imageURL) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        ZStack {
+                            accent.opacity(0.12)
+                            Image(systemName: "play.rectangle").appFont(.largeTitle).foregroundStyle(accent.opacity(0.45))
+                        }
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(alignment: .bottomTrailing) {
+                    if let duration = result.duration {
+                        Text(duration)
+                            .appFont(.caption, weight: .semibold)
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .padding(8)
+                    }
+                }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(result.title).appFont(.headline).lineLimit(2)
+                Label {
+                    Text([result.source, result.detail].compactMap { $0 }.joined(separator: "  ·  "))
+                } icon: {
+                    Image(systemName: "play.rectangle")
+                }
+                .labelStyle(.titleAndIcon)
+                .appFont(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Where a result came from, with a mark for its kind, in the same style as a library recipe's facts.
+private struct OnlineResultSource: View {
+    let result: RecipeSearchResult
+    let preview: PagePreview?
+
+    var body: some View {
+        Label {
+            Text([result.source.isEmpty ? (result.link.host ?? "") : result.source, preview?.minutes.map { "\($0) min" }]
+                .compactMap { $0 }.joined(separator: "  ·  "))
+        } icon: {
+            Image(systemName: symbol)
+        }
+        .labelStyle(.titleAndIcon)
+        .appFont(.subheadline)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    private var symbol: String {
+        switch result.kind {
+        case .web: "globe"
+        case .site: "dot.radiowaves.up.forward"
+        case .video: "play.rectangle"
+        }
+    }
+}
+
+private struct OnlineResultImage: View {
+    @Environment(\.appAccent) private var accent
+    let result: RecipeSearchResult
+    let preview: PagePreview?
+
+    var body: some View {
+        AsyncImage(url: result.imageURL ?? preview?.imageURL) { image in
+            image.resizable().scaledToFill()
+        } placeholder: {
+            ZStack {
+                accent.opacity(0.12)
+                Image(systemName: result.kind == .video ? "play.rectangle" : "fork.knife")
+                    .appFont(.title2)
+                    .foregroundStyle(accent.opacity(0.45))
             }
         }
-        if !Task.isCancelled { isSearching = false }
+    }
+}
+
+struct OnlineSearchProgress: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text("Searching online…").foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+    }
+}
+
+/// Google in the app's browser, at the end of every online search.
+struct SearchTheWebLink: View {
+    @AppStorage(SearchSetting.searchGoogle.key) private var enabled = true
+    @Environment(\.appAccent) private var accent
+    let query: String
+    var inList = true
+
+    var body: some View {
+        if enabled, let url = RecipeSearch.webSearchURL(query) {
+            PushLink(inList: inList) { RecipeWebBrowser(start: url, title: "“\(query)”") } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe").foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Search the Web for “\(query)”").foregroundStyle(.primary)
+                        Text("Tap a result to see it as a recipe you can add.").appFont(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentShape(Rectangle())
+            }
+        }
     }
 }
 
@@ -303,37 +531,35 @@ private struct ResultLinks: WebPage.NavigationDeciding {
     }
 }
 
-struct FeatureFlagToggle: View {
-    let flag: FeatureFlag
+struct SearchSettingToggle: View {
+    let setting: SearchSetting
     @AppStorage private var isOn: Bool
     @AppStorage private var parentIsOn: Bool
 
-    init(flag: FeatureFlag) {
-        self.flag = flag
-        _isOn = AppStorage(wrappedValue: flag.defaultValue, flag.key)
-        let parent = flag.parent ?? flag
-        _parentIsOn = AppStorage(wrappedValue: parent.defaultValue, parent.key)
+    init(setting: SearchSetting) {
+        self.setting = setting
+        _isOn = AppStorage(wrappedValue: true, setting.key)
+        _parentIsOn = AppStorage(wrappedValue: true, (setting.parent ?? setting).key)
     }
 
     var body: some View {
         Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(flag.title)
-                Text(flag.detail).appFont(.caption).foregroundStyle(.secondary)
+                Text(setting.title)
+                Text(setting.detail).appFont(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(.leading, flag.parent == nil ? 0 : 16)
-        .disabled(flag.parent != nil && !parentIsOn)
+        .disabled(setting.parent != nil && !parentIsOn)
     }
 }
 
 extension View {
-    /// With Discover Search on, a search box whose submitted query swaps the page for online results.
+    /// With online search on, a search box whose submitted query swaps the page for online results.
     func discoverSearch() -> some View { modifier(DiscoverSearchModifier()) }
 }
 
 private struct DiscoverSearchModifier: ViewModifier {
-    @AppStorage(FeatureFlag.discoverSearch.key) private var enabled = false
+    @AppStorage(SearchSetting.discoverSearch.key) private var enabled = true
     @State private var query = ""
     @State private var submitted = ""
 
@@ -347,38 +573,6 @@ private struct DiscoverSearchModifier: ViewModifier {
             .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
         } else {
             content
-        }
-    }
-}
-
-/// The last row of a library search: the same words searched online, when Discover Search is on.
-struct SearchOnlineLink: View {
-    @AppStorage(FeatureFlag.discoverSearch.key) private var enabled = false
-    @Environment(\.appAccent) private var accent
-    let query: String
-
-    var body: some View {
-        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if enabled, !text.isEmpty {
-            NavigationLink {
-                DiscoverSearchResults(query: text)
-                    .themedCanvas()
-                    .navigationTitle("“\(text)”")
-                    #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
-                    #endif
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "globe").foregroundStyle(accent)
-                    Text("Search Recipes Online for “\(text)”").foregroundStyle(.primary)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").appFont(.footnote, weight: .semibold).foregroundStyle(.tertiary)
-                }
-                .padding(14)
-                .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
     }
 }

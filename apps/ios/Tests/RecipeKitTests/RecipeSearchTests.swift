@@ -11,12 +11,14 @@ final class RecipeSearchTests: XCTestCase {
     }
 
     func testYouTubeVideos() {
-        let html = #"<script>var ytInitialData = {"contents":[{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Best Lasagna"}]},"ownerText":{"runs":[{"text":"Chef A"}]}}},{"channelRenderer":{"channelId":"UC1"}}]};</script>"#
+        let html = #"<script>var ytInitialData = {"contents":[{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Best Lasagna"}]},"ownerText":{"runs":[{"text":"Chef A"}]},"lengthText":{"simpleText":"12:04"},"shortViewCountText":{"simpleText":"1.2M views"},"publishedTimeText":{"simpleText":"3 years ago"}}},{"channelRenderer":{"channelId":"UC1"}}]};</script>"#
         let results = RecipeSearch.youTubeVideos(inSearchPage: html)
         XCTAssertEqual(results.map(\.title), ["Best Lasagna"])
         XCTAssertEqual(results.first?.source, "Chef A")
         XCTAssertEqual(results.first?.link.absoluteString, "https://www.youtube.com/watch?v=abcdefghijk")
         XCTAssertEqual(results.first?.kind, .video)
+        XCTAssertEqual(results.first?.duration, "12:04")
+        XCTAssertEqual(results.first?.detail, "1.2M views · 3 years ago")
     }
 
     func testWebResults() {

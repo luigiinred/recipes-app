@@ -76,17 +76,17 @@ The followed-posts tab SHALL be named "Discover". It always shows a Popular Feed
 - **WHEN** the user taps the X on the Popular Feeds card
 - **THEN** the card goes away and Popular Feeds stays reachable from the navigation bar
 
-### Requirement: Discover search (experimental)
-Behind the "Discover Search" switch (off by default, in Settings → Discover and Developer Tools), the Discover tab SHALL have a "Search Recipes Online" box, and a search on Home or Recipes SHALL end with a "Search Recipes Online for …" row that opens the same results. Submitting a search lists, each under its own switch (on by default):
+### Requirement: Search recipes online
+Unless "Search Recipes Online" is switched off in Settings → Search (where each source below also has its own switch), the Discover tab SHALL have a "Search Recipes Online" box, and a search on Home or Recipes SHALL show the same online results right under the matching recipes, with a spinner while sources answer and "Search the Web for …" at the end. "No Results" shows only when neither the library nor any source found anything, and then it carries Search the Web. Online results look like library rows (or cards): a photo, the title, and the site with the cooking time, both read from the result's page when the search engine leaves them out. A search lists, each under its own switch (on by default):
 - "From the Web": Google's results, loaded in a hidden in-app browser and read from the page once it has run (title, star rating and picture from each card, with Google's `/goto` links resolved to the real page), topped up from DuckDuckGo's HTML results when Google gives fewer than eight
-- "Search Google for …": opens Google in an in-app browser, where tapping a result opens it in the app's recipe preview instead of the site
 - "From Sites You Follow": matching posts from the WordPress sites behind followed feeds, through their REST API
-- "YouTube": matching recipe videos, with Find Recipe Later in their long-press menu
+- "YouTube": matching recipe videos, each shown as YouTube does (a 16:9 picture with its running time, then the title, channel, views and age), with Find Recipe Later in their long-press menu
+- "Search the Web for …", last: opens Google in an in-app browser, where tapping a result opens it in the app's recipe preview instead of the site
 
 Each section appears as soon as its source answers. Tapping any result opens the same recipe preview as a feed post, with Add to My Recipes. No source needs an API key.
 
 #### Scenario: Turned off
-- **GIVEN** Discover Search is off in Developer Tools
+- **GIVEN** Search Recipes Online is off in Settings → Search
 - **WHEN** the user opens Discover
 - **THEN** there is no search box
 
@@ -97,3 +97,7 @@ When every loaded post has been viewed and older pages remain, Feeds SHALL load 
 - **GIVEN** every post in every followed feed has been viewed
 - **WHEN** the user opens Feeds
 - **THEN** the caught-up card shows with Browse Viewed Posts, and no viewed post appears in the feed
+
+### Requirement: Watch a video while its recipe loads
+Opening a YouTube post or result SHALL show its player right away, above a loading page, while the recipe is read from the video. When the recipe arrives, the recipe page replaces the loading page, and a video already playing carries on from the same moment in the recipe page's player.
+
