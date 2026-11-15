@@ -1,3 +1,4 @@
+import RecipeKit
 import SwiftUI
 import Testing
 @testable import Recipes
@@ -47,6 +48,23 @@ struct DiscoverSnapshotTests {
             of: MealieSharingPage().environmentObject(mealie).environmentObject(SampleData.discover()),
             macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet
         )
+    }
+
+    @Test("Add Server asks only for an address, with the token optional")
+    func addServer() {
+        assertPageSnapshots(of: AddDiscoverSheet().environmentObject(SampleData.discover()), inNavigationStack: false, coverage: .sheet)
+    }
+
+    @Test("each share link says what it gives and can be sent, copied or opened here", arguments: MealieLink.Kind.shareable)
+    func shareLink(_ kind: MealieLink.Kind) {
+        let link = MealieLink(server: URL(string: "https://mealie.example.com")!, token: "sample-token", kind: kind)
+        assertPageSnapshots(of: MealieShareLinkSheet(link: link), named: kind.rawValue, inNavigationStack: false, coverage: .sheet)
+    }
+
+    @Test("an invite link asks for the new user's account")
+    func join() {
+        let link = MealieLink(server: URL(string: "https://mealie.example.com")!, token: "invite", kind: .invite)
+        assertPageSnapshots(of: JoinMealieSheet(link: link), inNavigationStack: false, coverage: .sheet)
     }
 
     #if os(iOS)

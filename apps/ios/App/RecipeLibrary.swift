@@ -47,6 +47,11 @@ final class RecipeLibrary: ObservableObject {
 
     init() {}
 
+    /// A library on disk without the app's iCloud lookup or Reminders, for tests.
+    init(opening library: Library) {
+        self.library = library
+    }
+
     init(
         recipes: [Recipe], mealPlan: [MealPlanEntry] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [], categoryOrder: [String] = [],
         images: [UUID: Data] = [:], stepImages: [UUID: Data] = [:], isICloud: Bool = true, remindersStatus: RemindersStatus = .unavailable

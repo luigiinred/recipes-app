@@ -14,7 +14,9 @@ struct DiscoverSource: Codable, Identifiable, Hashable {
     var host: String { URL(string: server)?.host() ?? server }
     var name: String { label?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? host }
     var link: MealieLink? { MealieClient.normalizedServer(server).map { MealieLink(server: $0, token: token, kind: .discover, group: group) } }
-    var browser: MealieBrowser? { MealieClient.normalizedServer(server).map { MealieBrowser(server: $0, token: token, group: group) } }
+    func browser(session: URLSession = .shared) -> MealieBrowser? {
+        MealieClient.normalizedServer(server).map { MealieBrowser(server: $0, token: token, group: group, session: session) }
+    }
 }
 
 /// The servers shown in Discover on the Recipes tab, each with the recipes read from it so far.
@@ -23,15 +25,18 @@ final class DiscoverController: ObservableObject {
     @Published private(set) var sources: [DiscoverSource]
     private var catalogs: [UUID: DiscoverCatalog] = [:]
     private let isPreview: Bool
+    private let session: URLSession
 
     init() {
         isPreview = false
+        session = .shared
         sources = MealieCredentials.discoverSources()
     }
 
-    /// For previews and snapshots, which show fixed recipes without touching the network or Keychain.
-    init(previewing catalogs: [DiscoverCatalog]) {
+    /// For previews, snapshots and tests: never touches the Keychain, and reaches servers only through `session`.
+    init(previewing catalogs: [DiscoverCatalog], session: URLSession = .shared) {
         isPreview = true
+        self.session = session
         sources = catalogs.map(\.source)
         self.catalogs = Dictionary(uniqueKeysWithValues: catalogs.map { ($0.source.id, $0) })
     }
@@ -39,7 +44,7 @@ final class DiscoverController: ObservableObject {
     func catalog(for id: UUID) -> DiscoverCatalog? {
         if let catalog = catalogs[id] { return catalog }
         guard let source = sources.first(where: { $0.id == id }) else { return nil }
-        let catalog = DiscoverCatalog(source: source)
+        let catalog = DiscoverCatalog(source: source, session: session)
         catalogs[id] = catalog
         return catalog
     }
@@ -58,7 +63,7 @@ final class DiscoverController: ObservableObject {
             } else {
                 guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
                 server = url
-                group = await MealieClient(server: url, token: "").defaultGroup()
+                group = await MealieClient(server: url, token: "", session: session).defaultGroup()
             }
         } else {
             guard let url = MealieClient.normalizedServer(address) else { throw MealieError.notMealie }
@@ -67,7 +72,7 @@ final class DiscoverController: ObservableObject {
         var source = DiscoverSource(
             server: server.absoluteString, token: token, label: label?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty, group: group
         )
-        source.username = try await source.browser?.check()
+        source.username = try await source.browser(session: session)?.check()
         sources.append(source)
         save()
         return source
@@ -126,9 +131,9 @@ final class DiscoverCatalog: ObservableObject {
     private var photos: [UUID: Data] = [:]
     private var isLoading = false
 
-    init(source: DiscoverSource) {
+    init(source: DiscoverSource, session: URLSession = .shared) {
         self.source = source
-        let browser = source.browser
+        let browser = source.browser(session: session)
         self.browser = browser
         library = RecipeLibrary(browsing: { id in await browser?.image(for: id, thumbnail: true) })
     }
