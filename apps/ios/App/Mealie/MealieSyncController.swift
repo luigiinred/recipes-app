@@ -61,7 +61,7 @@ final class MealieSyncController: ObservableObject {
         let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
         let user = try await MealieClient(server: url, token: token).currentUser()
         let paired = MealieCredentials.Connection(server: url.absoluteString, username: user.username, token: token)
-        MealieCredentials.save(paired)
+        guard MealieCredentials.save(paired) else { throw MealieCredentials.NotSaved() }
         connection = paired
         status = .idle
         request()
