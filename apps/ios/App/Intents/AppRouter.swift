@@ -14,4 +14,6 @@ final class AppRouter: ObservableObject {
     @Published var feedPost: FeedEntry?
     /// Set by the tab bar's add button; the tab it names starts adding and clears it.
     @Published var add: AppDestination?
+    /// A recipe to open straight into editing, on a Mac where its page edits in place.
+    @Published var editRecipeID: UUID?
 }

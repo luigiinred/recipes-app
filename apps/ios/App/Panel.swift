@@ -11,6 +11,8 @@ final class PanelHost {
     }
 
     private(set) var stack: [Entry] = []
+    /// Off in a window too narrow for a panel beside the page, where `.panel` content opens in a sheet instead.
+    var fitsPanels = true
 
     var top: Entry? { stack.last }
 
@@ -131,6 +133,7 @@ private struct PanelHostModifier: ViewModifier {
                 }
                 .inspectorColumnWidth(min: 380, ideal: 440, max: 760)
             }
+            .onGeometryChange(for: Bool.self) { $0.size.width >= 960 } action: { host.fitsPanels = $0 }
             .environment(host)
     }
 }
@@ -175,24 +178,25 @@ private struct PanelPresenter<Panel: View>: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        if let host {
-            content
-                .onChange(of: key, initial: true) { _, key in
-                    if key != nil {
-                        let finish = finish(in: host)
-                        host.show(id, content: AnyView(panel().environment(\.dismissPanel, DismissPanelAction(close: finish))), close: finish)
-                    } else if host.contains(id) {
-                        host.remove(id)
-                        onDismiss?()
-                    }
-                }
-                .onDisappear {
-                    // A presenter inside a panel leaves whenever another panel covers it; only one in the window closes its panel.
-                    guard host.stack.first?.id == id else { return }
-                    finish(in: host)()
-                }
-        } else {
-            content.sheet(isPresented: Binding(get: { key != nil }, set: { if !$0 { close() } }), onDismiss: onDismiss, content: panel)
+        let inPanel = host?.fitsPanels ?? false
+        content
+            .onChange(of: [key, AnyHashable(inPanel)], initial: true) { _, _ in update(inPanel: inPanel) }
+            .onDisappear {
+                // A presenter inside a panel leaves whenever another panel covers it; only one in the window closes its panel.
+                guard let host, host.stack.first?.id == id else { return }
+                finish(in: host)()
+            }
+            .sheet(isPresented: Binding(get: { key != nil && !inPanel }, set: { if !$0 { close() } }), onDismiss: onDismiss, content: panel)
+    }
+
+    private func update(inPanel: Bool) {
+        guard let host else { return }
+        if key != nil, inPanel {
+            let finish = finish(in: host)
+            host.show(id, content: AnyView(panel().environment(\.dismissPanel, DismissPanelAction(close: finish))), close: finish)
+        } else if host.contains(id) {
+            host.remove(id)
+            if key == nil { onDismiss?() }
         }
     }
 }
