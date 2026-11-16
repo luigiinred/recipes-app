@@ -300,7 +300,7 @@ struct AddMealSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 520)
+        .sheetFrame(minWidth: 420, minHeight: 520)
         #endif
     }
 }

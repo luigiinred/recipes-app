@@ -566,7 +566,7 @@ struct AddToCalendarSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 380, minHeight: 240)
+        .sheetFrame(minWidth: 380, minHeight: 240)
         #endif
     }
 }

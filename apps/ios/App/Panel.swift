@@ -63,7 +63,28 @@ private struct PanelTitleKey: PreferenceKey {
     static func reduce(value: inout String?, nextValue: () -> String?) { value = value ?? nextValue() }
 }
 
+private struct SheetFrame: ViewModifier {
+    @Environment(\.dismissPanel) private var panel
+    let minWidth: CGFloat
+    let idealWidth: CGFloat?
+    let minHeight: CGFloat
+    let idealHeight: CGFloat?
+
+    func body(content: Content) -> some View {
+        if panel == nil {
+            content.frame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight)
+        } else {
+            content
+        }
+    }
+}
+
 extension View {
+    /// A sheet's size on Mac; in a panel the column sets the size instead.
+    func sheetFrame(minWidth: CGFloat, idealWidth: CGFloat? = nil, minHeight: CGFloat, idealHeight: CGFloat? = nil) -> some View {
+        modifier(SheetFrame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight))
+    }
+
     /// The navigation title, which a panel shows in its own header since a Mac panel draws no navigation bar.
     func panelTitle(_ title: String) -> some View {
         navigationTitle(title).preference(key: PanelTitleKey.self, value: title)
@@ -89,14 +110,21 @@ extension View {
 
 private struct PanelHostModifier: ViewModifier {
     @State private var host = PanelHost()
+    /// The last panel shown, kept while the column collapses: emptying it mid-animation sends AppKit's layout into a loop that aborts.
+    @State private var shown: PanelHost.Entry?
 
     func body(content: Content) -> some View {
         content
             .inspector(isPresented: Binding(get: { host.top != nil }, set: { if !$0 { host.closeAll() } })) {
                 // Only the top panel is drawn, so a covered one's toolbar buttons don't linger.
-                Group {
-                    if let top = host.top { PanelFrame(content: top.content).id(top.id) }
+                ZStack {
+                    if let entry = host.top ?? shown { PanelFrame(content: entry.content).id(entry.id) }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .onChange(of: host.top?.id) {
+                    if let top = host.top { shown = top }
+                }
+                .onDisappear { shown = nil }
                 .background {
                     // Esc closes the top panel wherever the focus is.
                     Button("Close") { host.closeTop() }.keyboardShortcut(.cancelAction).hidden()

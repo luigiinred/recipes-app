@@ -141,7 +141,7 @@ struct TagsSheet: View {
         }
         .onDisappear(perform: save)
         #if os(macOS)
-        .frame(minWidth: 380, minHeight: 320)
+        .sheetFrame(minWidth: 380, minHeight: 320)
         #endif
     }
 

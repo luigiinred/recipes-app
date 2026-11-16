@@ -57,7 +57,7 @@ struct ImportURLView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 460, minHeight: 260)
+        .sheetFrame(minWidth: 460, minHeight: 260)
         #endif
     }
 

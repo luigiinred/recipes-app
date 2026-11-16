@@ -93,7 +93,7 @@ struct PlanCreatorSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 560)
+        .sheetFrame(minWidth: 420, minHeight: 560)
         #endif
     }
 
