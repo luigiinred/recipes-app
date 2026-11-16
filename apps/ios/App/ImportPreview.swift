@@ -148,25 +148,39 @@ struct ImportPreviewSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @SheetDismiss private var dismiss
     let draft: ScanDraft
+    /// Set when the preview takes the place of the page instead of opening over it; Cancel and Save call it to go back.
+    var closeInline: (() -> Void)?
     let onSaved: (Recipe) -> Void
     @State private var editing = false
     @State private var isSaving = false
 
     var body: some View {
-        NavigationStack {
-            RecipeDetailView(recipe: draft.recipe, previewSave: {}, previewImage: draft.imageData, previewSaveInToolbar: false)
-                .importPreviewChrome(notice: draft.notice, isSaving: isSaving, cancel: { dismiss() }, edit: { editing = true }, save: save)
+        if let closeInline {
+            if editing { editor(closeInline: { editing = false }) } else { preview }
+        } else {
+            NavigationStack { preview }
+                .panel(isPresented: $editing) { editor(closeInline: nil) }
         }
-        .panel(isPresented: $editing) {
-            RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice,
-                             initialImage: draft.imageData, initialStepImages: draft.stepImages) { saved, image, steps in
-                Task {
-                    await library.save(saved, image: image, steps: steps)
-                    onSaved(saved)
-                }
-                dismiss()
+    }
+
+    private var preview: some View {
+        RecipeDetailView(recipe: draft.recipe, previewSave: {}, previewImage: draft.imageData, previewSaveInToolbar: false)
+            .importPreviewChrome(notice: draft.notice, isSaving: isSaving, cancel: close, edit: { editing = true }, save: save)
+    }
+
+    private func editor(closeInline: (() -> Void)?) -> some View {
+        RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice,
+                         initialImage: draft.imageData, initialStepImages: draft.stepImages, closeInline: closeInline) { saved, image, steps in
+            Task {
+                await library.save(saved, image: image, steps: steps)
+                onSaved(saved)
             }
+            close()
         }
+    }
+
+    private func close() {
+        if let closeInline { closeInline() } else { dismiss() }
     }
 
     private func save() {
@@ -175,7 +189,7 @@ struct ImportPreviewSheet: View {
             let result = ImportResult(recipe: draft.recipe, imageData: draft.imageData, stepImageData: draft.stepImages)
             if let saved = await library.add(result) { onSaved(saved) }
             isSaving = false
-            dismiss()
+            close()
         }
     }
 }

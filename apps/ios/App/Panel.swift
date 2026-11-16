@@ -11,8 +11,6 @@ final class PanelHost {
     }
 
     private(set) var stack: [Entry] = []
-    /// Off in a window too narrow for a panel beside the page, where `.panel` content opens in a sheet instead.
-    var fitsPanels = true
 
     var top: Entry? { stack.last }
 
@@ -93,7 +91,8 @@ extension View {
     }
 
     /// A window with a panel host shows `.panel` content beside it, instead of in a sheet.
-    func panelHost() -> some View { modifier(PanelHostModifier()) }
+    /// In a narrow window the sidebar hides while a panel is open, to make room, and comes back when it closes.
+    func panelHost(sidebar: Binding<NavigationSplitViewVisibility>) -> some View { modifier(PanelHostModifier(sidebar: sidebar)) }
 
     /// A sheet, except in a Mac window, where it opens in the panel at the window's trailing edge.
     func panel(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> some View) -> some View {
@@ -111,7 +110,10 @@ extension View {
 }
 
 private struct PanelHostModifier: ViewModifier {
+    @Binding var sidebar: NavigationSplitViewVisibility
     @State private var host = PanelHost()
+    @State private var width: CGFloat = 0
+    @State private var sidebarBeforePanel: NavigationSplitViewVisibility?
     /// The last panel shown, kept while the column collapses: emptying it mid-animation sends AppKit's layout into a loop that aborts.
     @State private var shown: PanelHost.Entry?
 
@@ -131,9 +133,18 @@ private struct PanelHostModifier: ViewModifier {
                     // Esc closes the top panel wherever the focus is.
                     Button("Close") { host.closeTop() }.keyboardShortcut(.cancelAction).hidden()
                 }
-                .inspectorColumnWidth(min: 380, ideal: 440, max: 760)
+                .inspectorColumnWidth(min: 340, ideal: 420, max: 760)
             }
-            .onGeometryChange(for: Bool.self) { $0.size.width >= 960 } action: { host.fitsPanels = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .onChange(of: host.top == nil) { _, closed in
+                if !closed, width < 1100, sidebar != .detailOnly {
+                    sidebarBeforePanel = sidebar
+                    sidebar = .detailOnly
+                } else if closed, let before = sidebarBeforePanel {
+                    sidebar = before
+                    sidebarBeforePanel = nil
+                }
+            }
             .environment(host)
     }
 }
@@ -178,9 +189,9 @@ private struct PanelPresenter<Panel: View>: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        let inPanel = host?.fitsPanels ?? false
+        let inPanel = host != nil
         content
-            .onChange(of: [key, AnyHashable(inPanel)], initial: true) { _, _ in update(inPanel: inPanel) }
+            .onChange(of: key, initial: true) { _, _ in update(inPanel: inPanel) }
             .onDisappear {
                 // A presenter inside a panel leaves whenever another panel covers it; only one in the window closes its panel.
                 guard let host, host.stack.first?.id == id else { return }
