@@ -24,8 +24,8 @@ struct MealieSharingPage: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .sheet(item: $shareLink) { MealieShareLinkSheet(link: $0) }
-        .sheet(isPresented: $addingServer) { AddDiscoverSheet() }
+        .panel(item: $shareLink) { MealieShareLinkSheet(link: $0) }
+        .panel(isPresented: $addingServer) { AddDiscoverSheet() }
         .alert("Rename Server", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Save") { if let renaming { discover.rename(renaming, to: newName) } }
@@ -171,7 +171,7 @@ extension MealieLink: Identifiable {
 
 /// The link just made: send it, copy it, or open it here to try it.
 struct MealieShareLinkSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let link: MealieLink
     @State private var copied = false
 
@@ -203,7 +203,7 @@ struct MealieShareLinkSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(link.kind.shareTitle)
+            .panelTitle(link.kind.shareTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -219,7 +219,7 @@ struct MealieShareLinkSheet: View {
 /// Opened from an invite link: makes a new user on the server, then syncs with it as them.
 struct JoinMealieSheet: View {
     @EnvironmentObject private var mealie: MealieSyncController
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let link: MealieLink
     @State private var fullName = ""
     @State private var email = ""
@@ -270,7 +270,7 @@ struct JoinMealieSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Join Mealie")
+            .panelTitle("Join Mealie")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

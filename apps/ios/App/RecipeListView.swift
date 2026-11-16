@@ -59,10 +59,10 @@ struct RecipeListView: View {
                 listStyle: usesGrid ? nil : Binding(get: { style }, set: { storedStyle = $0 }),
                 findRecipes: browsedCategory != nil && !library.recipes.isEmpty ? FindRecipesAction(title: collection.title) { scanning = true } : nil
             )
-            .sheet(item: $editing) { recipe in
+            .panel(item: $editing) { recipe in
                 RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
             }
-            .sheet(isPresented: $scanning) {
+            .panel(isPresented: $scanning) {
                 if let browsedCategory {
                     CategoryScanSheet(category: browsedCategory, candidates: RecipeTags.recipes(fitting: browsedCategory, among: library.recipes))
                 }
@@ -260,7 +260,7 @@ struct EmptyLibraryView: View {
 /// Recipes elsewhere in the library that look like they belong in a category, to tick and file in one go.
 struct CategoryScanSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let category: String
     let candidates: [Recipe]
     @State private var chosen: Set<UUID>
@@ -288,7 +288,7 @@ struct CategoryScanSheet: View {
                     )
                 }
             }
-            .navigationTitle("Add to \(CategoryTree.components(category).last ?? category)")
+            .panelTitle("Add to \(CategoryTree.components(category).last ?? category)")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -417,16 +417,16 @@ private struct RecipeActionsModifier: ViewModifier {
             showingImport = true
             router.reminder = nil
         }
-        .sheet(isPresented: $showingNew) {
+        .panel(isPresented: $showingNew) {
             RecipeEditorView(recipe: Recipe(title: "")) { saved, image, steps in
                 Task { await library.save(saved, image: image, steps: steps) }
                 selection = saved.id
             }
         }
-        .sheet(item: $ideaDraft) { draft in
+        .panel(item: $ideaDraft) { draft in
             NewIdeaSheet(photo: draft.photo) { selection = $0.id }
         }
-        .sheet(isPresented: $showingImport) {
+        .panel(isPresented: $showingImport) {
             ImportURLView(
                 onReview: { result in
                     draft = ScanDraft(
@@ -436,7 +436,7 @@ private struct RecipeActionsModifier: ViewModifier {
                 }
             )
         }
-        .sheet(item: $draft) { draft in
+        .panel(item: $draft) { draft in
             ImportPreviewSheet(draft: draft) { selection = $0.id }
         }
         #if os(iOS)

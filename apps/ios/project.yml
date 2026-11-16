@@ -98,6 +98,7 @@ targets:
       - App/RecipeImageView.swift
       - App/StepImageView.swift
       - App/ToolbarButtons.swift
+      - App/Panel.swift
       - App/AppSettings.swift
       - App/Theme.swift
       - App/RecipeLink.swift

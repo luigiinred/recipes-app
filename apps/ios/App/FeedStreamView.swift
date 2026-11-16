@@ -911,7 +911,7 @@ struct RecipeFeedsPage: View {
                 Button { adding = true } label: { Label("Add a Site or Feed", systemImage: "plus") }
             }
         }
-        .sheet(isPresented: $adding) { AddFeedSheet() }
+        .panel(isPresented: $adding) { AddFeedSheet() }
     }
 
     private func row(_ popular: PopularFeed) -> some View {

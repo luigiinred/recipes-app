@@ -6,7 +6,7 @@ struct PlanCreatorSheet: View {
     static let recommendationLimit = 12
 
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @Environment(\.referenceDate) private var referenceDate
     @Environment(\.appAccent) private var accent
     let weekStart: Date
@@ -73,7 +73,7 @@ struct PlanCreatorSheet: View {
                 }
             }
             .themedCanvas()
-            .navigationTitle("Create a Plan")
+            .panelTitle("Create a Plan")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

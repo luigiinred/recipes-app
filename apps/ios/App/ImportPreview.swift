@@ -146,7 +146,7 @@ struct RecipePreviewContent: View {
 /// An import or scan before it's saved: the recipe page as it will look, Cancel, Edit for fixes, and Save.
 struct ImportPreviewSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let draft: ScanDraft
     let onSaved: (Recipe) -> Void
     @State private var editing = false
@@ -157,7 +157,7 @@ struct ImportPreviewSheet: View {
             RecipeDetailView(recipe: draft.recipe, previewSave: {}, previewImage: draft.imageData, previewSaveInToolbar: false)
                 .importPreviewChrome(notice: draft.notice, isSaving: isSaving, cancel: { dismiss() }, edit: { editing = true }, save: save)
         }
-        .sheet(isPresented: $editing) {
+        .panel(isPresented: $editing) {
             RecipeEditorView(recipe: draft.recipe, scannedText: draft.text, scannedTextTitle: draft.textTitle, notice: draft.notice,
                              initialImage: draft.imageData, initialStepImages: draft.stepImages) { saved, image, steps in
                 Task {

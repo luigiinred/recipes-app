@@ -10,7 +10,7 @@ struct IdeaDraft: Identifiable {
 /// Jot down something to cook that has no recipe yet, like "Spaghetti" or "Frozen burgers".
 struct NewIdeaSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let onSaved: (Recipe) -> Void
 
     @State private var title = ""
@@ -43,7 +43,7 @@ struct NewIdeaSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("New Idea")
+            .panelTitle("New Idea")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

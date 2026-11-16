@@ -165,7 +165,7 @@ struct MealieSettingsPage: View {
 struct AddDiscoverSheet: View {
     @EnvironmentObject private var discover: DiscoverController
     @EnvironmentObject private var mealie: MealieSyncController
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @State private var address = ""
     @State private var token = ""
     @State private var label = ""
@@ -217,7 +217,7 @@ struct AddDiscoverSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add Discover Server")
+            .panelTitle("Add Discover Server")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

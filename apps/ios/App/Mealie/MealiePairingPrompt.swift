@@ -15,7 +15,7 @@ private struct MealiePairingPrompt: ViewModifier {
             } message: { link in
                 Text(message(for: link))
             }
-            .sheet(item: invite) { link in JoinMealieSheet(link: link) }
+            .panel(item: invite) { link in JoinMealieSheet(link: link) }
             .alert("Couldn't Connect to Mealie", isPresented: isFailed) {
                 Button("OK", role: .cancel) {}
             } message: {

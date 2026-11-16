@@ -1363,7 +1363,7 @@ private struct TagTile: View {
 /// Every way to narrow the home, applied as it changes, with the count of what's left.
 private struct HomeFilterSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @Binding var filter: HomeFilter
     let ratingStyle: RatingStyle
 

@@ -111,7 +111,7 @@ struct TagEditor: View {
 /// Edits a recipe's tags on their own, saving whenever the sheet closes.
 struct TagsSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let recipe: Recipe
     @State private var tags: [String]
 
@@ -131,7 +131,7 @@ struct TagsSheet: View {
             }
             .formStyle(.grouped)
             .scrollDismissesKeyboard(.immediately)
-            .navigationTitle("Tags")
+            .panelTitle("Tags")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

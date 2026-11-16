@@ -59,14 +59,14 @@ struct FreeTextActions: View {
         }
         .padding(14)
         .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .sheet(isPresented: $planning) { AddToCalendarSheet(text: text) }
+        .panel(isPresented: $planning) { AddToCalendarSheet(text: text) }
     }
 }
 
 /// A note in Up Next or a meal planned by name: find a recipe for it, make it an idea, or plan it.
 struct FreeTextSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let item: FreeTextItem
     var open: ((UUID) -> Void)?
     @State private var planning: UpNextNote?
@@ -115,7 +115,7 @@ struct FreeTextSheet: View {
             #endif
             .toolbar { ToolbarItem(placement: .cancellationAction) { CancelButton() } }
         }
-        .sheet(item: $planning, onDismiss: { if !library.upNextNotes.contains(where: { $0.id == item.id }) { dismiss() } }) {
+        .panel(item: $planning, onDismiss: { if !library.upNextNotes.contains(where: { $0.id == item.id }) { dismiss() } }) {
             AddToCalendarSheet(note: $0)
         }
         #if os(macOS)

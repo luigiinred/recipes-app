@@ -491,6 +491,7 @@ struct RootView: View {
             path.append(id)
             selection = nil
         }
+        .panelHost()
         .toastHost()
         .cleanupScanning()
         .cookModeCover(cook)
