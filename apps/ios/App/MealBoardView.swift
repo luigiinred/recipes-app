@@ -111,8 +111,9 @@ struct MealBoardView: View {
     private var wideBoard: some View {
         HStack(spacing: 0) {
             if showsRecipes {
+                // No hard minimum width: a fixed width here outgrows the window as the sidebar opens, and AppKit aborts.
                 BoardRecipesPanel()
-                    .frame(width: 296)
+                    .frame(minWidth: 0, idealWidth: 296, maxWidth: 296)
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 Divider()
             }
@@ -120,6 +121,8 @@ struct MealBoardView: View {
                 WeekBar(weekStart: $weekStart, calendar: calendar, today: today)
                 board
             }
+            .frame(minWidth: 0, maxWidth: .infinity)
+            .clipped()
         }
     }
 
