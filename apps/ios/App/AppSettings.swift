@@ -106,6 +106,7 @@ enum AppSettings {
         static let defaultMeal = "defaultMeal"
         static let hiddenMeals = "hiddenMeals"
         static let weekStart = "weekStart"
+        static let boardShowsRecipes = "boardShowsRecipes"
         static let keepAwake = "keepAwakeWhileCooking"
         static let listStyle = "recipeListStyle"
         static let homeSort = "recipeHomeSort"

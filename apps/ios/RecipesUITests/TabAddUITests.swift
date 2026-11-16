@@ -33,6 +33,7 @@ final class TabAddUITests: XCTestCase {
         let add = app.navigationBars.buttons["Add"]
         XCTAssertTrue(add.waitForExistence(timeout: 5), "Plan has its own Add button")
         add.tap()
+        app.buttons["Add to Up Next"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Add to Up Next"].waitForExistence(timeout: 5))
     }
 
@@ -48,14 +49,6 @@ final class TabAddUITests: XCTestCase {
         app.tabBars.buttons["Plan"].tap()
         XCTAssertTrue(app.navigationBars.buttons["Add"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.tabBars.buttons["Add"].exists)
-    }
-
-    func testUpNextReorderIsAnIconNotText() {
-        app.tabBars.buttons["Plan"].tap()
-        XCTAssertTrue(app.buttons["Reorder"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Edit"].exists)
-        app.buttons["Reorder"].tap()
-        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
     }
 }
 #endif

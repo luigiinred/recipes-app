@@ -329,18 +329,17 @@ struct RecipesRouteDestination: View {
         case .feedPost(let entry):
             FeedEntryPreview(entry: entry)
         case .upNext:
-            QueueView { push(.recipe($0)) }.navigationTitle("Up Next")
+            MealBoardView { push(.recipe($0)) }
+                .navigationTitle("Up Next")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
         case .plan:
-            MyWeekView(open: { push(.recipe($0)) })
+            MealBoardView { push(.recipe($0)) }
                 .navigationTitle("Plan")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { router.add = .plan } label: { Label("Add", systemImage: "plus") }
-                    }
-                }
         case .groceries:
             GroceriesView(layout: .combined)
                 .toolbar {
@@ -360,7 +359,7 @@ struct UpNextTab: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            QueueView { path.append($0) }
+            MealBoardView { path.append($0) }
                 .navigationTitle("Up Next")
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationDestination(for: UUID.self) { id in
@@ -378,14 +377,9 @@ struct PlanTab: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            MyWeekView(open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
+            MealBoardView(open: { path.append($0) }, showsSmartPlan: showsSmartPlan)
                 .navigationTitle("Plan")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { router.add = .plan } label: { Label("Add", systemImage: "plus") }
-                    }
-                }
                 .navigationDestination(for: UUID.self) { id in
                     if let recipe = library.recipe(id: id) {
                         RecipeDetailView(recipe: recipe)
@@ -533,9 +527,9 @@ struct RootView: View {
         case .feeds:
             FeedStreamView()
         case .plan:
-            MyWeekView(open: { path.append($0) }).navigationTitle("Plan")
+            MealBoardView { path.append($0) }.navigationTitle("Plan")
         case .upNext:
-            QueueView { path.append($0) }.navigationTitle("Up Next")
+            MealBoardView { path.append($0) }.navigationTitle("Up Next")
         case .groceries:
             GroceriesBoard()
         }

@@ -448,6 +448,31 @@ final class RecipeLibrary: ObservableObject {
         }
     }
 
+    func moveQueued(_ id: UUID, to index: Int) async {
+        guard let from = upNext.firstIndex(where: { $0.id == id }) else { return }
+        await moveQueued(from: IndexSet(integer: from), to: index)
+    }
+
+    /// Takes a meal off the calendar and puts its recipe, or its words, back at the end of Up Next.
+    func unplan(_ entry: MealPlanEntry) async {
+        if let recipe = recipe(id: entry.recipeID) {
+            var queued = recipe
+            queued.wantToCook = true
+            queued.queuedAt = Date()
+            await perform { [queued] library in
+                try library.mealPlan.delete(entry)
+                try library.recipes.save(queued)
+            }
+        } else {
+            let isQueued = upNext.contains { $0.title.localizedCaseInsensitiveCompare(entry.title) == .orderedSame }
+            let note = UpNextNote(title: entry.title)
+            await perform { library in
+                try library.mealPlan.delete(entry)
+                if !isQueued { try library.upNextNotes.save(note) }
+            }
+        }
+    }
+
     /// Puts typed words in Up Next, unless they're already there.
     func queue(text: String) async {
         let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
