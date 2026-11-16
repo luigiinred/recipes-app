@@ -7,6 +7,9 @@ struct RecipeDetailView: View {
     @Environment(\.appearance) private var appearance
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
+    #if os(macOS)
+    @EnvironmentObject private var router: AppRouter
+    #endif
     let recipe: Recipe
     var previewSave: (() -> Void)?
     var previewImage: Data?
@@ -51,6 +54,26 @@ struct RecipeDetailView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        if editing {
+            RecipeEditorView(recipe: recipe, onDelete: { dismiss() }, closeInline: { editing = false }) { saved, image, steps in
+                Task { await library.save(saved, image: image, steps: steps) }
+            }
+            .id(recipe.id)
+        } else {
+            page
+                .onChange(of: router.editRecipeID, initial: true) { _, id in
+                    guard id == recipe.id, previewSave == nil else { return }
+                    router.editRecipeID = nil
+                    editing = true
+                }
+        }
+        #else
+        page
+        #endif
+    }
+
+    private var page: some View {
         GeometryReader { geometry in
             let fold = geometry.verticalFold
             if geometry.size.width >= 760 || fold != nil, !recipe.isIdea {
@@ -125,9 +148,11 @@ struct RecipeDetailView: View {
                 }
             }
         }
+        #if os(iOS)
         .panel(isPresented: $editing) {
             RecipeEditorView(recipe: recipe, onDelete: { dismiss() }) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
+        #endif
         .panel(isPresented: $showingTimeline) { RecipeTimelineSheet(recipeID: recipe.id) }
         .panel(isPresented: $editingTags) { TagsSheet(recipe: recipe) }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {

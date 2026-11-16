@@ -14,6 +14,8 @@ struct RecipeEditorView: View {
     var onCancel: (() -> Void)?
     /// Called after the recipe is deleted from here, so the page behind the editor can close.
     var onDelete: (() -> Void)?
+    /// Set when the editor takes the place of the recipe page instead of opening over it; Cancel and Save call it to go back.
+    var closeInline: (() -> Void)?
 
     @EnvironmentObject private var library: RecipeLibrary
     @State private var confirmingDelete = false
@@ -39,10 +41,11 @@ struct RecipeEditorView: View {
     init(
         recipe: Recipe, scannedText: String? = nil, scannedTextTitle: String = "Scanned text", notice: String? = nil,
         initialImage: Data? = nil, initialStepImages: [Data?] = [], onCancel: (() -> Void)? = nil, onDelete: (() -> Void)? = nil,
-        onSave: @escaping (Recipe, ImageChange, StepImageChanges) -> Void
+        closeInline: (() -> Void)? = nil, onSave: @escaping (Recipe, ImageChange, StepImageChanges) -> Void
     ) {
         self.onCancel = onCancel
         self.onDelete = onDelete
+        self.closeInline = closeInline
         original = recipe
         self.scannedText = scannedText
         self.scannedTextTitle = scannedTextTitle
@@ -74,7 +77,17 @@ struct RecipeEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        if closeInline != nil {
+            form
+        } else {
+            NavigationStack { form }
+            #if os(macOS)
+            .sheetFrame(minWidth: 560, idealWidth: 600, minHeight: 640, idealHeight: 800)
+            #endif
+        }
+    }
+
+    private var form: some View {
             container {
                 if let notice {
                     Section {
@@ -154,7 +167,7 @@ struct RecipeEditorView: View {
                 Button("Delete Recipe", role: .destructive) {
                     Task { await library.delete(original) }
                     onDelete?()
-                    if let onCancel { onCancel() } else { dismiss() }
+                    close()
                 }
             } message: {
                 Text("This can't be undone. The recipe and its photo are removed from all your devices.")
@@ -171,8 +184,8 @@ struct RecipeEditorView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if let onCancel {
-                        Button(action: onCancel) { Label("Cancel", systemImage: "xmark") }.labelStyle(.iconOnly)
+                    if let cancel = onCancel ?? closeInline {
+                        Button(action: cancel) { Label("Cancel", systemImage: "xmark") }.labelStyle(.iconOnly)
                     } else {
                         CancelButton()
                     }
@@ -181,10 +194,10 @@ struct RecipeEditorView: View {
                     ConfirmButton(title: "Save", isDisabled: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { save() }
                 }
             }
-        }
-        #if os(macOS)
-        .sheetFrame(minWidth: 560, idealWidth: 600, minHeight: 640, idealHeight: 800)
-        #endif
+    }
+
+    private func close() {
+        if let cancel = onCancel ?? closeInline { cancel() } else { dismiss() }
     }
 
     @ViewBuilder
@@ -473,7 +486,7 @@ struct RecipeEditorView: View {
         changes.removed = original.stepImages.compactMap { $0 }.filter { !kept.contains($0) }
         CustomUnits.remember(ingredients.compactMap(\.customUnit))
         onSave(recipe, imageChange, changes)
-        dismiss()
+        if let closeInline { closeInline() } else { dismiss() }
     }
 }
 

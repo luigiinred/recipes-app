@@ -22,6 +22,9 @@ enum RecipeListStyle: String, CaseIterable {
 
 struct RecipeListView: View {
     @EnvironmentObject private var library: RecipeLibrary
+    #if os(macOS)
+    @EnvironmentObject private var router: AppRouter
+    #endif
     @Environment(\.discover) private var scope
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
@@ -169,7 +172,14 @@ struct RecipeListView: View {
     @ViewBuilder
     private func libraryMenu(_ recipe: Recipe) -> some View {
         RecipeQuickActions(recipe: recipe)
-        Button("Edit", systemImage: "pencil") { editing = recipe }
+        Button("Edit", systemImage: "pencil") {
+            #if os(macOS)
+            router.editRecipeID = recipe.id
+            selection = recipe.id
+            #else
+            editing = recipe
+            #endif
+        }
         if let browsedCategory {
             Button("Remove Tag", systemImage: "tag.slash") { Task { await library.removeTags(recipe, in: browsedCategory) } }
         }
