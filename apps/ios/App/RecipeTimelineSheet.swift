@@ -4,7 +4,7 @@ import SwiftUI
 /// Every time a recipe was cooked, newest first, with a place to log another.
 struct RecipeTimelineSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let recipeID: UUID
 
     @State private var date = Date()
@@ -55,7 +55,7 @@ struct RecipeTimelineSheet: View {
                 }
             }
             .animation(.snappy, value: recipe?.timeline)
-            .navigationTitle(recipe?.title ?? "Timeline")
+            .panelTitle(recipe?.title ?? "Timeline")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

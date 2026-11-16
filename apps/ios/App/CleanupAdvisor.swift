@@ -162,14 +162,14 @@ struct CleanupSuggestionCard: View {
         .padding(.bottom, 12)
         .frame(maxWidth: 560)
         .transition(.move(edge: .bottom).combined(with: .opacity))
-        .sheet(isPresented: $reviewing) { CleanupReviewSheet(recipe: recipe, cleanup: cleanup) }
+        .panel(isPresented: $reviewing) { CleanupReviewSheet(recipe: recipe, cleanup: cleanup) }
     }
 }
 
 /// Every change a cleanup would make, as before and after, each with a checkbox; only the checked ones are saved.
 struct CleanupReviewSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @Environment(\.appAccent) private var accent
     let recipe: Recipe
     let cleanup: RecipeCleanup
@@ -196,7 +196,7 @@ struct CleanupReviewSheet: View {
                     }
                 }
             }
-            .navigationTitle("Review Cleanup")
+            .panelTitle("Review Cleanup")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -349,7 +349,7 @@ struct RecipesToTidyView: View {
             }
         }
         .navigationTitle("Recipes to Tidy")
-        .sheet(item: $reviewing) { recipe in
+        .panel(item: $reviewing) { recipe in
             if let cleanup = advisor.suggestion(for: recipe) { CleanupReviewSheet(recipe: recipe, cleanup: cleanup) }
         }
     }

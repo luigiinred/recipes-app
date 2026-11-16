@@ -2,7 +2,7 @@ import RecipeKit
 import SwiftUI
 
 struct ImportURLView: View {
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let onReview: (ImportResult) -> Void
     @EnvironmentObject private var library: RecipeLibrary
 
@@ -45,7 +45,7 @@ struct ImportURLView: View {
             }
             .formStyle(.grouped)
             .animation(.snappy, value: isLoading)
-            .navigationTitle("Import from Web or YouTube")
+            .panelTitle("Import from Web or YouTube")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

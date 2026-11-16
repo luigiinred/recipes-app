@@ -3,7 +3,7 @@ import RecipeKit
 import SwiftUI
 
 struct RecipeEditorView: View {
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let original: Recipe
     let scannedText: String?
     let scannedTextTitle: String
@@ -165,7 +165,7 @@ struct RecipeEditorView: View {
                 let padded = Self.withTrailingBlank(rows)
                 if padded.count != rows.count { ingredients = padded }
             }
-            .navigationTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
+            .panelTitle(original.title.isEmpty ? "New Recipe" : "Edit Recipe")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

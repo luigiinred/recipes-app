@@ -67,10 +67,10 @@ struct MyWeekView: View {
                     .disabled(library.recipes.isEmpty)
             }
         }
-        .sheet(item: $addingOn) { AddMealSheet(day: $0) }
-        .sheet(item: $typedMeal) { FreeTextSheet(item: .entry($0), open: open) }
-        .sheet(isPresented: $smartPlanning) { SmartPlanSheet(weekStart: weekStart) }
-        .sheet(isPresented: $creatingPlan) {
+        .panel(item: $addingOn) { AddMealSheet(day: $0) }
+        .panel(item: $typedMeal) { FreeTextSheet(item: .entry($0), open: open) }
+        .panel(isPresented: $smartPlanning) { SmartPlanSheet(weekStart: weekStart) }
+        .panel(isPresented: $creatingPlan) {
             PlanCreatorSheet(weekStart: weekStart) {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(400))
@@ -206,7 +206,7 @@ struct MyWeekView: View {
 /// Pick a recipe for a day, or type a meal as it is: Up Next first, or anything in the library.
 struct AddMealSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let day: Date
 
     @State private var meal: Meal
@@ -284,7 +284,7 @@ struct AddMealSheet: View {
                 }
             }
             .searchable(text: $search, prompt: "Search My Recipes")
-            .navigationTitle(day.formatted(.dateTime.weekday(.wide).month().day()))
+            .panelTitle(day.formatted(.dateTime.weekday(.wide).month().day()))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

@@ -60,10 +60,10 @@ struct QueueView: View {
                 Button { adding = true } label: { Label("Add to Up Next", systemImage: "plus") }
             }
         }
-        .sheet(item: $planning) { AddToCalendarSheet(recipe: $0) }
-        .sheet(item: $planningNote) { AddToCalendarSheet(note: $0) }
-        .sheet(item: $openNote) { FreeTextSheet(item: .note($0), open: open) }
-        .sheet(isPresented: $adding) { UpNextPickerSheet() }
+        .panel(item: $planning) { AddToCalendarSheet(recipe: $0) }
+        .panel(item: $planningNote) { AddToCalendarSheet(note: $0) }
+        .panel(item: $openNote) { FreeTextSheet(item: .note($0), open: open) }
+        .panel(isPresented: $adding) { UpNextPickerSheet() }
     }
 
     private func noteRow(_ note: UpNextNote) -> some View {
@@ -121,7 +121,7 @@ struct QueueView: View {
 
 struct UpNextPickerSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @State private var search = ""
 
     private var candidates: [Recipe] { library.recipes.filter { !$0.wantToCook && $0.matches(search) } }
@@ -151,7 +151,7 @@ struct UpNextPickerSheet: View {
                 if candidates.isEmpty, typed.isEmpty { ContentUnavailableView.search(text: search) }
             }
             .searchable(text: $search, prompt: "Search My Recipes")
-            .navigationTitle("Add to Up Next")
+            .panelTitle("Add to Up Next")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

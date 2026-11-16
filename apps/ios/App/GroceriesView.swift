@@ -102,7 +102,7 @@ struct GroceriesView: View {
 
 struct AddToGroceriesSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let recipe: Recipe
 
     @State private var skipped: Set<Int> = []
@@ -130,7 +130,7 @@ struct AddToGroceriesSheet: View {
                 }
                 .buttonStyle(.plain)
             }
-            .navigationTitle("Groceries")
+            .panelTitle("Groceries")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

@@ -125,11 +125,11 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $editing) {
+        .panel(isPresented: $editing) {
             RecipeEditorView(recipe: recipe, onDelete: { dismiss() }) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
-        .sheet(isPresented: $showingTimeline) { RecipeTimelineSheet(recipeID: recipe.id) }
-        .sheet(isPresented: $editingTags) { TagsSheet(recipe: recipe) }
+        .panel(isPresented: $showingTimeline) { RecipeTimelineSheet(recipeID: recipe.id) }
+        .panel(isPresented: $editingTags) { TagsSheet(recipe: recipe) }
         .alert("Step Timestamps", isPresented: Binding(get: { timestampMessage != nil }, set: { if !$0 { timestampMessage = nil } })) {
             Button("OK") { timestampMessage = nil }
         } message: {
@@ -138,8 +138,8 @@ struct RecipeDetailView: View {
         .recipeImageGenerator(isPresented: $generatingImage, recipe: recipe) { data in
             Task { await library.save(recipe, image: .set(data)) }
         }
-        .sheet(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: scaled) }
-        .sheet(isPresented: $addingToCalendar) { AddToCalendarSheet(recipe: recipe) }
+        .panel(isPresented: $addingToGroceries) { AddToGroceriesSheet(recipe: scaled) }
+        .panel(isPresented: $addingToCalendar) { AddToCalendarSheet(recipe: recipe) }
         .overlay(alignment: .bottom) {
             if previewSave == nil, let cleanup = CleanupAdvisor.shared.suggestion(for: recipe) {
                 CleanupSuggestionCard(recipe: recipe, cleanup: cleanup)
@@ -520,7 +520,7 @@ struct RecipeDetailView: View {
 
 struct AddToCalendarSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     private let title: String
     private let add: @MainActor (RecipeLibrary, Date, Meal) async -> Void
 
@@ -551,7 +551,7 @@ struct AddToCalendarSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(title)
+            .panelTitle(title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

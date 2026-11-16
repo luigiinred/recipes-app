@@ -360,7 +360,7 @@ struct MealieServersShelf: View {
                 .padding(.horizontal)
             }
         }
-        .sheet(isPresented: $adding) { AddDiscoverSheet() }
+        .panel(isPresented: $adding) { AddDiscoverSheet() }
     }
 }
 

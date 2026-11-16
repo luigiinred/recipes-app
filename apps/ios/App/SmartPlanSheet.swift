@@ -4,7 +4,7 @@ import SwiftUI
 /// Asks Apple Intelligence to fill the open slots of a week with recipes that go together, then lets you tweak the result.
 struct SmartPlanSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     let weekStart: Date
 
     @AppStorage(AppSettings.Key.weekStart) private var weekStartSetting = AppSettings.WeekStart.system.rawValue
@@ -29,7 +29,7 @@ struct SmartPlanSheet: View {
                 case .review: review
                 }
             }
-            .navigationTitle("Smart Plan")
+            .panelTitle("Smart Plan")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

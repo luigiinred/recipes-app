@@ -141,7 +141,7 @@ private struct VideoWithoutRecipe: View {
 
 struct AddFeedSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
     @State private var source = Source.site
 
     enum Source: String, CaseIterable {
@@ -192,7 +192,7 @@ struct AddFeedSheet: View {
                 FeedPreviewPage(url: found.url, title: found.title, onFollow: { dismiss() })
             }
             .formStyle(.grouped)
-            .navigationTitle("Add Feed")
+            .panelTitle("Add Feed")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

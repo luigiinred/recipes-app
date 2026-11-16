@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CancelButton: View {
-    @Environment(\.dismiss) private var dismiss
+    @SheetDismiss private var dismiss
 
     var body: some View {
         Button { dismiss() } label: { Label("Cancel", systemImage: "xmark") }
