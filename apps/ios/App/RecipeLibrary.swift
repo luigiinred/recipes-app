@@ -23,6 +23,7 @@ struct StepImageChanges {
 final class RecipeLibrary: ObservableObject {
     @Published private(set) var recipes: [Recipe] = []
     @Published private(set) var mealPlan: [MealPlanEntry] = []
+    @Published private(set) var upNextNotes: [UpNextNote] = []
     @Published private(set) var groceries: [GroceryItem] = []
     @Published private(set) var feeds: [Feed] = []
     @Published private(set) var categoryOrder: [String] = []
@@ -53,12 +54,13 @@ final class RecipeLibrary: ObservableObject {
     }
 
     init(
-        recipes: [Recipe], mealPlan: [MealPlanEntry] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [], categoryOrder: [String] = [],
+        recipes: [Recipe], mealPlan: [MealPlanEntry] = [], upNextNotes: [UpNextNote] = [], groceries: [GroceryItem] = [], feeds: [Feed] = [], categoryOrder: [String] = [],
         images: [UUID: Data] = [:], stepImages: [UUID: Data] = [:], isICloud: Bool = true, remindersStatus: RemindersStatus = .unavailable
     ) {
         self.remindersStatus = remindersStatus
         self.recipes = recipes
         self.mealPlan = mealPlan
+        self.upNextNotes = upNextNotes
         self.groceries = groceries
         self.feeds = feeds
         self.categoryOrder = categoryOrder
@@ -216,15 +218,16 @@ final class RecipeLibrary: ObservableObject {
             Task { await self.updateLoadProgress(LoadProgress(done: done, total: total)) }
         }
         let result = await Task.detached {
-            Result { try (library.recipes.list(progress: report), library.mealPlan.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
+            Result { try (library.recipes.list(progress: report), library.mealPlan.list(), library.upNextNotes.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
         }.value
         switch result {
-        case .success(let (recipes, plan, groceries, feeds, stamps, stepStamps, order)):
+        case .success(let (recipes, plan, notes, groceries, feeds, stamps, stepStamps, order)):
             if recipes != self.recipes {
                 self.recipes = recipes
                 if reminders != nil { Self.index(recipes) }
             }
             if plan != mealPlan { mealPlan = plan }
+            if notes != upNextNotes { upNextNotes = notes }
             if groceries != self.groceries { self.groceries = groceries }
             let sortedFeeds = feeds.sorted { $0.createdAt < $1.createdAt }
             if sortedFeeds != self.feeds { self.feeds = sortedFeeds }
@@ -390,17 +393,6 @@ final class RecipeLibrary: ObservableObject {
         await perform { try $0.mealPlan.delete(entry) }
     }
 
-    /// Saves the idea as a recipe, unless one with that title exists, and puts it on the calendar.
-    func plan(idea title: String, on day: Date, meal: Meal) async {
-        let existing = recipes.first { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }
-        let idea = existing ?? Recipe(title: title)
-        let entry = MealPlanEntry(recipeID: idea.id, title: idea.title, day: DayKey.string(from: day), meal: meal)
-        await perform { library in
-            if existing == nil { try library.recipes.save(idea) }
-            try library.mealPlan.save(entry)
-        }
-    }
-
     func addIdea(title: String, notes: String, image: Data? = nil) async -> Recipe {
         let idea = Recipe(title: title, notes: notes)
         await save(idea, image: image.map(ImageChange.set) ?? .unchanged)
@@ -431,21 +423,101 @@ final class RecipeLibrary: ObservableObject {
         }
     }
 
-    /// Reorders Up Next after a drag by renumbering the queue times of the recipes that moved.
+    var upNext: [UpNextItem] { UpNextItem.queue(recipes: recipes, notes: upNextNotes) }
+
+    /// Reorders Up Next after a drag by renumbering the queue times of the recipes and notes that moved.
     func moveQueued(from source: IndexSet, to destination: Int) async {
-        let queue = RecipeCollection.wantToCook.filter(recipes)
+        let queue = upNext
         guard queue.count > 1 else { return }
         var ordered = queue
         ordered.move(fromOffsets: source, toOffset: destination)
-        let base = queue.map { $0.queuedAt ?? $0.createdAt }.min() ?? Date()
-        let changed = ordered.enumerated().compactMap { index, recipe -> Recipe? in
+        let base = queue.map(\.queuedAt).min() ?? Date()
+        var recipes: [Recipe] = []
+        var notes: [UpNextNote] = []
+        for (index, item) in ordered.enumerated() {
             let time = base.addingTimeInterval(Double(index))
-            guard recipe.queuedAt != time else { return nil }
-            var changed = recipe
-            changed.queuedAt = time
-            return changed
+            guard item.queuedAt != time else { continue }
+            switch item {
+            case .recipe(var recipe): recipe.queuedAt = time; recipes.append(recipe)
+            case .note(var note): note.queuedAt = time; notes.append(note)
+            }
         }
-        await perform { library in for recipe in changed { try library.recipes.save(recipe) } }
+        await perform { library in
+            for recipe in recipes { try library.recipes.save(recipe) }
+            for note in notes { try library.upNextNotes.save(note) }
+        }
+    }
+
+    /// Puts typed words in Up Next, unless they're already there.
+    func queue(text: String) async {
+        let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, !upNext.contains(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) else { return }
+        let note = UpNextNote(title: title)
+        await perform { try $0.upNextNotes.save(note) }
+    }
+
+    /// Queues a recipe in a note's place in Up Next.
+    func use(_ recipe: Recipe, for note: UpNextNote) async {
+        var queued = recipe
+        queued.wantToCook = true
+        queued.queuedAt = note.queuedAt
+        await perform { [queued] library in
+            try library.recipes.save(queued)
+            try library.upNextNotes.delete(note)
+        }
+    }
+
+    func remove(_ note: UpNextNote) async {
+        await perform { try $0.upNextNotes.delete(note) }
+    }
+
+    /// Puts typed words on the calendar as they are, without making a recipe of them.
+    func plan(text: String, on day: Date, meal: Meal) async {
+        let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let entry = MealPlanEntry(title: title, day: DayKey.string(from: day), meal: meal)
+        await perform { try $0.mealPlan.save(entry) }
+    }
+
+    /// Planning a note takes it out of Up Next, as planning a recipe does.
+    func plan(_ note: UpNextNote, on day: Date, meal: Meal) async {
+        let entry = MealPlanEntry(title: note.title, day: DayKey.string(from: day), meal: meal)
+        await perform { library in
+            try library.mealPlan.save(entry)
+            try library.upNextNotes.delete(note)
+        }
+    }
+
+    /// Turns a note into an idea that keeps its place in Up Next, or queues the recipe already named that.
+    @discardableResult
+    func makeIdea(from note: UpNextNote) async -> Recipe {
+        var idea = existingRecipe(titled: note.title) ?? Recipe(title: note.title)
+        idea.wantToCook = true
+        idea.queuedAt = note.queuedAt
+        await perform { [idea] library in
+            try library.recipes.save(idea)
+            try library.upNextNotes.delete(note)
+        }
+        return idea
+    }
+
+    /// Links a typed meal to an idea of the same name, saving the idea if there isn't one.
+    @discardableResult
+    func makeIdea(from entry: MealPlanEntry) async -> Recipe {
+        let existing = existingRecipe(titled: entry.title)
+        let idea = existing ?? Recipe(title: entry.title)
+        var linked = entry
+        linked.recipeID = idea.id
+        linked.updatedAt = Date()
+        await perform { [linked] library in
+            if existing == nil { try library.recipes.save(idea) }
+            try library.mealPlan.save(linked)
+        }
+        return idea
+    }
+
+    private func existingRecipe(titled title: String) -> Recipe? {
+        recipes.first { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }
     }
 
     func addGroceries(_ items: [GroceryItem]) async {

@@ -9,6 +9,7 @@ public struct Library: Sendable {
 
     public var recipes: RecipeStore { RecipeStore(directory: root.appendingPathComponent("Recipes")) }
     public var mealPlan: DocumentStore<MealPlanEntry> { DocumentStore(directory: root.appendingPathComponent("Calendar")) }
+    public var upNextNotes: DocumentStore<UpNextNote> { DocumentStore(directory: root.appendingPathComponent("UpNext")) }
     public var images: RecipeImageStore { RecipeImageStore(directory: root.appendingPathComponent("Images")) }
     public var stepImages: RecipeImageStore { RecipeImageStore(directory: root.appendingPathComponent("StepImages")) }
     public var feeds: DocumentStore<Feed> { DocumentStore(directory: root.appendingPathComponent("Feeds")) }

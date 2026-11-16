@@ -521,7 +521,23 @@ struct RecipeDetailView: View {
 struct AddToCalendarSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
-    let recipe: Recipe
+    private let title: String
+    private let add: @MainActor (RecipeLibrary, Date, Meal) async -> Void
+
+    init(recipe: Recipe) {
+        title = "Add to Planner"
+        add = { await $0.plan(recipe, on: $1, meal: $2) }
+    }
+
+    init(text: String) {
+        title = "Plan “\(text)”"
+        add = { await $0.plan(text: text, on: $1, meal: $2) }
+    }
+
+    init(note: UpNextNote) {
+        title = "Plan “\(note.title)”"
+        add = { await $0.plan(note, on: $1, meal: $2) }
+    }
 
     @State private var day = Date()
     @State private var meal = AppSettings.defaultMeal()
@@ -535,7 +551,7 @@ struct AddToCalendarSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add to Planner")
+            .navigationTitle(title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -543,7 +559,7 @@ struct AddToCalendarSheet: View {
                 ToolbarItem(placement: .cancellationAction) { CancelButton() }
                 ToolbarItem(placement: .confirmationAction) {
                     ConfirmButton(title: "Add") {
-                        Task { await library.plan(recipe, on: day, meal: meal) }
+                        Task { await add(library, day, meal) }
                         dismiss()
                     }
                 }

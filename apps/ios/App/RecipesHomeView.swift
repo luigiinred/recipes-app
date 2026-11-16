@@ -289,6 +289,7 @@ struct RecipesHomeView: View {
     @AppStorage(SearchSetting.discoverSearch.key) private var searchesOnline = true
     @State private var online = OnlineRecipeSearch()
     @State private var keyboardShown = false
+    @State private var freeTextItem: FreeTextItem?
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
@@ -379,7 +380,28 @@ struct RecipesHomeView: View {
     }
 
     private var upNextPicks: [HeroPick] {
-        RecipeCollection.wantToCook.filter(library.recipes).prefix(5).map { HeroPick(recipe: $0, kicker: "Up Next") }
+        library.upNext.prefix(5).map { item in
+            switch item {
+            case .recipe(let recipe): HeroPick(recipe: recipe, kicker: "Up Next")
+            case .note(let note): HeroPick(recipe: Recipe(id: note.id, title: note.title), kicker: "Up Next")
+            }
+        }
+    }
+
+    /// Typed words worth saving as they are: a search that isn't already a recipe's name.
+    private var freeText: String {
+        guard tag == nil else { return "" }
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !library.recipes.contains(where: { $0.title.localizedCaseInsensitiveCompare(text) == .orderedSame }) else { return "" }
+        return text
+    }
+
+    /// A pick with no recipe behind it is a note in Up Next or a meal typed into the plan.
+    private func openPick(_ id: UUID) {
+        if library.recipe(id: id) != nil { selection = id }
+        else if let note = library.upNextNotes.first(where: { $0.id == id }) { freeTextItem = .note(note) }
+        else if let entry = library.mealPlan.first(where: { $0.id == id && $0.recipeID == nil }) { freeTextItem = .entry(entry) }
+        else { router.destination = .plan }
     }
 
     private func picks(for section: HomeSection) -> [HeroPick] {
@@ -439,6 +461,7 @@ struct RecipesHomeView: View {
             HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
+        .sheet(item: $freeTextItem) { FreeTextSheet(item: $0) { selection = $0 } }
         .sheet(item: $editing) { recipe in
             RecipeEditorView(recipe: recipe) { saved, image, steps in Task { await library.save(saved, image: image, steps: steps) } }
         }
@@ -554,6 +577,12 @@ struct RecipesHomeView: View {
                     .contextMenu { recipeMenu(recipe) }
                 }
                 if items.isEmpty, showsNoMatches { noMatches.listRowSeparator(.hidden).themedRow() }
+                if !freeText.isEmpty {
+                    FreeTextActions(text: freeText)
+                        .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 12, trailing: margin))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
                 if !query.isEmpty, !discover.sources.isEmpty {
                     DiscoverSearchMatches(query: query)
                         .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 12, trailing: margin))
@@ -611,6 +640,7 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             if items.isEmpty, showsNoMatches { noMatches }
+            if !freeText.isEmpty { FreeTextActions(text: freeText).padding(.horizontal, margin) }
             if !query.isEmpty, !discover.sources.isEmpty { DiscoverSearchMatches(query: query).padding(.horizontal, margin) }
             if !onlineQuery.isEmpty { onlineGrid }
             }
@@ -666,9 +696,7 @@ struct RecipesHomeView: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(title: section.title, accessory: heroAccessory(section))
                 .padding(.horizontal, margin)
-            HeroCarousel(picks: picks, margin: margin) { id in
-                if library.recipe(id: id) != nil { selection = id } else { router.destination = .plan }
-            } actions: { recipe in
+            HeroCarousel(picks: picks, margin: margin) { openPick($0) } actions: { recipe in
                 if library.recipe(id: recipe.id) != nil {
                     if section == .upNext {
                         Button("Made It", systemImage: "checkmark.circle") { Task { await library.logMade(recipe) } }
@@ -1544,7 +1572,7 @@ struct HomePages: View {
     }
 
     private func detail(_ page: TabItem) -> String {
-        let queued = RecipeCollection.wantToCook.filter(library.recipes).count
+        let queued = library.upNext.count
         return switch page {
         case .recipes: "\(library.recipes.count) \(library.recipes.count == 1 ? "recipe" : "recipes")"
         case .feeds: "Feeds and search"
