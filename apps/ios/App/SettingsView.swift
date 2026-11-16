@@ -31,7 +31,8 @@ struct SettingsView: View {
         .sheet(isPresented: $showingTour) { OnboardingView { showingTour = false } }
         #endif
         #if os(macOS)
-        .frame(minWidth: 460, minHeight: 520)
+        .panelHost(sidebar: .constant(.detailOnly))
+        .frame(minWidth: 760, minHeight: 520)
         #endif
     }
 
