@@ -12,6 +12,7 @@ struct MyWeekView: View {
     @State private var addingOn: Date?
     @State private var smartPlanning: Bool
     @State private var creatingPlan = false
+    @State private var typedMeal: MealPlanEntry?
     @AppStorage(AppSettings.Key.weekStart) private var weekStartSetting = AppSettings.WeekStart.system.rawValue
 
     init(open: @escaping (UUID) -> Void, showsSmartPlan: Bool = false) {
@@ -67,6 +68,7 @@ struct MyWeekView: View {
             }
         }
         .sheet(item: $addingOn) { AddMealSheet(day: $0) }
+        .sheet(item: $typedMeal) { FreeTextSheet(item: .entry($0), open: open) }
         .sheet(isPresented: $smartPlanning) { SmartPlanSheet(weekStart: weekStart) }
         .sheet(isPresented: $creatingPlan) {
             PlanCreatorSheet(weekStart: weekStart) {
@@ -139,13 +141,14 @@ struct MyWeekView: View {
 
     private func row(_ entry: MealPlanEntry) -> some View {
         Button {
-            if let id = entry.recipeID, library.recipe(id: id) != nil { open(id) }
+            if let id = entry.recipeID, library.recipe(id: id) != nil { open(id) } else { typedMeal = entry }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: entry.meal.symbol).foregroundStyle(Theme.accent).frame(width: 24)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(entry.title).appFont(.body)
-                    Text(entry.meal.title).appFont(.caption).foregroundStyle(.secondary)
+                    Text(entry.recipeID.flatMap(library.recipe(id:)) == nil ? "\(entry.meal.title) · No recipe yet" : entry.meal.title)
+                        .appFont(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -200,7 +203,7 @@ struct MyWeekView: View {
     }
 }
 
-/// Pick a recipe for a day, or jot down an idea: Up Next first, or anything in the library.
+/// Pick a recipe for a day, or type a meal as it is: Up Next first, or anything in the library.
 struct AddMealSheet: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.dismiss) private var dismiss
@@ -220,6 +223,10 @@ struct AddMealSheet: View {
     }
 
     private var queued: [Recipe] { RecipeCollection.wantToCook.filter(library.recipes) }
+    private var notes: [UpNextNote] {
+        guard source == .queue else { return [] }
+        return library.upNextNotes.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }.sorted { $0.queuedAt < $1.queuedAt }
+    }
     private var recipes: [Recipe] {
         let pool = source == .queue && !queued.isEmpty ? queued : library.recipes
         return pool.filter { $0.matches(search) }
@@ -229,7 +236,7 @@ struct AddMealSheet: View {
 
     private func addIdea() {
         guard !trimmedIdea.isEmpty else { return }
-        Task { await library.plan(idea: trimmedIdea, on: day, meal: meal) }
+        Task { await library.plan(text: trimmedIdea, on: day, meal: meal) }
         dismiss()
     }
 
@@ -237,32 +244,41 @@ struct AddMealSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    TextField("Or add an idea, like “Spaghetti” or “Leftovers”", text: $idea)
+                    TextField("Or type a meal, like “Eggs” or “Leftovers”", text: $idea)
                         .submitLabel(.done)
                         .onSubmit(addIdea)
                     Button("Add", action: addIdea).disabled(trimmedIdea.isEmpty)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
                 Divider()
-                if !queued.isEmpty {
+                if !queued.isEmpty || !library.upNextNotes.isEmpty {
                     Picker("Source", selection: $source) {
                         ForEach(Source.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented).labelsHidden()
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
-                List(recipes) { recipe in
-                    Button {
-                        Task { await library.plan(recipe, on: day, meal: meal) }
-                        dismiss()
-                    } label: { RecipeRow(recipe: recipe) }
-                    .buttonStyle(.plain)
+                List {
+                    ForEach(notes) { note in
+                        Button {
+                            Task { await library.plan(note, on: day, meal: meal) }
+                            dismiss()
+                        } label: { FreeTextRow(title: note.title) }
+                        .buttonStyle(.plain)
+                    }
+                    ForEach(recipes) { recipe in
+                        Button {
+                            Task { await library.plan(recipe, on: day, meal: meal) }
+                            dismiss()
+                        } label: { RecipeRow(recipe: recipe) }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .listStyle(.plain)
                 .overlay {
-                    if library.recipes.isEmpty {
+                    if library.recipes.isEmpty, notes.isEmpty {
                         EmptyLibraryView()
-                    } else if recipes.isEmpty {
+                    } else if recipes.isEmpty, notes.isEmpty {
                         ContentUnavailableView.search(text: search)
                     }
                 }
