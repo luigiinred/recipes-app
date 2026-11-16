@@ -211,7 +211,7 @@ struct MealieShareLinkSheet: View {
         }
         .presentationDetents([.medium, .large])
         #if os(macOS)
-        .frame(minWidth: 460, minHeight: 360)
+        .sheetFrame(minWidth: 460, minHeight: 360)
         #endif
     }
 }
@@ -287,7 +287,7 @@ struct JoinMealieSheet: View {
         }
         .interactiveDismissDisabled(isJoining)
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 360)
+        .sheetFrame(minWidth: 420, minHeight: 360)
         #endif
     }
 

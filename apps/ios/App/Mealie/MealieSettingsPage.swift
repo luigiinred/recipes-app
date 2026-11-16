@@ -235,7 +235,7 @@ struct AddDiscoverSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 260)
+        .sheetFrame(minWidth: 420, minHeight: 260)
         #endif
     }
 

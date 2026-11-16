@@ -62,7 +62,7 @@ struct RecipeTimelineSheet: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { ConfirmButton { dismiss() } } }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 480)
+        .sheetFrame(minWidth: 420, minHeight: 480)
         #endif
     }
 }

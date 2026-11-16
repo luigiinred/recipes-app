@@ -183,7 +183,7 @@ struct RecipeEditorView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 560, idealWidth: 600, minHeight: 640, idealHeight: 800)
+        .sheetFrame(minWidth: 560, idealWidth: 600, minHeight: 640, idealHeight: 800)
         #endif
     }
 

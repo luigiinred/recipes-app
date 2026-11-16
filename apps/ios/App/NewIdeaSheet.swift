@@ -81,7 +81,7 @@ struct NewIdeaSheet: View {
         }
         .task { nameFromPhoto() }
         #if os(macOS)
-        .frame(minWidth: 380, minHeight: 280)
+        .sheetFrame(minWidth: 380, minHeight: 280)
         #endif
     }
 

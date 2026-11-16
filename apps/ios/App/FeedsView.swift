@@ -208,7 +208,7 @@ struct AddFeedSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 460, minHeight: 220)
+        .sheetFrame(minWidth: 460, minHeight: 220)
         #endif
     }
 

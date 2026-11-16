@@ -148,7 +148,7 @@ struct AddToGroceriesSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 480)
+        .sheetFrame(minWidth: 420, minHeight: 480)
         #endif
     }
 }
