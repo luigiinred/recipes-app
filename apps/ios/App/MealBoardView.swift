@@ -506,7 +506,6 @@ struct MealBoardView: View {
         let queue = library.upNext
         return VStack(alignment: .leading, spacing: 10) {
             VStack(spacing: 6) {
-                Capsule().fill(.secondary.opacity(0.5)).frame(width: 36, height: 5)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("Up Next").appFont(.title2, weight: .bold)
                     if !queue.isEmpty { Text("\(queue.count)").appFont(.headline).foregroundStyle(.secondary) }
@@ -527,9 +526,13 @@ struct MealBoardView: View {
                     }
                 }
             }
-            .padding(.top, 8)
-            // Closed, the title has nothing under it, so it gets the grabber's space below too and sits centered.
-            .padding(.bottom, sheetStep == .title ? 19 : 0)
+            // The grabber floats over the top edge, so closed, the title sits in the middle of the sheet.
+            .padding(.top, sheetStep == .title ? 18 : 22)
+            .padding(.bottom, sheetStep == .title ? 18 : 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .top) {
+                Capsule().fill(.secondary.opacity(0.5)).frame(width: 36, height: 5).padding(.top, 7)
+            }
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.snappy) { sheetStep = sheetStep == .title ? .cards : .title } }
             .gesture(DragGesture(minimumDistance: 12).onEnded { value in
@@ -553,7 +556,8 @@ struct MealBoardView: View {
         .frame(height: sheetContentHeight, alignment: .top)
         .padding(.horizontal, 20)
         // Down to the bottom of the screen, like Maps: the content clears the home indicator, or the tab bar, which then sits inside the sheet.
-        .padding(.bottom, max(bottomInset, 12))
+        // Closed with only the home indicator below, the sheet stays slim and lets the indicator overlap it, as Maps does.
+        .padding(.bottom, sheetStep == .title && bottomInset < 50 ? 0 : max(bottomInset, 12))
         .background {
             ZStack {
                 Color.clear.contentShape(Rectangle()).onTapGesture(perform: dismissKeyboard)
