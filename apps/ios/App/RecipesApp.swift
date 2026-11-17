@@ -36,12 +36,17 @@ struct RecipesApp: App {
                 .task { await library.run() }
                 .task { await mealie.run() }
                 .onChange(of: library.recipes) { mealie.request(); rescheduleReminders() }
-                .onChange(of: library.mealPlan) { mealie.request(); rescheduleReminders() }
+                .onChange(of: library.mealPlan) {
+                    mealie.request()
+                    rescheduleReminders()
+                    MealCalendarSync.shared.request(plan: library.mealPlan)
+                }
                 .onChange(of: library.groceries) { mealie.request() }
                 .onChange(of: scenePhase) {
                     switch scenePhase {
                     case .active:
                         mealie.refresh(); mealie.request(); discover.refresh(); rescheduleReminders()
+                        MealCalendarSync.shared.request(plan: library.mealPlan)
                         Task { await feeds.refreshOffline(library.feeds); await feeds.publishWidget(library.feeds) }
                     #if os(iOS)
                     case .background:
@@ -62,12 +67,12 @@ struct RecipesApp: App {
         .backgroundTask(.appRefresh(FeedRefresh.taskID)) { await FeedRefresh.run() }
         #endif
         #if os(macOS)
-        Settings {
-            SettingsView(inSheet: false)
-                .environmentObject(library)
-                .environmentObject(mealie)
-                .environmentObject(discover)
-                .appTheme()
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { router.showsSettings = true }.keyboardShortcut(",", modifiers: .command)
+            }
+            // File → Take Photo with an iPhone or iPad, for a recipe page's photo.
+            ImportFromDevicesCommands()
         }
         #endif
     }

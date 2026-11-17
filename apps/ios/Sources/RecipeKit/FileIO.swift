@@ -45,4 +45,12 @@ enum FileIO {
         try? FileManager.default.startDownloadingUbiquitousItem(at: directory.appendingPathComponent(real))
         return true
     }
+
+    /// A Mac keeps an undownloaded iCloud file under its own name, and reading it waits for the download.
+    static func startDownloadIfNotLocal(_ url: URL) -> Bool {
+        guard (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus == .notDownloaded
+        else { return false }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        return true
+    }
 }

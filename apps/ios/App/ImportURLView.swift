@@ -14,7 +14,7 @@ struct ImportURLView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 if isLoading {
                     Section {
                         VStack(spacing: 12) {

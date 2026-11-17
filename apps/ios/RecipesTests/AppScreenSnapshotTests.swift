@@ -55,11 +55,6 @@ struct AppScreenSnapshotTests {
         assertPageSnapshots(of: RootView(tab: .recipes, searchQuery: "tomato"), inNavigationStack: false)
     }
 
-    @Test("Plan tab: Up Next queue")
-    func planQueue() {
-        assertPageSnapshots(of: RootView(tab: .upNext), inNavigationStack: false)
-    }
-
     @Test("Plan tab: My Week")
     func planWeek() {
         assertPageSnapshots(of: RootView(tab: .plan), inNavigationStack: false, coverage: .adaptive)

@@ -402,4 +402,38 @@ final class StepSplitterTests: XCTestCase {
         let whole = original.split(separator: ".").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map { $0 + "." }
         XCTAssertEqual(StepSplitter.validated(whole, original: original)?.count, 8)
     }
+
+    func testUnshoutedLowercasesShoutedWordsAndKeepsAcronyms() {
+        XCTAssertEqual(RecipeStandards.unshouted("2 cups SUGAR", sentences: false), "2 cups sugar")
+        XCTAssertEqual(RecipeStandards.unshouted("1 tsp VANILLA", sentences: false), "1 tsp vanilla")
+        XCTAssertEqual(RecipeStandards.unshouted("1 cup BBQ sauce", sentences: false), "1 cup BBQ sauce")
+        XCTAssertEqual(RecipeStandards.unshouted("1/2 cup Milk", sentences: false), "1/2 cup Milk")
+        XCTAssertEqual(RecipeStandards.unshouted("COOK TOGETHER UNTIL BLENDED. ADD THE BBQ SAUCE.", sentences: true),
+                       "Cook together until blended. Add the BBQ sauce.")
+    }
+
+    func testStandardTitleTitleCasesATitleInCapitals() {
+        XCTAssertEqual(RecipeStandards.standardTitle("NO BAKE COOKIES"), "No Bake Cookies")
+        XCTAssertEqual(RecipeStandards.standardTitle("MAC AND CHEESE"), "Mac and Cheese")
+        XCTAssertEqual(RecipeStandards.standardTitle("BBQ RIBS"), "BBQ Ribs")
+        XCTAssertEqual(RecipeStandards.standardTitle("No Bake Cookies"), "No Bake Cookies")
+    }
+
+    func testCleanupOffersCapitalsFixesForATitleAndIngredients() async {
+        let recipe = Recipe(title: "NO BAKE COOKIES", ingredients: ["2 cups SUGAR", "1 stick BUTTER", "1/2 cup Milk"],
+                            steps: ["Cook together until well blended."])
+        let cleanup = await RecipeCleanup.suggest(for: recipe)
+        XCTAssertEqual(cleanup.recipe.title, "No Bake Cookies")
+        XCTAssertEqual(cleanup.recipe.ingredients, ["2 cups sugar", "1 stick butter", "1/2 cup Milk"])
+        XCTAssertTrue(cleanup.changes.contains { $0.kind == .title })
+    }
+
+    func testPunctuationFixIsKeptOnlyWhenTheWordsAreUnchanged() {
+        let step = "Add vanilla, peanut butter, and oatmeal Mix well."
+        XCTAssertTrue(StepPunctuation.needsHelp(step))
+        XCTAssertEqual(StepPunctuation.validated("Add vanilla, peanut butter, and oatmeal. Mix well.", original: step),
+                       "Add vanilla, peanut butter, and oatmeal. Mix well.")
+        XCTAssertNil(StepPunctuation.validated("Add vanilla and oatmeal. Mix well.", original: step))
+        XCTAssertFalse(StepPunctuation.needsHelp("Cook together until well blended."))
+    }
 }

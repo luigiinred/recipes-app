@@ -2,7 +2,7 @@ import Foundation
 
 /// Something the on-device model does for the app, with the instructions it is given. Each can be replaced in Settings.
 public enum AIAction: String, CaseIterable, Identifiable, Sendable {
-    case mealPhotoName, videoCaptions, webPage, splitSteps, groupIngredients, planWeek
+    case mealPhotoName, videoCaptions, webPage, splitSteps, punctuateSteps, groupIngredients, planWeek
 
     public var id: String { rawValue }
 
@@ -12,6 +12,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
         case .videoCaptions: "Recipe from video captions"
         case .webPage: "Recipe from a web page"
         case .splitSteps: "Split a pasted method into steps"
+        case .punctuateSteps: "Fix run-together sentences in steps"
         case .groupIngredients: "Group ingredients into sections"
         case .planWeek: "Smart Plan for My Week"
         }
@@ -23,6 +24,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
         case .videoCaptions: "Writes a recipe from what the cook says when a video has no written recipe."
         case .webPage: "Finds the recipe in a page's text when the page has no recipe data."
         case .splitSteps: "Breaks a method that was pasted as one block into separate steps."
+        case .punctuateSteps: "Adds the period and capital missing where two sentences run together, without changing any words."
         case .groupIngredients: "Decides whether the ingredient list needs sections, such as a salad and its dressing."
         case .planWeek: "Fills the open slots in your week from your own recipes."
         }
@@ -34,6 +36,7 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
         case .videoCaptions: "play.rectangle"
         case .webPage: "doc.text"
         case .splitSteps: "list.number"
+        case .punctuateSteps: "textformat"
         case .groupIngredients: "square.stack.3d.up"
         case .planWeek: "calendar.badge.plus"
         }
@@ -67,6 +70,10 @@ public enum AIAction: String, CaseIterable, Identifiable, Sendable {
         case .splitSteps: """
             A recipe's method was pasted as one block. Split it into separate steps in the original order. \
             Keep the author's words. Do not add, drop or reorder anything. Each step is one action or two related ones.
+            """
+        case .punctuateSteps: """
+            Fix only the punctuation, capitalization and spacing of one recipe step, such as a missing period where two \
+            sentences run together. Keep every word exactly as written and in the same order. Do not add, remove, reword or reorder anything.
             """
         case .groupIngredients: """
             You decide whether a recipe's ingredient list needs sections. Most recipes do not: use one section name for every \

@@ -59,7 +59,7 @@ struct OnboardingTests {
         defaults.set(FirstTab.recipes.rawValue, forKey: AppSettings.Key.firstTab)
         defaults.set("plan", forKey: AppSettings.Key.hiddenTabs)
         defaults.set(true, forKey: AppSettings.Key.settingsInTabBar)
-        #expect(AppSettings.tabs("", defaults: defaults) == [.recipes, .feeds, .upNext, .groceries, .settings])
+        #expect(AppSettings.tabs("", defaults: defaults) == [.recipes, .feeds, .groceries, .settings])
         #expect(AppSettings.tabs("groceries,home,recipes", defaults: defaults) == [.groceries, .home, .recipes])
         #expect(AppSettings.tabs("feeds,plan", defaults: defaults).first == .recipes)
     }

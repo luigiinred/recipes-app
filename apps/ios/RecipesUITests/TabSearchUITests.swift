@@ -20,7 +20,7 @@ final class TabSearchUITests: XCTestCase {
     private func launch(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"] + arguments
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"] + arguments
         app.launch()
         return app
     }

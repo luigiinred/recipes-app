@@ -276,7 +276,6 @@ struct RecipesHomeView: View {
     @EnvironmentObject private var discover: DiscoverController
     @EnvironmentObject private var cook: CookSession
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
-    @AppStorage(AppSettings.Key.listStyle) private var style = RecipeListStyle.list
     @AppStorage(AppSettings.Key.homeSort) private var savedSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
@@ -286,7 +285,6 @@ struct RecipesHomeView: View {
     @AppStorage(AppSettings.Key.homeTipDismissed) private var homeTipDismissed = false
     @AppStorage(AppSettings.Key.dismissedHomeCards) private var dismissedCardsRaw = ""
     @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
-    @AppStorage(SearchSetting.discoverSearch.key) private var searchesOnline = true
     @State private var online = OnlineRecipeSearch()
     @State private var keyboardShown = false
     @State private var freeTextItem: FreeTextItem?
@@ -300,6 +298,8 @@ struct RecipesHomeView: View {
     var showsQuickFilters = false
     /// The open search field floats at the bottom, so the filter chips sit above it.
     var searchFieldAtBottom = false
+    /// The filter chips only show while typing, or once one is picked, so an open but idle search stays clean.
+    var keyboardIsUp = false
     /// Shows one tag's page with its own filters instead of the shared home.
     var tag: String?
     /// Lists every recipe instead of the home's first few.
@@ -388,13 +388,6 @@ struct RecipesHomeView: View {
         }
     }
 
-    /// Typed words worth saving as they are: a search that isn't already a recipe's name.
-    private var freeText: String {
-        guard tag == nil else { return "" }
-        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !library.recipes.contains(where: { $0.title.localizedCaseInsensitiveCompare(text) == .orderedSame }) else { return "" }
-        return text
-    }
 
     /// A pick with no recipe behind it is a note in Up Next or a meal typed into the plan.
     private func openPick(_ id: UUID) {
@@ -435,7 +428,7 @@ struct RecipesHomeView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .recipeActions(selection: $selection, listStyle: nil, addsAtTrailing: isHome)
+        .recipeActions(selection: $selection, addsAtTrailing: isHome)
         .task(id: onlineQuery) { await searchOnline() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardShown = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardShown = false }
@@ -449,13 +442,10 @@ struct RecipesHomeView: View {
             #endif
             if !library.recipes.isEmpty, !isHome {
                 ToolbarItem(placement: .primaryAction) { sortMenu }
-                if !isRegular {
-                    ToolbarItem(placement: .primaryAction) { styleButton }
-                }
             }
         }
         .safeAreaBar(edge: .bottom) {
-            if showsQuickFilters, !library.recipes.isEmpty { quickFilterBar }
+            if showsQuickFilters, !library.recipes.isEmpty, keyboardIsUp || filter.isActive { quickFilterBar }
         }
         .sheet(isPresented: $choosingFilter) {
             HomeFilterSheet(filter: Binding(get: { filter }, set: { filter = $0 }), ratingStyle: ratingStyle)
@@ -472,10 +462,13 @@ struct RecipesHomeView: View {
         let items = isHome ? Array(all.prefix(Self.homeRecipeLimit)) : all
         return List(selection: $selection) {
             Section {
-                header(count: all.count)
-                    .listRowInsets(EdgeInsets(top: 8, leading: margin, bottom: 12, trailing: margin))
-                    .listRowSeparator(.hidden)
-                    .themedRow()
+                // While searching the shelves carry their own titles, My Recipes among them.
+                if query.isEmpty {
+                    header(count: all.count)
+                        .listRowInsets(EdgeInsets(top: 8, leading: margin, bottom: 12, trailing: margin))
+                        .listRowSeparator(.hidden)
+                        .themedRow()
+                }
                 #if os(iOS)
                 if isHome, showsPages {
                     HomePages()
@@ -560,29 +553,30 @@ struct RecipesHomeView: View {
                     .listRowSeparator(.hidden)
                     .themedRow()
             }
-                ForEach(items) { recipe in
-                    Group {
-                        switch style {
-                        case .cards: RecipeCard(recipe: recipe)
-                        case .list: RecipeRow(recipe: recipe)
-                        }
+                if !query.isEmpty, !items.isEmpty {
+                    // Searching, results come in App Store–style shelves: yours first, then each place online.
+                    RowShelf(title: "My Recipes", margin: margin, items: items) { recipe in
+                        Button { selection = recipe.id } label: { RecipeRow(recipe: recipe) }
+                            .buttonStyle(.plain)
+                            .draggable(RecipeDragItem(id: recipe.id))
+                            .contextMenu { recipeMenu(recipe) }
                     }
-                    .tag(recipe.id)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 16, trailing: 0))
+                    .listRowSeparator(.hidden)
                     .themedRow()
-                    .listRowSeparator(style == .cards || recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
-                    .listRowSeparator(style == .cards ? .hidden : .automatic, edges: .bottom)
-                    .listRowInsets(style == .cards ? EdgeInsets(top: 12, leading: margin, bottom: 20, trailing: margin) : EdgeInsets(top: 8, leading: margin, bottom: 8, trailing: margin))
-                    .recipeSwipeActions(for: recipe)
-                    .draggable(RecipeDragItem(id: recipe.id))
-                    .contextMenu { recipeMenu(recipe) }
+                } else {
+                    ForEach(items) { recipe in
+                        RecipeCard(recipe: recipe)
+                        .tag(recipe.id)
+                        .themedRow()
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 20, trailing: margin))
+                        .recipeSwipeActions(for: recipe)
+                        .draggable(RecipeDragItem(id: recipe.id))
+                        .contextMenu { recipeMenu(recipe) }
+                    }
                 }
                 if items.isEmpty, showsNoMatches { noMatches.listRowSeparator(.hidden).themedRow() }
-                if !freeText.isEmpty {
-                    FreeTextActions(text: freeText)
-                        .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 12, trailing: margin))
-                        .listRowSeparator(.hidden)
-                        .themedRow()
-                }
                 if !query.isEmpty, !discover.sources.isEmpty {
                     DiscoverSearchMatches(query: query)
                         .listRowInsets(EdgeInsets(top: 12, leading: margin, bottom: 12, trailing: margin))
@@ -640,7 +634,6 @@ struct RecipesHomeView: View {
             }
             .padding(.horizontal, margin)
             if items.isEmpty, showsNoMatches { noMatches }
-            if !freeText.isEmpty { FreeTextActions(text: freeText).padding(.horizontal, margin) }
             if !query.isEmpty, !discover.sources.isEmpty { DiscoverSearchMatches(query: query).padding(.horizontal, margin) }
             if !onlineQuery.isEmpty { onlineGrid }
             }
@@ -648,48 +641,11 @@ struct RecipesHomeView: View {
     }
 
     private var customizeTip: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "house")
-                .appFont(.title3)
-                .foregroundStyle(accent)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center) {
-                    Text("Make Home yours").appFont(.headline)
-                    Spacer(minLength: 8)
-                    Button {
-                        withAnimation(.snappy) { homeTipDismissed = true }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .appFont(.body, weight: .semibold)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, height: 32)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.borderless)
-                    .padding(.vertical, -6)
-                    .accessibilityLabel("Dismiss")
-                }
-                Text("Reorder sections or turn off the ones you don't use.")
-                    .appFont(.subheadline)
-                    .foregroundStyle(.secondary)
-                Button {
-                    homeTipDismissed = true
-                    openRoute(.homeSettings)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Customize Home")
-                        Image(systemName: "chevron.right").appFont(.caption, weight: .semibold)
-                    }
-                    .appFont(.subheadline, weight: .medium)
-                    .foregroundStyle(.tint)
-                }
-                .buttonStyle(.borderless)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        InlineAlert(symbol: "house", title: "Make Home yours", message: "Reorder sections or turn off the ones you don't use.",
+                    linkTitle: "Customize Home", action: {
+                        homeTipDismissed = true
+                        openRoute(.homeSettings)
+                    }, onDismiss: { homeTipDismissed = true })
     }
 
     private func heroSection(_ section: HomeSection, picks: [HeroPick]) -> some View {
@@ -720,9 +676,9 @@ struct RecipesHomeView: View {
         case .today where shows(.plan):
             return AnyView(emptyCard(section, symbol: "calendar.badge.plus", heading: "Nothing planned for today",
                                      message: "Plan a meal, or create a plan for the whole week.") { router.destination = .plan })
-        case .upNext where shows(.upNext):
+        case .upNext where shows(.plan):
             return AnyView(emptyCard(section, symbol: "text.line.first.and.arrowtriangle.forward", heading: "Line up what to cook",
-                                     message: "Swipe a recipe left, or use its ⋯ menu, to add it to Up Next. Planning it takes it off.") { openRoute(.upNext) })
+                                     message: "Swipe a recipe left, or use its ⋯ menu, to add it to Up Next. Planning it takes it off.") { openRoute(.plan) })
         case .favorites where !library.recipes.isEmpty:
             return AnyView(emptyCard(section, symbol: "heart", heading: "Keep your favorites close",
                                      message: "Long-press a recipe, or use its ⋯ menu, and choose Favorite.", action: nil))
@@ -738,39 +694,11 @@ struct RecipesHomeView: View {
     }
 
     private func emptyCard(_ section: HomeSection, symbol: String, heading: String, message: String, action: (() -> Void)?) -> some View {
-        let card = HStack(spacing: 12) {
-            Image(systemName: symbol).appFont(.title2).foregroundStyle(accent).frame(width: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(heading).appFont(.headline)
-                Text(message).appFont(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .contentShape(Rectangle())
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             sectionTitle(section.title)
-            HStack(alignment: .top, spacing: 8) {
-                if let action {
-                    Button(action: action) { card }.buttonStyle(.plain)
-                } else {
-                    card
-                }
-                Button {
-                    withAnimation(.snappy) { dismissedCardsRaw = (dismissedCardsRaw.split(separator: ",").map(String.init) + [section.rawValue]).joined(separator: ",") }
-                } label: {
-                    Image(systemName: "xmark")
-                        .appFont(.body, weight: .semibold)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 32, height: 32)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Dismiss")
+            InlineAlert(symbol: symbol, title: heading, message: message, action: action) {
+                dismissedCardsRaw = (dismissedCardsRaw.split(separator: ",").map(String.init) + [section.rawValue]).joined(separator: ",")
             }
-            .padding(.vertical, 16)
-            .padding(.leading, 16)
-            .padding(.trailing, 8)
-            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -893,7 +821,7 @@ struct RecipesHomeView: View {
     private func heroAccessory(_ section: HomeSection) -> HomeSectionHeader.Accessory? {
         switch section {
         case .today: .init(title: "View Plan") { router.destination = .plan }
-        case .upNext: .init(title: "View All", accessibilityLabel: "View All of Up Next") { openRoute(.upNext) }
+        case .upNext: .init(title: "View All", accessibilityLabel: "View All of Up Next") { openRoute(.plan) }
         case .favorites: .init(title: "View All", accessibilityLabel: "View All Favorites") { openRoute(.collection(.favorites)) }
         default: nil
         }
@@ -1013,15 +941,6 @@ struct RecipesHomeView: View {
         .accessibilityValue(sort.title)
     }
 
-    private var styleButton: some View {
-        let other: RecipeListStyle = style == .cards ? .list : .cards
-        return Button { withAnimation(.snappy) { style = other } } label: {
-            Label("Show \(other.title)", systemImage: other.symbol)
-                .labelStyle(.iconOnly)
-                .contentTransition(.symbolEffect(.replace))
-        }
-    }
-
     static func countText(_ count: Int) -> String { count == 1 ? "1 recipe" : "\(count) recipes" }
 
     /// The page title sits here; once it scrolls under the bar, the bar shows it instead.
@@ -1044,7 +963,7 @@ struct RecipesHomeView: View {
 
     /// What's searched online: the typed words, on the library's own search, while online search is on.
     private var onlineQuery: String {
-        guard searchesOnline, tag == nil else { return "" }
+        guard tag == nil else { return "" }
         return query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -1071,20 +990,10 @@ struct RecipesHomeView: View {
         ForEach(OnlineRecipeSearch.Group.allCases) { group in
             let results = online.results(in: group)
             if !results.isEmpty {
-                Text(group.rawValue)
-                    .appFont(.title3, weight: .bold)
-                    .accessibilityAddTraits(.isHeader)
-                    .listRowInsets(EdgeInsets(top: 24, leading: margin, bottom: 4, trailing: margin))
+                RowShelf(title: group.rawValue, margin: margin, items: results) { OnlineResultLink(result: $0, inShelf: true) }
+                    .listRowInsets(EdgeInsets(top: 16, leading: 0, bottom: 16, trailing: 0))
                     .listRowSeparator(.hidden)
                     .themedRow()
-                ForEach(results) { result in
-                    let isCard = style == .cards || result.kind == .video
-                    OnlineResultLink(result: result, asCard: style == .cards)
-                        .themedRow()
-                        .listRowSeparator(isCard || result.id == results.first?.id ? .hidden : .automatic, edges: .top)
-                        .listRowSeparator(isCard ? .hidden : .automatic, edges: .bottom)
-                        .listRowInsets(isCard ? EdgeInsets(top: 12, leading: margin, bottom: 20, trailing: margin) : EdgeInsets(top: 8, leading: margin, bottom: 8, trailing: margin))
-                }
             }
         }
         if online.isSearching {
@@ -1106,14 +1015,7 @@ struct RecipesHomeView: View {
         ForEach(OnlineRecipeSearch.Group.allCases) { group in
             let results = online.results(in: group)
             if !results.isEmpty {
-                Text(group.rawValue)
-                    .appFont(.title3, weight: .bold)
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.horizontal, margin)
-                GridSection(title: nil, minimum: 260, spacing: 24) {
-                    ForEach(results) { OnlineResultLink(result: $0, asCard: true) }
-                }
-                .padding(.horizontal, margin)
+                RowShelf(title: group.rawValue, margin: margin, items: results) { OnlineResultLink(result: $0, inShelf: true) }
             }
         }
         if online.isSearching { OnlineSearchProgress().padding(.horizontal, margin) }
@@ -1234,34 +1136,15 @@ private struct HeroCard: View {
     let pick: HeroPick
 
     var body: some View {
-        Color.clear
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .overlay { RecipeImageView(recipe: pick.recipe) }
-            .overlay {
-                LinearGradient(colors: [.clear, .clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+        PhotoCard(title: pick.recipe.title) {
+            RecipeImageView(recipe: pick.recipe)
+        } detail: {
+            if let minutes = pick.recipe.totalMinutes {
+                Label(HomeFilter.minutes(minutes), systemImage: "clock").appFont(.subheadline, weight: .medium)
             }
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(pick.kicker.uppercased())
-                        .appFont(.caption, weight: .bold)
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text(pick.recipe.title)
-                        .appFont(.title2, weight: .bold)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    if let minutes = pick.recipe.totalMinutes {
-                        Label(HomeFilter.minutes(minutes), systemImage: "clock")
-                            .appFont(.subheadline, weight: .medium)
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                }
-                .padding(20)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
+        }
+        .recipeZoomSource(pick.recipe.id, in: "hero", cornerRadius: PhotoCard<EmptyView, EmptyView>.cornerRadius)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -1371,7 +1254,7 @@ private struct HomeFilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 if !library.categoryTree.isEmpty {
                     Section("Tags") {
                         ForEach(tagLevels.indices, id: \.self) { level in
@@ -1576,8 +1459,7 @@ struct HomePages: View {
         return switch page {
         case .recipes: "\(library.recipes.count) \(library.recipes.count == 1 ? "recipe" : "recipes")"
         case .feeds: "Feeds and search"
-        case .upNext: queued == 0 ? "Nothing queued" : "\(queued) to cook"
-        case .plan: "Your week of meals"
+        case .plan: queued == 0 ? "Your week of meals" : "Your week, \(queued) up next"
         case .groceries: "Your shopping list"
         case .home, .settings: ""
         }

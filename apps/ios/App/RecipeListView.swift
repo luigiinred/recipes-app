@@ -13,13 +13,6 @@ struct ScanDraft: Identifiable {
     var stepImages: [Data?] = []
 }
 
-enum RecipeListStyle: String, CaseIterable {
-    case cards, list
-
-    var title: String { self == .cards ? "Photo Cards" : "Compact List" }
-    var symbol: String { self == .cards ? "rectangle.grid.1x2" : "list.bullet" }
-}
-
 struct RecipeListView: View {
     @EnvironmentObject private var library: RecipeLibrary
     #if os(macOS)
@@ -28,24 +21,18 @@ struct RecipeListView: View {
     @Environment(\.discover) private var scope
     @Binding var collection: RecipeCollection
     @Binding var selection: Recipe.ID?
-    var styleOverride: RecipeListStyle?
 
-    @AppStorage(AppSettings.Key.listStyle) private var storedStyle = RecipeListStyle.list
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
-    @State private var search = ""
     @State private var editing: Recipe?
     @State private var scanning = false
-
-    private var style: RecipeListStyle { styleOverride ?? storedStyle }
 
     private var browsedCategory: String? {
         if case .category(let path) = collection { path } else { nil }
     }
 
     private var usesGrid: Bool {
-        guard styleOverride != .list else { return false }
         #if os(iOS)
         return sizeClass == .regular
         #else
@@ -55,11 +42,9 @@ struct RecipeListView: View {
 
     var body: some View {
         content
-            .macSearchable(text: $search, prompt: "Search My Recipes")
             .navigationTitle(collection.title)
             .recipeActions(
                 selection: $selection,
-                listStyle: usesGrid ? nil : Binding(get: { style }, set: { storedStyle = $0 }),
                 findRecipes: browsedCategory != nil && !library.recipes.isEmpty ? FindRecipesAction(title: collection.title) { scanning = true } : nil
             )
             .panel(item: $editing) { recipe in
@@ -83,15 +68,15 @@ struct RecipeListView: View {
         if case .category(let path) = collection {
             return library.recipes.filter { recipe in
                 recipe.tags.contains { CategoryTree.components($0).count == CategoryTree.components(path).count && CategoryTree.tag($0, isIn: path) }
-            }.filter { $0.matches(search) }
+            }
         }
         #endif
-        return collection.filter(library.recipes).filter { $0.matches(search) }
+        return collection.filter(library.recipes)
     }
 
     #if os(iOS)
     private var subcategories: [CategoryNode] {
-        guard case .category(let path) = collection, search.isEmpty else { return [] }
+        guard case .category(let path) = collection else { return [] }
         return CategoryTree.node(at: path, in: library.categoryTree)?.children ?? []
     }
     #endif
@@ -116,17 +101,11 @@ struct RecipeListView: View {
             #endif
             Section {
                 ForEach(items) { recipe in
-                    Group {
-                        switch style {
-                        case .cards: RecipeCard(recipe: recipe)
-                        case .list: RecipeRow(recipe: recipe)
-                        }
-                    }
+                    RecipeCard(recipe: recipe)
                     .tag(recipe.id)
                     .themedRow()
-                    .listRowSeparator(style == .cards ? .hidden : .automatic)
-                    .listRowSeparator(recipe.id == items.first?.id ? .hidden : .automatic, edges: .top)
-                    .listRowInsets(style == .cards ? EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16) : nil)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     .libraryRowActions(for: recipe, removingTagFrom: browsedCategory, readOnly: scope != nil)
                     .contextMenu { recipeMenu(recipe) }
                 }
@@ -149,14 +128,12 @@ struct RecipeListView: View {
             DiscoverStatusView(catalog: scope.catalog)
         } else if library.recipes.isEmpty {
             EmptyLibraryView()
-        } else if items.isEmpty, search.isEmpty {
+        } else if items.isEmpty {
             #if os(iOS)
             if subcategories.isEmpty { EmptyStateView(symbol: "tray", title: collection.title, message: "No recipes here yet.") }
             #else
             EmptyStateView(symbol: "tray", title: collection.title, message: "No recipes here yet.")
             #endif
-        } else if items.isEmpty {
-            ContentUnavailableView.search(text: search)
         }
     }
 
@@ -372,19 +349,14 @@ private struct RecipeActionsModifier: ViewModifier {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.discover) private var scope
     @Binding var selection: Recipe.ID?
-    var listStyle: Binding<RecipeListStyle>?
     var findRecipes: FindRecipesAction?
     var addsAtTrailing = false
 
     @State private var showingNew = false
-    @State private var ideaDraft: IdeaDraft?
     @State private var showingImport = false
     @State private var showingFileImporter = false
     @State private var showingScanner = false
     @State private var draft: ScanDraft?
-    @State private var showingMealCamera = false
-    @State private var showingMealLibrary = false
-    @State private var mealPhotoItem: PhotosPickerItem?
     @State private var progressMessage: String?
     @State private var scanError: String?
 
@@ -438,15 +410,11 @@ private struct RecipeActionsModifier: ViewModifier {
             } else if let findRecipes {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        if let listStyle { listStyleButton(listStyle) }
                         Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
                         Button("Find Recipes for \(findRecipes.title)", systemImage: "sparkle.magnifyingglass", action: findRecipes.perform)
                     } label: { Label("More", systemImage: "ellipsis.circle") }
                 }
             } else {
-                if let listStyle {
-                    ToolbarItem(placement: .primaryAction) { listStyleButton(listStyle) }
-                }
                 ToolbarItem(placement: addPlacement) {
                     Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
                 }
@@ -458,9 +426,6 @@ private struct RecipeActionsModifier: ViewModifier {
             router.reminder = nil
         }
         .panel(isPresented: opensInPlace ? .constant(false) : $showingNew) { newRecipeEditor(closeInline: nil) }
-        .panel(item: $ideaDraft) { draft in
-            NewIdeaSheet(photo: draft.photo) { selection = $0.id }
-        }
         .panel(isPresented: $showingImport) {
             ImportURLView(
                 onReview: { result in
@@ -485,29 +450,7 @@ private struct RecipeActionsModifier: ViewModifier {
             )
             .ignoresSafeArea()
         }
-        .fullScreenCover(isPresented: $showingMealCamera) {
-            MealCamera(
-                onFinish: { data in
-                    showingMealCamera = false
-                    ideaDraft = IdeaDraft(photo: data)
-                },
-                onCancel: { showingMealCamera = false }
-            )
-            .ignoresSafeArea()
-        }
         #endif
-        .photosPicker(isPresented: $showingMealLibrary, selection: $mealPhotoItem, matching: .images)
-        .onChange(of: mealPhotoItem) { _, item in
-            guard let item else { return }
-            mealPhotoItem = nil
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self) {
-                    ideaDraft = IdeaDraft(photo: data)
-                } else {
-                    scanError = "Couldn't load that photo."
-                }
-            }
-        }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.image, .pdf]) { result in
             guard case .success(let url) = result else { return }
             scan {
@@ -531,15 +474,6 @@ private struct RecipeActionsModifier: ViewModifier {
         #endif
     }
 
-    private func listStyleButton(_ listStyle: Binding<RecipeListStyle>) -> some View {
-        Button {
-            listStyle.wrappedValue = listStyle.wrappedValue == .cards ? .list : .cards
-        } label: {
-            Label(listStyle.wrappedValue == .cards ? "Show as List" : "Show as Cards", systemImage: listStyle.wrappedValue == .cards ? "list.bullet" : "square.grid.2x2")
-        }
-        .help(listStyle.wrappedValue == .cards ? "Show as a compact list" : "Show as photo cards")
-    }
-
     @ViewBuilder
     private var addItems: some View {
         Button("Paste a Link…", systemImage: "link") { showingImport = true }
@@ -554,15 +488,6 @@ private struct RecipeActionsModifier: ViewModifier {
         Button("From a Photo or PDF…", systemImage: "doc.viewfinder") { showingFileImporter = true }
         #endif
         Button("Write Your Own", systemImage: "square.and.pencil") { showingNew = true }
-        Menu("Save an Idea", systemImage: "lightbulb") {
-            Button("Just a Name", systemImage: "character.cursor.ibeam") { ideaDraft = IdeaDraft() }
-            #if os(iOS)
-            if MealCamera.isAvailable {
-                Button("Photo of a Meal", systemImage: "camera") { showingMealCamera = true }
-            }
-            #endif
-            Button("Meal from My Photos", systemImage: "photo") { showingMealLibrary = true }
-        }
     }
 
     private func scan(_ recognize: @escaping @Sendable () throws -> String) {
@@ -603,8 +528,8 @@ extension View {
         if enabled { draggable(RecipeDragItem(id: recipe.id)) } else { self }
     }
 
-    func recipeActions(selection: Binding<Recipe.ID?>, listStyle: Binding<RecipeListStyle>?, findRecipes: FindRecipesAction? = nil, addsAtTrailing: Bool = false) -> some View {
-        modifier(RecipeActionsModifier(selection: selection, listStyle: listStyle, findRecipes: findRecipes, addsAtTrailing: addsAtTrailing))
+    func recipeActions(selection: Binding<Recipe.ID?>, findRecipes: FindRecipesAction? = nil, addsAtTrailing: Bool = false) -> some View {
+        modifier(RecipeActionsModifier(selection: selection, findRecipes: findRecipes, addsAtTrailing: addsAtTrailing))
     }
 }
 
@@ -620,7 +545,6 @@ enum RecipesRoute: Hashable {
     case allRecipes
     case feeds
     case feedPost(FeedEntry)
-    case upNext
     case plan
     case groceries
     case homeSettings
@@ -715,14 +639,6 @@ extension FolderTile {
 #endif
 
 extension View {
-    func macSearchable(text: Binding<String>, prompt: String) -> some View {
-        #if os(macOS)
-        searchable(text: text, prompt: prompt)
-        #else
-        self
-        #endif
-    }
-
     /// Keeps the search field visible at the top on iPhone instead of scrolling away with the list.
     func persistentSearch(text: Binding<String>, prompt: String) -> some View {
         #if os(iOS)
@@ -824,20 +740,12 @@ struct RecipeCard: View {
     let recipe: Recipe
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Color.clear
-                .aspectRatio(16 / 10, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .overlay { RecipeImageView(recipe: recipe) }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title).appFont(.title3, weight: .semibold).lineLimit(2)
-                RecipeFacts(recipe: recipe)
-            }
-            .padding(.horizontal, 4)
+        PhotoCard(title: recipe.title) {
+            RecipeImageView(recipe: recipe)
+        } detail: {
+            RecipeFacts(recipe: recipe)
         }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .recipeZoomSource(recipe.id, in: "card", cornerRadius: PhotoCard<EmptyView, EmptyView>.cornerRadius)
     }
 }
 
@@ -845,16 +753,11 @@ struct RecipeRow: View {
     let recipe: Recipe
 
     var body: some View {
-        HStack(spacing: 12) {
+        ThumbnailRow(title: recipe.title) {
             RecipeImageView(recipe: recipe)
-                .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(recipe.title).appFont(.headline).lineLimit(2)
-                RecipeFacts(recipe: recipe)
-            }
-            Spacer(minLength: 0)
+                .recipeZoomSource(recipe.id, in: "row", cornerRadius: 14)
+        } subtitle: {
+            RecipeFacts(recipe: recipe)
         }
-        .padding(.vertical, 3)
     }
 }

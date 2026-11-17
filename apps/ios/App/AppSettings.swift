@@ -4,12 +4,11 @@ import RecipeKit
 /// User preferences, stored in UserDefaults so views can bind to them with @AppStorage.
 /// A tab that Settings can hide. Home and Settings always show.
 enum MainTab: String, CaseIterable {
-    case feeds, upNext, plan, groceries
+    case feeds, plan, groceries
 
     var title: String {
         switch self {
         case .feeds: "Discover"
-        case .upNext: "Up Next"
         case .plan: "Plan"
         case .groceries: "Groceries"
         }
@@ -18,7 +17,6 @@ enum MainTab: String, CaseIterable {
     var symbol: String {
         switch self {
         case .feeds: "safari"
-        case .upNext: "text.line.first.and.arrowtriangle.forward"
         case .plan: "calendar"
         case .groceries: "checklist"
         }
@@ -28,6 +26,8 @@ enum MainTab: String, CaseIterable {
 /// How the iPhone gets between pages: a tab bar, or Home with a link to each page and search at the bottom.
 enum NavigationStyle: String, CaseIterable {
     case tabs, home
+
+    static let standard = NavigationStyle.home
 
     var title: String {
         switch self {
@@ -52,7 +52,7 @@ enum FeedMarkMode: String, CaseIterable {
 
 /// A tab the user can place in the tab bar, in the order they choose.
 enum TabItem: String, CaseIterable, Identifiable {
-    case home, recipes, feeds, upNext, plan, groceries, settings
+    case home, recipes, feeds, plan, groceries, settings
 
     var id: String { rawValue }
 
@@ -107,7 +107,6 @@ enum AppSettings {
         static let hiddenMeals = "hiddenMeals"
         static let weekStart = "weekStart"
         static let keepAwake = "keepAwakeWhileCooking"
-        static let listStyle = "recipeListStyle"
         static let homeSort = "recipeHomeSort"
         static let defaultSort = "recipeDefaultSort"
         static let remembersSort = "rememberRecipeSort"
@@ -152,6 +151,8 @@ enum AppSettings {
         static let firstTab = "firstTab"
         static let tabOrder = "tabOrder"
         static let navigationStyle = "navigationStyle"
+        static let boardShowsUpNext = "boardShowsUpNext"
+        static let mealCalendar = "syncMealPlanToCalendar"
         static let suggestCleanups = "suggestCleanups"
         static let scanForCleanups = "scanLibraryForCleanups"
 

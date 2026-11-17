@@ -17,7 +17,7 @@ final class AppStoreScreenshotMacUITests: XCTestCase {
         app.launchEnvironment["RECIPES_DIR"] = library
         app.launchEnvironment["RECIPES_WINDOW_SIZE"] = "1280x800"
         app.launchEnvironment["RECIPES_APPEARANCE"] = "light"
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-ApplePersistenceIgnoreState", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-ApplePersistenceIgnoreState", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
         if scene == "home" {
             app.launchArguments += ["-homeSections", "feeds,tags,recipes,today,upNext,favorites,discover", "-hiddenHomeSections", "today,upNext,favorites,discover"]
         }

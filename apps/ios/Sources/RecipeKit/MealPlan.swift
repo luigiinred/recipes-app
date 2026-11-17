@@ -25,6 +25,8 @@ public struct MealPlanEntry: Codable, Identifiable, Hashable, Sendable {
     public var meal: Meal
     public var createdAt: Date
     public var updatedAt: Date
+    /// Where it sits among the day's meals of its kind, once someone has dragged it into place.
+    public var position: Double?
 
     public init(
         id: UUID = UUID(),
@@ -33,7 +35,8 @@ public struct MealPlanEntry: Codable, Identifiable, Hashable, Sendable {
         day: String,
         meal: Meal = .dinner,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        position: Double? = nil
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -42,6 +45,12 @@ public struct MealPlanEntry: Codable, Identifiable, Hashable, Sendable {
         self.meal = meal
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.position = position
+    }
+
+    /// A day's meals by kind, then in the order they were dragged into, then by title.
+    public static func dayOrder(_ a: MealPlanEntry, _ b: MealPlanEntry) -> Bool {
+        (a.meal.order, a.position ?? .greatestFiniteMagnitude, a.title) < (b.meal.order, b.position ?? .greatestFiniteMagnitude, b.title)
     }
 }
 

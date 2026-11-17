@@ -16,4 +16,6 @@ final class AppRouter: ObservableObject {
     @Published var add: AppDestination?
     /// A recipe to open straight into editing, on a Mac where its page edits in place.
     @Published var editRecipeID: UUID?
+    /// The Mac shows Settings as a section of the main window.
+    @Published var showsSettings = false
 }

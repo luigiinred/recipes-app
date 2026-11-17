@@ -148,9 +148,18 @@ final class RecipeLibrary: ObservableObject {
     }
 
     func run() async {
+        // Finding the iCloud folder can take a while at launch, so last launch's folder shows its recipes in the meantime.
+        if let remembered = RecipeLocation.rememberedForApp() {
+            library = remembered.library
+            isICloud = remembered.isICloud
+            await reload()
+        }
         let resolved = await Task.detached { RecipeLocation.resolveForApp() }.value
-        library = resolved.library
-        isICloud = resolved.isICloud
+        RecipeLocation.remember(resolved)
+        if library?.root.standardizedFileURL != resolved.root.standardizedFileURL {
+            library = resolved.library
+            isICloud = resolved.isICloud
+        }
         let reminders = RemindersSync()
         self.reminders = reminders
         let watcher = Task { for await _ in reminders.changes { self.remindersChanged = true } }
@@ -217,8 +226,12 @@ final class RecipeLibrary: ObservableObject {
             guard isFirstLoad, let self else { return }
             Task { await self.updateLoadProgress(LoadProgress(done: done, total: total)) }
         }
+        let found: @Sendable ([Recipe]) -> Void = { [weak self] recipes in
+            guard isFirstLoad, let self else { return }
+            Task { await self.showFirstRecipes(recipes) }
+        }
         let result = await Task.detached {
-            Result { try (library.recipes.list(progress: report), library.mealPlan.list(), library.upNextNotes.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
+            Result { try (library.recipes.list(progress: report, found: found, coordinated: !isFirstLoad), library.mealPlan.list(), library.upNextNotes.list(), library.groceries.list(), library.feeds.list(), library.images.stamps(), library.stepImages.stamps(), library.categoryOrder.load()) }
         }.value
         switch result {
         case .success(let (recipes, plan, notes, groceries, feeds, stamps, stepStamps, order)):
@@ -240,6 +253,11 @@ final class RecipeLibrary: ObservableObject {
         case .failure(let error):
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func showFirstRecipes(_ found: [Recipe]) {
+        guard !isLoaded, found.count > recipes.count else { return }
+        recipes = found
     }
 
     private func updateLoadProgress(_ progress: LoadProgress) {
@@ -345,6 +363,7 @@ final class RecipeLibrary: ObservableObject {
         var changed = recipe
         changed.wantToCook = value
         changed.queuedAt = value ? Date() : nil
+        show(recipes: [changed])
         await save(changed)
     }
 
@@ -371,25 +390,57 @@ final class RecipeLibrary: ObservableObject {
         await perform { try $0.feeds.delete(feed) }
     }
 
-    func plan(_ recipe: Recipe, on day: Date, meal: Meal) async {
+    func plan(_ recipe: Recipe, on day: Date, meal: Meal, before target: MealPlanEntry? = nil) async {
         let entry = MealPlanEntry(recipeID: recipe.id, title: recipe.title, day: DayKey.string(from: day), meal: meal)
+        let placed = placing(entry, on: entry.day, before: target)
         var dequeued = recipe
         dequeued.wantToCook = false
         dequeued.queuedAt = nil
         let wasQueued = recipe.wantToCook
+        show(recipes: wasQueued ? [dequeued] : [], entries: placed)
         await perform { library in
-            try library.mealPlan.save(entry)
+            for entry in placed { try library.mealPlan.save(entry) }
             if wasQueued { try library.recipes.save(dequeued) }
         }
+    }
+
+    /// Moves a meal to `day`, just before `target` or after the rest of its kind, renumbering the day so the order sticks.
+    func place(_ entry: MealPlanEntry, on day: String, before target: MealPlanEntry?) async {
+        guard target?.id != entry.id else { return }
+        let placed = placing(entry, on: day, before: target)
+        show(entries: placed)
+        await perform { library in for entry in placed { try library.mealPlan.save(entry) } }
+    }
+
+    /// `entry` set on `day` before `target`, taking its kind of meal, plus that day's other meals whose numbers changed.
+    private func placing(_ entry: MealPlanEntry, on day: String, before target: MealPlanEntry?) -> [MealPlanEntry] {
+        var moved = entry
+        moved.day = day
+        if let target { moved.meal = target.meal }
+        var ordered = mealPlan.filter { $0.day == day && $0.id != entry.id }.sorted(by: MealPlanEntry.dayOrder)
+        let index = target.flatMap { target in ordered.firstIndex { $0.id == target.id } }
+            ?? ordered.lastIndex { $0.meal.order <= moved.meal.order }.map { $0 + 1 } ?? 0
+        ordered.insert(moved, at: index)
+        var changed: [MealPlanEntry] = []
+        for (number, var item) in ordered.enumerated() {
+            let position = Double(number)
+            guard item.id == entry.id || item.position != position else { continue }
+            item.position = position
+            item.updatedAt = Date()
+            changed.append(item)
+        }
+        return changed
     }
 
     func update(_ entry: MealPlanEntry) async {
         var entry = entry
         entry.updatedAt = Date()
+        show(entries: [entry])
         await perform { [entry] in try $0.mealPlan.save(entry) }
     }
 
     func remove(_ entry: MealPlanEntry) async {
+        show(removingEntries: [entry.id])
         await perform { try $0.mealPlan.delete(entry) }
     }
 
@@ -442,9 +493,37 @@ final class RecipeLibrary: ObservableObject {
             case .note(var note): note.queuedAt = time; notes.append(note)
             }
         }
+        show(recipes: recipes, notes: notes)
         await perform { library in
             for recipe in recipes { try library.recipes.save(recipe) }
             for note in notes { try library.upNextNotes.save(note) }
+        }
+    }
+
+    func moveQueued(_ id: UUID, to index: Int) async {
+        guard let from = upNext.firstIndex(where: { $0.id == id }) else { return }
+        await moveQueued(from: IndexSet(integer: from), to: index)
+    }
+
+    /// Takes a meal off the calendar and puts its recipe, or its words, back at the end of Up Next.
+    func unplan(_ entry: MealPlanEntry) async {
+        if let recipe = recipe(id: entry.recipeID) {
+            var queued = recipe
+            queued.wantToCook = true
+            queued.queuedAt = Date()
+            show(recipes: [queued], removingEntries: [entry.id])
+            await perform { [queued] library in
+                try library.mealPlan.delete(entry)
+                try library.recipes.save(queued)
+            }
+        } else {
+            let isQueued = upNext.contains { $0.title.localizedCaseInsensitiveCompare(entry.title) == .orderedSame }
+            let note = UpNextNote(title: entry.title)
+            show(removingEntries: [entry.id], notes: isQueued ? [] : [note])
+            await perform { library in
+                try library.mealPlan.delete(entry)
+                if !isQueued { try library.upNextNotes.save(note) }
+            }
         }
     }
 
@@ -453,6 +532,7 @@ final class RecipeLibrary: ObservableObject {
         let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, !upNext.contains(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) else { return }
         let note = UpNextNote(title: title)
+        show(notes: [note])
         await perform { try $0.upNextNotes.save(note) }
     }
 
@@ -461,6 +541,7 @@ final class RecipeLibrary: ObservableObject {
         var queued = recipe
         queued.wantToCook = true
         queued.queuedAt = note.queuedAt
+        show(recipes: [queued], removingNotes: [note.id])
         await perform { [queued] library in
             try library.recipes.save(queued)
             try library.upNextNotes.delete(note)
@@ -468,6 +549,7 @@ final class RecipeLibrary: ObservableObject {
     }
 
     func remove(_ note: UpNextNote) async {
+        show(removingNotes: [note.id])
         await perform { try $0.upNextNotes.delete(note) }
     }
 
@@ -476,14 +558,45 @@ final class RecipeLibrary: ObservableObject {
         let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         let entry = MealPlanEntry(title: title, day: DayKey.string(from: day), meal: meal)
-        await perform { try $0.mealPlan.save(entry) }
+        let placed = placing(entry, on: entry.day, before: nil)
+        show(entries: placed)
+        await perform { library in for entry in placed { try library.mealPlan.save(entry) } }
+    }
+
+    /// Plans a dish from the web by its name at once, then imports its recipe and links the meal to it.
+    func plan(importing url: URL, title: String, on day: Date, meal: Meal, before target: MealPlanEntry? = nil) async {
+        let entry = MealPlanEntry(title: title, day: DayKey.string(from: day), meal: meal)
+        let placed = placing(entry, on: entry.day, before: target)
+        show(entries: placed)
+        await perform { library in for entry in placed { try library.mealPlan.save(entry) } }
+        guard let recipe = await importRecipe(from: url), var planned = mealPlan.first(where: { $0.id == entry.id }) else { return }
+        planned.recipeID = recipe.id
+        planned.title = recipe.title
+        await update(planned)
+    }
+
+    /// Puts a dish from the web in Up Next by its name at once, then imports its recipe into the same place.
+    func queue(importing url: URL, title: String, at index: Int?) async {
+        let note = UpNextNote(title: title)
+        show(notes: [note])
+        await perform { try $0.upNextNotes.save(note) }
+        if let index { await moveQueued(note.id, to: index) }
+        guard let recipe = await importRecipe(from: url), let placed = upNextNotes.first(where: { $0.id == note.id }) else { return }
+        await use(recipe, for: placed)
+    }
+
+    func importRecipe(from url: URL) async -> Recipe? {
+        guard let result = try? await RecipeImporter.importResult(from: url) else { return nil }
+        return await add(result)
     }
 
     /// Planning a note takes it out of Up Next, as planning a recipe does.
-    func plan(_ note: UpNextNote, on day: Date, meal: Meal) async {
+    func plan(_ note: UpNextNote, on day: Date, meal: Meal, before target: MealPlanEntry? = nil) async {
         let entry = MealPlanEntry(title: note.title, day: DayKey.string(from: day), meal: meal)
+        let placed = placing(entry, on: entry.day, before: target)
+        show(entries: placed, removingNotes: [note.id])
         await perform { library in
-            try library.mealPlan.save(entry)
+            for entry in placed { try library.mealPlan.save(entry) }
             try library.upNextNotes.delete(note)
         }
     }
@@ -575,10 +688,29 @@ final class RecipeLibrary: ObservableObject {
         return try await Task.detached { try library.export().jsonData() }.value
     }
 
+    /// Puts a change on screen before it's written, so a drop lands at once; the reload after the write confirms it.
+    private func show(recipes changed: [Recipe] = [], entries: [MealPlanEntry] = [], removingEntries: Set<UUID> = [],
+                      notes: [UpNextNote] = [], removingNotes: Set<UUID> = []) {
+        guard library != nil else { return }
+        if !changed.isEmpty { recipes.upsert(changed) }
+        if !removingEntries.isEmpty { mealPlan.removeAll { removingEntries.contains($0.id) } }
+        if !entries.isEmpty { mealPlan.upsert(entries) }
+        if !removingNotes.isEmpty { upNextNotes.removeAll { removingNotes.contains($0.id) } }
+        if !notes.isEmpty { upNextNotes.upsert(notes) }
+    }
+
     private func perform(_ work: @escaping @Sendable (Library) throws -> some Any) async {
         guard let library else { return }
         let result = await Task.detached { Result { _ = try work(library) } }.value
         if case .failure(let error) = result { errorMessage = error.localizedDescription }
         await reload()
+    }
+}
+
+private extension Array where Element: Identifiable {
+    mutating func upsert(_ items: [Element]) {
+        for item in items {
+            if let index = firstIndex(where: { $0.id == item.id }) { self[index] = item } else { append(item) }
+        }
     }
 }

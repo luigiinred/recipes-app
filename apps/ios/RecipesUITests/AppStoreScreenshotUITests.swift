@@ -17,7 +17,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
 
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? (scene == "list" ? "list" : "cards"), "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-defaultMeal", "lunch", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
         if dark { app.launchArguments += ["-AppleInterfaceStyle", "Dark"] }
         if scene == "home" {
             app.launchArguments += ["-homeSections", "feeds,tags,recipes,today,upNext,favorites,discover", "-hiddenHomeSections", "today,upNext,favorites,discover"]
@@ -164,7 +164,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
             // First launch on a fresh install: let the system's one-time questions get answered, so they never appear in a recording.
             let first = XCUIApplication()
             first.launchEnvironment["RECIPES_DIR"] = library
-            first.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
+            first.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
             first.launch()
             sleep(6)
             if ProcessInfo.processInfo.environment["APP_PREVIEW_PRIME"] == "1" {
@@ -194,7 +194,7 @@ final class AppStoreScreenshotUITests: XCTestCase {
         if scene == "share" { try shareFromSafari(landscape: env["APP_STORE_LANDSCAPE"] == "1"); return }
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", env["APP_STORE_STYLE"] ?? "cards", "-onboardingCompleted", "YES", "-defaultMeal", "dinner", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-defaultMeal", "dinner", "-reviewPromptDismissed", "YES", "-homeCustomizeTipDismissed", "YES", "-hiddenTabs", "feeds"]
         if env["APP_STORE_LANDSCAPE"] == "1" { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
 

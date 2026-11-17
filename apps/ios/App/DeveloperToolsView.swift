@@ -38,7 +38,7 @@ struct DeveloperToolsView: View {
     @State private var addedSamples = false
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 Button { addSamples() } label: { Label("Add Sample Recipes, Plan and Groceries", systemImage: "square.stack.3d.up") }
                     .sensoryFeedback(.success, trigger: addedSamples)

@@ -37,6 +37,22 @@ public enum RecipeLocation {
         public var library: Library { Library(root: root) }
     }
 
+    private static let rememberedRootKey = "lastLibraryRoot"
+    private static let rememberedICloudKey = "lastLibraryIsICloud"
+
+    /// Where the app's library was last time, when it's still there, so it opens before iCloud answers where it is now.
+    public static func rememberedForApp(defaults: UserDefaults = .standard) -> Resolved? {
+        guard ProcessInfo.processInfo.environment["RECIPES_DIR"]?.isEmpty ?? true,
+              let path = defaults.string(forKey: rememberedRootKey), FileManager.default.fileExists(atPath: path) else { return nil }
+        return Resolved(root: URL(fileURLWithPath: path, isDirectory: true), isICloud: defaults.bool(forKey: rememberedICloudKey))
+    }
+
+    public static func remember(_ resolved: Resolved, defaults: UserDefaults = .standard) {
+        guard ProcessInfo.processInfo.environment["RECIPES_DIR"]?.isEmpty ?? true else { return }
+        defaults.set(resolved.root.path, forKey: rememberedRootKey)
+        defaults.set(resolved.isICloud, forKey: rememberedICloudKey)
+    }
+
     /// Blocking: call off the main thread.
     public static func resolveForApp() -> Resolved {
         if let path = ProcessInfo.processInfo.environment["RECIPES_DIR"], !path.isEmpty {

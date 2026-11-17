@@ -4,6 +4,7 @@ import Foundation
 public struct RecipeCleanup: Sendable {
     public struct Change: Identifiable, Hashable, Sendable {
         public enum Kind: Hashable, Sendable {
+            case title
             case ingredient(Int)
             case sections
             case step(Int)
@@ -22,6 +23,7 @@ public struct RecipeCleanup: Sendable {
     public let original: Recipe
     public private(set) var changes: [Change] = []
 
+    private var tidiedTitle: String?
     private var tidiedIngredients: [Int: String] = [:]
     private var headingLines: [Int: String] = [:]
     private var groups: [IngredientGrouper.Group]?
@@ -43,6 +45,7 @@ public struct RecipeCleanup: Sendable {
     /// "Tidy 3 ingredients and split the method into 6 steps."
     public var summary: String {
         var parts: [String] = []
+        if changes.contains(where: { $0.kind == .title }) { parts.append("fix the title's capitals") }
         let ingredients = changes.filter { if case .ingredient = $0.kind { true } else { false } }.count
         if ingredients > 0 { parts.append("tidy \(ingredients) \(ingredients == 1 ? "ingredient" : "ingredients")") }
         if let sections = changes.first(where: { $0.kind == .sections }) { parts.append(sections.title.prefix(1).lowercased() + sections.title.dropFirst()) }
@@ -65,11 +68,19 @@ public struct RecipeCleanup: Sendable {
     public static func suggest(for original: Recipe) async -> RecipeCleanup {
         var cleanup = RecipeCleanup(original: original)
 
+        let title = RecipeStandards.standardTitle(original.title)
+        if title != original.title {
+            cleanup.tidiedTitle = title
+            cleanup.changes.append(Change(kind: .title, title: "Title", before: [original.title], after: [title]))
+        }
+
         for (index, text) in original.ingredients.enumerated() {
-            let parsed = Ingredient(parsing: text).text
-            if let heading = RecipeStandards.ingredientHeading(parsed) {
+            if let heading = RecipeStandards.ingredientHeading(Ingredient(parsing: text).text) {
                 cleanup.headingLines[index] = heading
-            } else if parsed != text {
+                continue
+            }
+            let parsed = Ingredient(parsing: RecipeStandards.unshouted(text, sentences: false)).text
+            if parsed != text {
                 cleanup.tidiedIngredients[index] = parsed
                 cleanup.changes.append(Change(kind: .ingredient(index), title: parsed.isEmpty ? "Remove an empty line" : "Ingredient",
                                               before: [text], after: parsed.isEmpty ? [] : [parsed]))
@@ -97,8 +108,9 @@ public struct RecipeCleanup: Sendable {
                 if !split.preamble.isEmpty { preface.append(split.preamble) }
                 pieces = split.steps
             }
-            pieces = pieces.map(RecipeStandards.standardStep).filter { !$0.isEmpty }
+            pieces = pieces.map { RecipeStandards.standardStep(RecipeStandards.unshouted($0, sentences: true)) }.filter { !$0.isEmpty }
             pieces = await StepSplitter.split(pieces)
+            pieces = await StepPunctuation.fix(pieces)
             guard pieces != [step] else { continue }
             cleanup.stepPieces[index] = pieces
             let title = pieces.isEmpty ? "Remove empty step \(index + 1)" : pieces.count > 1 ? "Split step \(index + 1) into \(pieces.count)" : "Step \(index + 1)"
@@ -116,6 +128,7 @@ public struct RecipeCleanup: Sendable {
     /// The recipe with only the accepted changes. A split step keeps its video time and photo on its first part.
     public func applying(_ accepted: Set<Change.Kind>) -> Recipe {
         var recipe = original
+        if accepted.contains(.title), let tidiedTitle { recipe.title = tidiedTitle }
         let sectionsOn = accepted.contains(.sections)
 
         var lines: [String] = []
@@ -187,7 +200,8 @@ extension Recipe {
     /// A stable fingerprint of the parts a cleanup reads, so a recipe already checked isn't checked again until it changes.
     public var cleanupFingerprint: String {
         let sections = ingredientSections.map { "\($0.start):\($0.title)" }
-        let parts = [title] + ingredients + ["§"] + sections + ["§"] + steps + ["§", notes]
+        // The leading version makes every recipe get checked again when the cleanup learns a new kind of fix.
+        let parts = ["2", title] + ingredients + ["§"] + sections + ["§"] + steps + ["§", notes]
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in parts.joined(separator: "\u{1F}").utf8 {
             hash ^= UInt64(byte)

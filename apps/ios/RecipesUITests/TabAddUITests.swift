@@ -14,7 +14,7 @@ final class TabAddUITests: XCTestCase {
         _ = try recipes.save(Recipe(title: "Roasted Soup", ingredients: ["1 tomato"], steps: ["Roast."], wantToCook: true, queuedAt: Date(timeIntervalSince1970: 2)))
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 15))
     }
@@ -28,12 +28,13 @@ final class TabAddUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["Add"].exists)
     }
 
-    func testPlanTabButtonAddsToUpNext() {
+    func testPlanUpNextPlusOpensASearch() {
         app.tabBars.buttons["Plan"].tap()
-        let add = app.navigationBars.buttons["Add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5), "Plan has its own Add button")
+        let add = app.buttons["Add to Up Next"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "Up Next has its own add button")
         add.tap()
-        XCTAssertTrue(app.navigationBars["Add to Up Next"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.searchFields["Search recipes or type a meal"].waitForExistence(timeout: 5), "the + opens a search")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "its search is ready to type")
     }
 
     func testGroceriesTabButtonFocusesNewItemField() {
@@ -44,18 +45,10 @@ final class TabAddUITests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the Add item field should take focus")
     }
 
-    func testPlanAddStaysInItsNavigationBar() {
+    func testPlanHasNoAddInItsNavigationBar() {
         app.tabBars.buttons["Plan"].tap()
-        XCTAssertTrue(app.navigationBars.buttons["Add"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.tabBars.buttons["Add"].exists)
-    }
-
-    func testUpNextReorderIsAnIconNotText() {
-        app.tabBars.buttons["Plan"].tap()
-        XCTAssertTrue(app.buttons["Reorder"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Edit"].exists)
-        app.buttons["Reorder"].tap()
-        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars.buttons["Plan My Week"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars.buttons["Add"].exists)
     }
 }
 #endif
