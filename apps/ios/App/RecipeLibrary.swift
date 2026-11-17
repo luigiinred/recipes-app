@@ -638,6 +638,7 @@ final class RecipeLibrary: ObservableObject {
         let fresh = items.filter { item in
             !waiting.contains { $0.name.lowercased() == item.name.lowercased() && $0.quantity == item.quantity }
         }
+        show(groceries: fresh)
         await perform { library in for item in fresh { try library.groceries.save(item) } }
     }
 
@@ -645,15 +646,18 @@ final class RecipeLibrary: ObservableObject {
         var item = item
         item.isChecked = checked
         item.updatedAt = Date()
+        show(groceries: [item])
         await perform { [item] in try $0.groceries.save(item) }
     }
 
     func remove(_ item: GroceryItem) async {
+        show(removingGroceries: [item.id])
         await perform { try $0.groceries.delete(item) }
     }
 
     func clearCompleted() async {
         let done = groceries.filter(\.isChecked)
+        show(removingGroceries: Set(done.map(\.id)))
         await perform { library in for item in done { try library.groceries.delete(item) } }
     }
 
@@ -667,6 +671,7 @@ final class RecipeLibrary: ObservableObject {
 
     func clearAllGroceries() async {
         let all = groceries
+        show(removingGroceries: Set(all.map(\.id)))
         await perform { library in for item in all { try library.groceries.delete(item) } }
     }
 
@@ -690,13 +695,16 @@ final class RecipeLibrary: ObservableObject {
 
     /// Puts a change on screen before it's written, so a drop lands at once; the reload after the write confirms it.
     private func show(recipes changed: [Recipe] = [], entries: [MealPlanEntry] = [], removingEntries: Set<UUID> = [],
-                      notes: [UpNextNote] = [], removingNotes: Set<UUID> = []) {
+                      notes: [UpNextNote] = [], removingNotes: Set<UUID> = [],
+                      groceries changedGroceries: [GroceryItem] = [], removingGroceries: Set<UUID> = []) {
         guard library != nil else { return }
         if !changed.isEmpty { recipes.upsert(changed) }
         if !removingEntries.isEmpty { mealPlan.removeAll { removingEntries.contains($0.id) } }
         if !entries.isEmpty { mealPlan.upsert(entries) }
         if !removingNotes.isEmpty { upNextNotes.removeAll { removingNotes.contains($0.id) } }
         if !notes.isEmpty { upNextNotes.upsert(notes) }
+        if !removingGroceries.isEmpty { groceries.removeAll { removingGroceries.contains($0.id) } }
+        if !changedGroceries.isEmpty { groceries.upsert(changedGroceries) }
     }
 
     private func perform(_ work: @escaping @Sendable (Library) throws -> some Any) async {
