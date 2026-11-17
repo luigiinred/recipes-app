@@ -142,8 +142,7 @@ struct OnboardingTabsPage: View {
     private static func detail(_ tab: MainTab) -> String {
         switch tab {
         case .feeds: "New posts from the recipe sites you follow."
-        case .upNext: "The recipes you've queued to cook soon."
-        case .plan: "Your week of meals."
+        case .plan: "Your week of meals, and Up Next to plan from."
         case .groceries: "A shopping list that can sync with Reminders."
         }
     }

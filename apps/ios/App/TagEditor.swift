@@ -122,7 +122,7 @@ struct TagsSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     TagEditor(tags: $tags)
                 } footer: {

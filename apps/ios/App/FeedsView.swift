@@ -160,7 +160,7 @@ struct AddFeedSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Picker("Source", selection: $source) {
                     ForEach(Source.allCases, id: \.self) { Text($0.rawValue) }
                 }

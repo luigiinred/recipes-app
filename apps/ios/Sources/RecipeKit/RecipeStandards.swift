@@ -76,6 +76,65 @@ public enum RecipeStandards {
         return (preamble, steps.filter { !$0.isEmpty })
     }
 
+    /// Acronyms that stay in capitals when the words around them don't.
+    static let acronyms: Set<String> = ["BBQ", "BLT", "MSG", "PB", "TV", "UK", "US", "USA", "XL", "XXL", "II", "III", "IV"]
+
+    /// Words written in capitals for no reason, like "2 cups SUGAR", in lowercase. A line that's all capitals is lowercased
+    /// throughout; with `sentences`, each sentence then starts with a capital again.
+    public static func unshouted(_ text: String, sentences: Bool) -> String {
+        let letters = text.filter(\.isLetter)
+        guard letters.contains(where: \.isUppercase) else { return text }
+        var result: String
+        if letters.count >= 4, !letters.contains(where: \.isLowercase) {
+            result = text.lowercased()
+        } else {
+            result = text
+            let range = NSRange(text.startIndex..., in: text)
+            for match in shoutedWord.matches(in: text, range: range).reversed() {
+                guard let wordRange = Range(match.range, in: result) else { continue }
+                let word = String(result[wordRange])
+                if !acronyms.contains(word) { result.replaceSubrange(wordRange, with: word.lowercased()) }
+            }
+        }
+        guard result != text else { return text }
+        for acronym in acronyms {
+            result = result.replacingOccurrences(of: "\\b\(acronym.lowercased())\\b", with: acronym, options: .regularExpression)
+        }
+        return sentences ? sentenceCased(result) : result
+    }
+
+    private static let shoutedWord = try! NSRegularExpression(pattern: "(?<![\\p{L}\\p{N}])\\p{Lu}{2,}(?![\\p{L}\\p{N}])")
+
+    private static func sentenceCased(_ text: String) -> String {
+        var result = ""
+        var capitalizeNext = true
+        for character in text {
+            if capitalizeNext, character.isLetter {
+                result += character.uppercased()
+                capitalizeNext = false
+            } else {
+                result.append(character)
+                if ".!?".contains(character) { capitalizeNext = true } else if !character.isWhitespace, capitalizeNext, character.isNumber { capitalizeNext = false }
+            }
+        }
+        return result
+    }
+
+    private static let smallWords: Set<String> = ["a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "with"]
+
+    /// A title written all in capitals, like "NO BAKE COOKIES", in title case; any other title as it is.
+    public static func standardTitle(_ title: String) -> String {
+        let letters = title.filter(\.isLetter)
+        guard letters.count >= 3, !letters.contains(where: \.isLowercase) else { return title }
+        let words = title.lowercased().split(separator: " ", omittingEmptySubsequences: false)
+        return words.enumerated().map { index, word in
+            let text = String(word)
+            if acronyms.contains(text.uppercased()) { return text.uppercased() }
+            if index > 0, smallWords.contains(text) { return text }
+            return text.prefix(1).uppercased() + text.dropFirst()
+        }.joined(separator: " ")
+    }
+
     public static func standardStep(_ text: String) -> String {
         var step = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let range = NSRange(step.startIndex..., in: step)

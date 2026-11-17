@@ -21,6 +21,30 @@ final class RecipeStoreTests: XCTestCase {
         XCTAssertTrue(try store.list().isEmpty)
     }
 
+    func testListHandsOverRecipesBeforeItFinishes() throws {
+        let store = RecipeStore(directory: directory)
+        for index in 0..<30 { try store.save(Recipe(title: "Recipe \(index)")) }
+        var batches: [Int] = []
+        let all = try store.list(found: { batches.append($0.count) })
+        XCTAssertEqual(batches, [1, 10, 20, 30])
+        XCTAssertEqual(all.count, 30)
+    }
+
+    func testListReadsWithoutCoordinationForAFirstLook() throws {
+        let store = RecipeStore(directory: directory)
+        try store.save(Recipe(title: "Pancakes"))
+        XCTAssertEqual(try store.list(coordinated: false).map(\.title), ["Pancakes"])
+    }
+
+    func testRememberedLibraryIsUsedOnlyWhileItsFolderExists() throws {
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        RecipeLocation.remember(RecipeLocation.Resolved(root: directory, isICloud: true), defaults: defaults)
+        XCTAssertEqual(RecipeLocation.rememberedForApp(defaults: defaults)?.root.path, directory.path)
+        try FileManager.default.removeItem(at: directory)
+        XCTAssertNil(RecipeLocation.rememberedForApp(defaults: defaults))
+    }
+
     func testListReportsProgressPerFileIncludingPlaceholders() throws {
         let store = RecipeStore(directory: directory)
         try store.save(Recipe(title: "Pancakes"))

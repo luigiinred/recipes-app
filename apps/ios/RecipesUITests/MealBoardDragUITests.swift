@@ -5,10 +5,8 @@ final class MealBoardDragUITests: XCTestCase {
     private var root: URL!
     private var app: XCUIApplication!
 
-    private var sunday: String {
-        let calendar = Calendar.current
-        return DayKey.string(from: calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date(), calendar: calendar)
-    }
+    /// Today is on screen everywhere: the iPhone strip opens centered on it, and wider boards show its week.
+    private var today: String { DayKey.string(from: Date(), calendar: .current) }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -21,19 +19,13 @@ final class MealBoardDragUITests: XCTestCase {
         _ = try library.recipes.save(Recipe(title: "Lentil Stew", ingredients: ["1 cup lentils"], steps: ["Stew."]))
     }
 
-    /// Without My Recipes, an iPhone shows Up Next and Sunday side by side.
-    private func launch(showsRecipes: Bool) {
+    private func launch() {
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = root.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
         app.launch()
         openPlan()
         XCTAssertTrue(element("board.upNext").waitForExistence(timeout: 15), "Plan opens the board")
-        // A launch argument would pin the setting, so flip it as a person would.
-        if element("board.recipes").exists != showsRecipes {
-            app.buttons[showsRecipes ? "Show My Recipes" : "Hide My Recipes"].firstMatch.tap()
-        }
-        XCTAssertEqual(element("board.recipes").waitForExistence(timeout: 3), showsRecipes)
     }
 
     override func tearDown() {
@@ -60,11 +52,9 @@ final class MealBoardDragUITests: XCTestCase {
         #endif
     }
 
-    /// On iPhone a column is a pill; its cards show below once it's picked.
+    /// Every day is a column, and on iPhone the one in the middle of the pager is today's.
     private func card(_ title: String, in column: String) -> XCUIElement {
-        guard isPhone else { return element(column).descendants(matching: .any)["board.card.\(title)"].firstMatch }
-        element(column).tap()
-        return element("board.page").descendants(matching: .any)["board.card.\(title)"].firstMatch
+        element(column).descendants(matching: .any)["board.card.\(title)"].firstMatch
     }
 
     /// A day column may sit past the screen's edge on iPhone; drop onto the part that shows.
@@ -82,7 +72,7 @@ final class MealBoardDragUITests: XCTestCase {
         #if os(macOS)
         from.click(forDuration: 0.6, thenDragTo: to)
         #else
-        from.press(forDuration: 1.0, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.6)
+        from.press(forDuration: 0.5, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.6)
         #endif
     }
 
@@ -98,37 +88,52 @@ final class MealBoardDragUITests: XCTestCase {
     private func recipe(_ title: String) throws -> Recipe? { try Library(root: root).recipes.list().first { $0.title == title } }
     private func plan() throws -> [MealPlanEntry] { try Library(root: root).mealPlan.list() }
 
-    func testDraggingARecipeFromMyRecipesQueuesIt() throws {
-        launch(showsRecipes: true)
-        drag(element("board.recipe.Lentil Stew"), onto: element("board.upNext"))
-        waitFor({ try self.recipe("Lentil Stew")?.wantToCook == true }, "Lentil Stew joins Up Next")
-        XCTAssertTrue(card("Lentil Stew", in: "board.upNext").waitForExistence(timeout: 5))
+    func testTypingARecipeNameOffersItAndPlansIt() throws {
+        launch()
+        let field = app.textFields["quickAdd.day.\(today)"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Lentil")
+        let suggestion = app.buttons["Lentil Stew"].firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 3))
+        suggestion.tap()
+        waitFor({ try self.plan().contains { $0.title == "Lentil Stew" && $0.recipeID != nil && $0.day == self.today } }, "the suggested recipe is planned today")
     }
 
-    func testDraggingARecipeFromMyRecipesOntoADayPlansIt() throws {
-        launch(showsRecipes: true)
-        drag(element("board.recipe.Lentil Stew"), onto: element("board.day.\(sunday)"))
-        waitFor({ try self.plan().contains { $0.title == "Lentil Stew" && $0.day == self.sunday } }, "Lentil Stew is planned on Sunday")
+    func testTypingWordsAndPressingReturnAddsThemToUpNext() throws {
+        launch()
+        let field: XCUIElement
+        if isPhone {
+            app.buttons["Add to Up Next"].firstMatch.tap()
+            field = app.searchFields.firstMatch
+        } else {
+            field = app.textFields["quickAdd.upNext"].firstMatch
+        }
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Takeout tacos\n")
+        waitFor({ try Library(root: self.root).upNextNotes.list().contains { $0.title == "Takeout tacos" } }, "the words join Up Next as they are")
+        XCTAssertTrue(card("Takeout tacos", in: "board.upNext").waitForExistence(timeout: 5))
     }
 
     func testDraggingAnUpNextCardOntoADayPlansItAndDequeuesIt() throws {
-        launch(showsRecipes: false)
-        drag(card("Queued Curry", in: "board.upNext"), onto: element("board.day.\(sunday)"))
+        launch()
+        drag(card("Queued Curry", in: "board.upNext"), onto: element("board.day.\(today)"))
         waitFor({ try self.plan().contains { $0.title == "Queued Curry" } && self.recipe("Queued Curry")?.wantToCook == false },
-                "Queued Curry moves from Up Next to Sunday")
-        XCTAssertTrue(card("Queued Curry", in: "board.day.\(sunday)").waitForExistence(timeout: 5))
+                "Queued Curry moves from Up Next to today")
+        XCTAssertTrue(card("Queued Curry", in: "board.day.\(today)").waitForExistence(timeout: 5))
     }
 
     func testDraggingAPlannedMealBackToUpNextUnplansIt() throws {
-        launch(showsRecipes: false)
-        drag(card("Queued Curry", in: "board.upNext"), onto: element("board.day.\(sunday)"))
+        launch()
+        drag(card("Queued Curry", in: "board.upNext"), onto: element("board.day.\(today)"))
         waitFor({ try !self.plan().isEmpty }, "Queued Curry is planned first")
-        drag(card("Queued Curry", in: "board.day.\(sunday)"), onto: element("board.upNext"))
+        drag(card("Queued Curry", in: "board.day.\(today)"), onto: element("board.upNext"))
         waitFor({ try self.plan().isEmpty && self.recipe("Queued Curry")?.wantToCook == true }, "Queued Curry goes back to Up Next; plan: \((try? plan().map { "\($0.title) \($0.day)" }) ?? []), queued: \((try? recipe("Queued Curry")?.wantToCook) ?? nil)")
     }
 
     func testDraggingAnUpNextCardOntoAnotherMovesItAhead() throws {
-        launch(showsRecipes: false)
+        launch()
         drag(card("Queued Chili", in: "board.upNext"), onto: card("Queued Curry", in: "board.upNext"))
         waitFor({
             let chili = try self.recipe("Queued Chili")?.queuedAt ?? .distantFuture
@@ -136,20 +141,21 @@ final class MealBoardDragUITests: XCTestCase {
             return chili < curry
         }, "Queued Chili moves ahead of Queued Curry")
     }
-
-    func testDraggingAnUpNextCardBackToMyRecipesRemovesIt() throws {
-        try XCTSkipIf(isPhone, "an iPhone shows My Recipes in place of the cards, not beside them")
-        launch(showsRecipes: true)
-        drag(card("Queued Chili", in: "board.upNext"), onto: element("board.recipes"))
-        waitFor({ try self.recipe("Queued Chili")?.wantToCook == false }, "Queued Chili leaves Up Next")
-    }
 }
 
 extension MealBoardDragUITests {
-    func testTappingAPillWhileMyRecipesShowsOpensItsCards() throws {
-        launch(showsRecipes: true)
-        try XCTSkipUnless(isPhone)
-        element("board.upNext").tap()
-        XCTAssertTrue(element("board.page").waitForExistence(timeout: 5), "tapping a pill swaps My Recipes for its cards")
+    func testDraggingAMealOntoAnotherMovesItAheadInTheDay() throws {
+        let plan = Library(root: root).mealPlan
+        try plan.save(MealPlanEntry(title: "Toast", day: today, meal: .dinner, position: 0))
+        try plan.save(MealPlanEntry(title: "Soup", day: today, meal: .dinner, position: 1))
+        launch()
+        drag(card("Soup", in: "board.day.\(today)"), onto: card("Toast", in: "board.day.\(today)"))
+        waitFor({
+            let meals = try self.plan()
+            let soup = meals.first { $0.title == "Soup" }?.position ?? .infinity
+            let toast = meals.first { $0.title == "Toast" }?.position ?? -.infinity
+            return soup < toast
+        }, "Soup moves ahead of Toast")
     }
 }
+

@@ -21,48 +21,6 @@ enum FreeTextItem: Identifiable, Hashable {
     }
 }
 
-/// Under search results: puts the typed words in Up Next or the planner as they are, to find a recipe for later.
-struct FreeTextActions: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @Environment(\.appAccent) private var accent
-    let text: String
-    @State private var planning = false
-
-    private var isQueued: Bool {
-        library.upNext.contains { $0.title.localizedCaseInsensitiveCompare(text) == .orderedSame }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "text.badge.plus").foregroundStyle(accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Save “\(text)” for Later").foregroundStyle(.primary)
-                    Text("Add it as it is, then find a recipe or make it an idea.").appFont(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            HStack(spacing: 10) {
-                Button { Task { await library.queue(text: text) } } label: {
-                    Label(isQueued ? "In Up Next" : "Up Next", systemImage: isQueued ? "checkmark" : "text.line.first.and.arrowtriangle.forward")
-                        .frame(maxWidth: .infinity)
-                }
-                .disabled(isQueued)
-                .accessibilityIdentifier("freeText.upNext")
-                Button { planning = true } label: {
-                    Label("Plan", systemImage: "calendar.badge.plus").frame(maxWidth: .infinity)
-                }
-                .accessibilityIdentifier("freeText.plan")
-            }
-            .buttonStyle(.bordered)
-            .tint(accent)
-        }
-        .padding(14)
-        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .panel(isPresented: $planning) { AddToCalendarSheet(text: text) }
-    }
-}
-
 /// A note in Up Next or a meal planned by name: find a recipe for it, make it an idea, or plan it.
 struct FreeTextSheet: View {
     @EnvironmentObject private var library: RecipeLibrary

@@ -1,4 +1,5 @@
 import ImagePlayground
+import PhotosUI
 import RecipeKit
 import SwiftUI
 
@@ -31,10 +32,17 @@ struct RecipeDetailView: View {
     @State private var findingTimestamps = false
     @State private var timestampMessage: String?
     @State private var generatingImage = false
+    @State private var choosingPhoto = false
+    @State private var pickingPhoto = false
+    @State private var takingPhoto = false
+    @State private var pickedPhoto: PhotosPickerItem?
     @State private var viewportHeight: CGFloat = 0
     @State private var scrolled: CGFloat = 0
-    @State private var pageOffset = PageOffset()
     @State private var topInset: CGFloat = 0
+    @Environment(\.recipeZoom) private var zoom
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// False for a moment after zooming out of a card, while the page's card rises into place under the photo.
+    @State private var settled = false
     @State private var sideInsets = EdgeInsets()
     @State private var sidePaneScrolled = false
     @State private var titleScrolledAway = false
@@ -92,6 +100,8 @@ struct RecipeDetailView: View {
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }
         }
+        .recipeZoomDestination(recipe.id)
+        .onAppear(perform: settle)
         .navigationTitle(titleScrolledAway ? recipe.title : "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -160,6 +170,39 @@ struct RecipeDetailView: View {
         } message: {
             Text(timestampMessage ?? "")
         }
+        .confirmationDialog("Add a Photo", isPresented: $choosingPhoto, titleVisibility: .visible) {
+            #if os(iOS)
+            if MealCamera.isAvailable { Button("Take Photo", systemImage: "camera") { takingPhoto = true } }
+            #endif
+            Button("Choose from Library", systemImage: "photo.on.rectangle") { pickingPhoto = true }
+            if supportsImagePlayground { Button("Create a Photo…", systemImage: "apple.image.playground") { generatingImage = true } }
+        }
+        .photosPicker(isPresented: $pickingPhoto, selection: $pickedPhoto, matching: .images)
+        .onChange(of: pickedPhoto) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) { savePhoto(data) }
+                pickedPhoto = nil
+            }
+        }
+        #if os(macOS)
+        .importsItemProviders(needsPhoto ? [.image] : []) { providers in
+            guard let provider = providers.first else { return false }
+            _ = provider.loadDataRepresentation(for: .image) { data, _ in
+                if let data { Task { @MainActor in savePhoto(data) } }
+            }
+            return true
+        }
+        #endif
+        #if os(iOS)
+        .fullScreenCover(isPresented: $takingPhoto) {
+            MealCamera { data in
+                takingPhoto = false
+                savePhoto(data)
+            } onCancel: { takingPhoto = false }
+            .ignoresSafeArea()
+        }
+        #endif
         .recipeImageGenerator(isPresented: $generatingImage, recipe: recipe) { data in
             Task { await library.save(recipe, image: .set(data)) }
         }
@@ -189,7 +232,7 @@ struct RecipeDetailView: View {
                 if recipe.youTubeVideoID != nil {
                     video.padding([.horizontal, .top], 24)
                 } else if hasArtwork {
-                    PhotoBanner(offset: pageOffset, height: Self.bannerHeight + topInset) { artwork }
+                    PhotoBanner(height: Self.bannerHeight + topInset) { artwork }
                         .padding(.bottom, -Self.cardRadius)
                 }
                 VStack(alignment: .leading, spacing: 24) {
@@ -210,6 +253,7 @@ struct RecipeDetailView: View {
                 .padding(.leading, hasArtwork ? sideInsets.leading : 0)
                 .padding(.trailing, hasArtwork ? sideInsets.trailing : 0)
                 .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
+                .offset(y: settled ? 0 : 32)
             }
             .textSelection(.enabled)
         }
@@ -220,9 +264,12 @@ struct RecipeDetailView: View {
         .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? Self.bannerHeight : 0) + 60 } action: { _, scrolledAway in
             titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
         }
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
-            pageOffset.y = y
-        }
+    }
+
+    private func settle() {
+        guard !settled else { return }
+        guard zoom?.source(for: recipe.id) != nil, previewSave == nil, !reduceMotion else { settled = true; return }
+        withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(0.12)) { settled = true }
     }
 
     private static let bannerHeight: CGFloat = 240
@@ -300,8 +347,11 @@ struct RecipeDetailView: View {
     private var hasArtwork: Bool {
         guard recipe.youTubeVideoID == nil else { return false }
         if reservesArtwork { return true }
-        return previewSave != nil ? previewImage != nil : library.hasImage(recipe.id)
+        // A recipe of yours always has the photo space; without a photo it asks for one.
+        return previewSave != nil ? previewImage != nil : true
     }
+
+    private var needsPhoto: Bool { previewSave == nil && !reservesArtwork && !library.hasImage(recipe.id) }
 
     @ViewBuilder
     private var artwork: some View {
@@ -310,9 +360,28 @@ struct RecipeDetailView: View {
             Image(decorative: image, scale: 1).resizable().scaledToFill()
         } else if reservesArtwork {
             Color.secondary.opacity(0.12)
+        } else if needsPhoto {
+            Button { choosingPhoto = true } label: {
+                accent.opacity(0.12)
+                    .overlay {
+                        Label("Add a Photo", systemImage: "camera")
+                            .appFont(.headline)
+                            .foregroundStyle(accent)
+                            .padding(.top, topInset)
+                            .padding(.bottom, Self.cardRadius)
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("recipe.addPhoto")
         } else {
             RecipeImageView(recipe: recipe)
         }
+    }
+
+    private func savePhoto(_ data: Data) {
+        guard let jpeg = RecipeImageProcessing.jpegData(from: data) else { return }
+        Task { await library.save(recipe, image: .set(jpeg)) }
     }
 
     private var header: some View {
@@ -569,7 +638,7 @@ struct AddToCalendarSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 DatePicker("Day", selection: $day, displayedComponents: .date)
                 Picker("Meal", selection: $meal) {
                     ForEach(Meal.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
@@ -606,29 +675,26 @@ private extension View {
     }
 }
 
-/// How far the page has scrolled, kept apart so only the photo redraws as it moves.
-@Observable
-private final class PageOffset {
-    var y: CGFloat = 0
-}
-
 /// The photo at the top of the page, which runs up behind the navigation bar.
 /// Scrolling moves it at half speed, so what's left in view stays centered as the page covers it;
 /// pulling past the top grows it from its bottom edge, cropping the sides, so no gap opens above.
+/// It reads its place in the scroll view as it's drawn, so it keeps up with a bounce frame by frame.
 private struct PhotoBanner<Artwork: View>: View {
-    let offset: PageOffset
     let height: CGFloat
     @ViewBuilder let artwork: Artwork
 
     var body: some View {
-        let y = offset.y
         Color.clear
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .overlay {
                 artwork
-                    .scaleEffect(y < 0 ? 1 - y / height : 1, anchor: .bottom)
-                    .offset(y: y > 0 ? y / 2 : 0)
+                    .visualEffect { content, proxy in
+                        let pulled = proxy.frame(in: .scrollView(axis: .vertical)).minY
+                        return content
+                            .scaleEffect(pulled > 0 ? 1 + pulled / proxy.size.height : 1, anchor: .bottom)
+                            .offset(y: pulled < 0 ? -pulled / 2 : 0)
+                    }
             }
             .mask(alignment: .bottom) { Rectangle().frame(height: 10_000) }
     }

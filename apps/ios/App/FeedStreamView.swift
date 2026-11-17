@@ -174,7 +174,7 @@ struct FeedStreamView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var loader: FeedLoader
     @Environment(\.appAccent) private var accent
-    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
+    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.grouped
     @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
     @AppStorage(AppSettings.Key.feedDiscoverDismissed) private var discoverDismissed = false
     /// Viewed posts taken out of the list, updated only while the list is on screen so an open post's link never disappears under it.
@@ -642,47 +642,55 @@ struct FeedRow: View {
                 FollowFeedButton(url: url, title: title)
             }
             .padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 16) { cards }
-                    .scrollTargetLayout()
-            }
-            .contentMargins(.horizontal, 16, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollClipDisabled()
+            posts
         }
         .task { await loader.load(url: url) }
     }
 
+    /// A site's posts as App Store–style shelves: three rows to a column, scrolling sideways.
     @ViewBuilder
-    private var cards: some View {
+    private var posts: some View {
         switch loader.states[url] {
         case .loaded(let entries):
-            ForEach(entries.filter { !hidden.contains($0.id) }) { entry in
-                NavigationLink { FeedEntryPreview(entry: entry) } label: {
-                    FeedCard(entry: entry, source: "", viewed: loader.isViewed(entry)).frame(width: Self.cardWidth)
+            let shown = entries.filter { !hidden.contains($0.id) }
+            if shown.isEmpty {
+                Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
+            } else {
+                RowShelf(margin: 16, items: shown) { entry in
+                    NavigationLink { FeedEntryPreview(entry: entry) } label: { FeedEntryRow(entry: entry, viewed: loader.isViewed(entry)) }
+                        .buttonStyle(.plain)
+                        .feedPostActions(entry, swipes: false)
+                        .onAppear {
+                            if entry.id == shown.last?.id, !loader.exhausted.contains(url) { Task { await loader.loadMore(url: url) } }
+                        }
                 }
-                .buttonStyle(.plain)
-                .feedPostActions(entry, swipes: false)
-            }
-            if entries.isEmpty {
-                Text("No posts yet.").appFont(.subheadline).foregroundStyle(.secondary)
-            } else if !loader.exhausted.contains(url) {
-                FeedCard(entry: .placeholder(0), source: "")
-                    .frame(width: Self.cardWidth)
-                    .loadingPlaceholder()
-                    .onAppear { Task { await loader.loadMore(url: url) } }
-                    .id(entries.count)
             }
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle")
                 .appFont(.subheadline)
                 .foregroundStyle(.secondary)
-                .frame(height: Self.cardWidth * 10 / 16)
+                .padding(.horizontal)
         case .loading, nil:
-            ForEach(0..<3, id: \.self) { index in
-                FeedCard(entry: .placeholder(index), source: "").frame(width: Self.cardWidth).loadingPlaceholder()
+            RowShelf(margin: 16, items: (0..<3).map { FeedEntry.placeholder($0) }) { entry in
+                FeedEntryRow(entry: entry, viewed: false).loadingPlaceholder()
             }
         }
+    }
+}
+
+/// A post as a shelf row: its photo, title and when it was posted.
+struct FeedEntryRow: View {
+    let entry: FeedEntry
+    var viewed = false
+
+    var body: some View {
+        ThumbnailRow(title: entry.title) {
+            FeedPhoto(url: entry.imageURL).saturation(viewed ? 0.4 : 1)
+        } subtitle: {
+            if let date = entry.published { Text(date, format: .relative(presentation: .named)) }
+        }
+        .opacity(viewed ? 0.6 : 1)
+        .accessibilityValue(viewed ? "Viewed" : "")
     }
 }
 
@@ -819,36 +827,17 @@ struct FeedCard: View {
     var viewed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Color.clear
-                .aspectRatio(16 / 10, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .overlay {
-                    FeedPhoto(url: entry.imageURL)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if viewed { FeedViewedBadge().padding(12) }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .saturation(viewed ? 0.4 : 1)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.title).appFont(.title3, weight: .semibold).lineLimit(2)
-                HStack(spacing: 4) {
-                    if !source.isEmpty { Text(source) }
-                    if let date = entry.published {
-                        if !source.isEmpty { Text("·") }
-                        Text(date, format: .relative(presentation: .named))
-                    }
-                }
-                .appFont(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+        PhotoCard(kicker: source, title: entry.title) {
+            FeedPhoto(url: entry.imageURL).saturation(viewed ? 0.4 : 1)
+        } detail: {
+            if let date = entry.published {
+                Text(date, format: .relative(presentation: .named)).appFont(.subheadline).lineLimit(1)
             }
-            .padding(.horizontal, 4)
+        }
+        .overlay(alignment: .topTrailing) {
+            if viewed { FeedViewedBadge().padding(12) }
         }
         .opacity(viewed ? 0.6 : 1)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
         .accessibilityValue(viewed ? "Viewed" : "")
     }
 }
@@ -933,7 +922,7 @@ struct RecipeFeedsPage: View {
 /// How posts open, when they count as viewed, and a way to see them all again.
 private struct ReadingFeedsSection: View {
     @EnvironmentObject private var loader: FeedLoader
-    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.stream
+    @AppStorage(AppSettings.Key.feedLayout) private var layout = FeedLayout.grouped
     @AppStorage(AppSettings.Key.feedShowViewed) private var showViewed = false
     @AppStorage(AppSettings.Key.feedDiscoverDismissed) private var discoverDismissed = false
     @AppStorage(AppSettings.Key.feedReader) private var opensInReader = true

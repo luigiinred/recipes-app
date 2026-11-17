@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.serialized)
 struct SearchSettingTests {
-    @Test("every source sits under online search, and all are on until switched off")
+    @Test("online search is always on, and every source is on until switched off")
     func onByDefault() {
         #expect(SearchSetting.discoverSearch.parent == nil)
         let nested = SearchSetting.allCases.filter { $0 != .discoverSearch }.allSatisfy { $0.parent == .discoverSearch }
@@ -16,6 +16,9 @@ struct SearchSettingTests {
         let allOn = SearchSetting.allCases.allSatisfy { $0.isOn }
         #expect(allOn)
         defaults.set(false, forKey: SearchSetting.discoverSearch.key)
+        #expect(SearchSetting.discoverSearch.isOn)
+        #expect(SearchSetting.searchYouTube.isOn)
+        defaults.set(false, forKey: SearchSetting.searchYouTube.key)
         #expect(!SearchSetting.searchYouTube.isOn)
     }
 }

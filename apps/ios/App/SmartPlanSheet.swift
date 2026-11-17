@@ -53,7 +53,7 @@ struct SmartPlanSheet: View {
     private var status: AppleIntelligence.Status { AppleIntelligence.status }
 
     private var options: some View {
-        Form {
+        ThemedForm {
             Section {
                 ForEach(Meal.allCases, id: \.self) { meal in
                     Toggle(isOn: Binding(

@@ -2,7 +2,7 @@ import RecipeKit
 import SwiftUI
 import WebKit
 
-/// Online search and each of its sources, all on unless switched off in Settings → Search. A source only matters with search on.
+/// Online search, always on, and each of its sources, on unless switched off in Settings → Search.
 enum SearchSetting: String, CaseIterable, Identifiable {
     case discoverSearch, searchWeb, searchGoogle, searchFollowedSites, searchYouTube
 
@@ -12,6 +12,7 @@ enum SearchSetting: String, CaseIterable, Identifiable {
     var parent: SearchSetting? { self == .discoverSearch ? nil : .discoverSearch }
 
     var isOn: Bool {
+        if self == .discoverSearch { return true }
         let defaults = UserDefaults.standard
         let value = defaults.object(forKey: key) == nil || defaults.bool(forKey: key)
         return value && (parent?.isOn ?? true)
@@ -40,8 +41,7 @@ enum SearchSetting: String, CaseIterable, Identifiable {
 
 struct SearchSettingsPage: View {
     var body: some View {
-        Form {
-            Section { SearchSettingToggle(setting: .discoverSearch) }
+        ThemedForm {
             Section {
                 ForEach(SearchSetting.allCases.filter { $0.parent != nil }) { SearchSettingToggle(setting: $0) }
             } header: {
@@ -64,13 +64,15 @@ struct SearchSettingsPage: View {
 final class OnlineRecipeSearch {
     enum Group: String, CaseIterable, Identifiable {
         case web = "From the Web"
-        case sites = "From Sites You Follow"
         case videos = "YouTube"
+        case sites = "From Sites You Follow"
         var id: Self { self }
     }
 
     private(set) var results: [Group: [RecipeSearchResult]] = [:]
     private(set) var isSearching = false
+    /// The last query searched to the end, so coming back to the page from a result doesn't search it again.
+    private var finished: String?
 
     init(seed: [Group: [RecipeSearchResult]] = [:]) {
         results = seed
@@ -83,13 +85,19 @@ final class OnlineRecipeSearch {
     func clear() {
         results = [:]
         isSearching = false
+        finished = nil
     }
 
     /// Call from a `.task(id:)` so a newer query cancels this one.
     func run(_ query: String, feeds: [Feed]) async {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text != finished else { return }
         results = [:]
-        guard !text.isEmpty, SearchSetting.discoverSearch.isOn else { isSearching = false; return }
+        guard !text.isEmpty, SearchSetting.discoverSearch.isOn else {
+            isSearching = false
+            finished = nil
+            return
+        }
         isSearching = true
         let wantsWeb = SearchSetting.searchWeb.isOn, wantsYouTube = SearchSetting.searchYouTube.isOn
         let followed = SearchSetting.searchFollowedSites.isOn ? Array(Set(feeds.compactMap { RecipeSearch.site(ofFeed: $0.url) })).prefix(12) : []
@@ -111,43 +119,86 @@ final class OnlineRecipeSearch {
                 withAnimation(.snappy) { results[kind] = found }
             }
         }
-        if !Task.isCancelled { withAnimation(.snappy) { isSearching = false } }
+        if !Task.isCancelled {
+            finished = text
+            withAnimation(.snappy) { isSearching = false }
+        }
     }
 }
 
-/// What a search on Discover found, grouped by where it came from, with Google at the end.
+/// The app's one search: your recipes that match, then what each online source found, with Google at the end.
+/// An empty query lists all your recipes. Your recipes drag onto the Plan board.
 struct DiscoverSearchResults: View {
     @EnvironmentObject private var library: RecipeLibrary
+    @Environment(\.appAccent) private var accent
+    @Environment(\.appearance) private var appearance
     let query: String
+    /// Opens one of your recipes; without it a recipe pushes onto the surrounding stack.
+    var openRecipe: ((UUID) -> Void)?
     @State private var search: OnlineRecipeSearch
     private let seeded: Bool
 
     /// `seed` shows fixed results without searching, for previews and snapshots.
-    init(query: String, seed: [OnlineRecipeSearch.Group: [RecipeSearchResult]]? = nil) {
+    init(query: String, openRecipe: ((UUID) -> Void)? = nil, seed: [OnlineRecipeSearch.Group: [RecipeSearchResult]]? = nil) {
         self.query = query
+        self.openRecipe = openRecipe
         seeded = seed != nil
         _search = State(initialValue: OnlineRecipeSearch(seed: seed ?? [:]))
     }
 
+    private var text: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var mine: [Recipe] {
+        library.recipes.filter { $0.matches(text) }.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
     var body: some View {
         List {
-            ForEach(OnlineRecipeSearch.Group.allCases) { group in
-                let results = search.results(in: group)
-                if !results.isEmpty {
-                    Section(group.rawValue) {
-                        ForEach(results) { OnlineResultLink(result: $0).themedRow() }
-                    }
+            if !mine.isEmpty {
+                Section("My Recipes") {
+                    ForEach(mine) { recipeLink($0).themedRow() }
                 }
             }
-            if search.isSearching {
-                Section { OnlineSearchProgress().themedRow() }
-            } else if search.isEmpty {
-                Section { Text("No recipes found.").foregroundStyle(.secondary).themedRow() }
+            if !text.isEmpty {
+                ForEach(OnlineRecipeSearch.Group.allCases) { group in
+                    let results = search.results(in: group)
+                    if !results.isEmpty {
+                        Section(group.rawValue) {
+                            ForEach(results) { OnlineResultLink(result: $0).themedRow() }
+                        }
+                    }
+                }
+                if search.isSearching {
+                    Section { OnlineSearchProgress().themedRow() }
+                } else if search.isEmpty, mine.isEmpty {
+                    Section { Text("No recipes found.").foregroundStyle(.secondary).themedRow() }
+                }
+                Section { SearchTheWebLink(query: text).themedRow() }
             }
-            Section { SearchTheWebLink(query: query).themedRow() }
         }
         .listStyle(.plain)
-        .task(id: query) { if !seeded { await search.run(query, feeds: library.feeds) } }
+        .overlay { if text.isEmpty, library.recipes.isEmpty { EmptyLibraryView() } }
+        .task(id: text) { if !seeded { await search.run(text, feeds: library.feeds) } }
+    }
+
+    @ViewBuilder
+    private func recipeLink(_ recipe: Recipe) -> some View {
+        Group {
+            if let openRecipe {
+                // A tap, not a Button: a Mac button holds the mouse and the row never starts dragging.
+                RecipeRow(recipe: recipe)
+                    .contentShape(Rectangle())
+                    .onTapGesture { openRecipe(recipe.id) }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { openRecipe(recipe.id) }
+            } else {
+                PushLink { RecipeDetailView(recipe: recipe) } label: { RecipeRow(recipe: recipe) }
+            }
+        }
+        .accessibilityIdentifier("search.recipe.\(recipe.title)")
+        .draggable(RecipeDragItem(id: recipe.id)) {
+            RecipeRow(recipe: recipe).padding(8).dragPreviewEnvironment(library, accent: accent, appearance: appearance)
+        }
     }
 }
 
@@ -156,12 +207,15 @@ struct OnlineResultLink: View {
     @EnvironmentObject private var library: RecipeLibrary
     let result: RecipeSearchResult
     var asCard = false
+    /// In a shelf every result is a row, videos too, and each row is its own link.
+    var inShelf = false
 
     var body: some View {
-        PushLink(inList: !asCard) {
+        PushLink(inList: !asCard && !inShelf) {
             FeedEntryPreview(entry: FeedEntry(title: result.title, link: result.link, imageURL: result.imageURL))
         } label: {
-            if result.kind == .video { VideoResultCard(result: result) }
+            if inShelf { OnlineResultRow(result: result) }
+            else if result.kind == .video { VideoResultCard(result: result) }
             else if asCard { OnlineResultCard(result: result) }
             else { OnlineResultRow(result: result) }
         }
@@ -172,6 +226,14 @@ struct OnlineResultLink: View {
                 }
             }
             Link(destination: result.link) { Label("Open in Browser", systemImage: "safari") }
+        }
+        .draggable(BoardCard.web(result.link, result.title)) {
+            Label(result.title, systemImage: "globe")
+                .appFont(.subheadline, weight: .semibold)
+                .lineLimit(2)
+                .padding(12)
+                .frame(width: 220, alignment: .leading)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
@@ -211,18 +273,11 @@ struct OnlineResultRow: View {
     @State private var preview: PagePreview?
 
     var body: some View {
-        HStack(spacing: 12) {
+        ThumbnailRow(title: result.title) {
             OnlineResultImage(result: result, preview: preview)
-                .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(result.title).appFont(.headline).lineLimit(2)
-                OnlineResultSource(result: result, preview: preview)
-            }
-            Spacer(minLength: 0)
+        } subtitle: {
+            OnlineResultSource(result: result, preview: preview)
         }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
         .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
     }
 }
@@ -232,20 +287,11 @@ struct OnlineResultCard: View {
     @State private var preview: PagePreview?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Color.clear
-                .aspectRatio(16 / 10, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .overlay { OnlineResultImage(result: result, preview: preview) }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(result.title).appFont(.title3, weight: .semibold).lineLimit(2)
-                OnlineResultSource(result: result, preview: preview)
-            }
-            .padding(.horizontal, 4)
+        PhotoCard(title: result.title) {
+            OnlineResultImage(result: result, preview: preview)
+        } detail: {
+            OnlineResultSource(result: result, preview: preview)
         }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
         .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
     }
 }
@@ -534,12 +580,10 @@ private struct ResultLinks: WebPage.NavigationDeciding {
 struct SearchSettingToggle: View {
     let setting: SearchSetting
     @AppStorage private var isOn: Bool
-    @AppStorage private var parentIsOn: Bool
 
     init(setting: SearchSetting) {
         self.setting = setting
         _isOn = AppStorage(wrappedValue: true, setting.key)
-        _parentIsOn = AppStorage(wrappedValue: true, (setting.parent ?? setting).key)
     }
 
     var body: some View {
@@ -549,30 +593,28 @@ struct SearchSettingToggle: View {
                 Text(setting.detail).appFont(.caption).foregroundStyle(.secondary)
             }
         }
-        .disabled(setting.parent != nil && !parentIsOn)
     }
 }
 
 extension View {
-    /// With online search on, a search box whose submitted query swaps the page for online results.
+    /// A search box whose submitted query swaps the page for the app's search results. A Mac window has one search for every page instead.
     func discoverSearch() -> some View { modifier(DiscoverSearchModifier()) }
 }
 
 private struct DiscoverSearchModifier: ViewModifier {
-    @AppStorage(SearchSetting.discoverSearch.key) private var enabled = true
     @State private var query = ""
     @State private var submitted = ""
 
     func body(content: Content) -> some View {
-        if enabled {
-            Group {
-                if submitted.isEmpty { content } else { DiscoverSearchResults(query: submitted) }
-            }
-            .searchable(text: $query, prompt: "Search Recipes Online")
-            .onSubmit(of: .search) { submitted = query.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
-        } else {
-            content
+        #if os(iOS)
+        Group {
+            if submitted.isEmpty { content } else { DiscoverSearchResults(query: submitted) }
         }
+        .searchable(text: $query, prompt: "Search")
+        .onSubmit(of: .search) { submitted = query.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .onChange(of: query) { _, text in if text.isEmpty { submitted = "" } }
+        #else
+        content
+        #endif
     }
 }

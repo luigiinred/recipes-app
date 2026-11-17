@@ -31,8 +31,19 @@ struct GroceriesView: View {
                     ForEach(completed) { row($0) }
                 }
             }
+            if addingItem {
+                // The empty space under the list, so a tap there puts the keyboard away.
+                Color.clear
+                    .frame(height: 400)
+                    .contentShape(Rectangle())
+                    .onTapGesture { addingItem = false }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .accessibilityHidden(true)
+            }
         }
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.immediately)
         .themedCanvas()
         .animation(.snappy, value: toBuy.map(\.id) + completed.map(\.id))
         .onChange(of: router.add) { _, target in
@@ -72,6 +83,8 @@ struct GroceriesView: View {
 
     private func row(_ item: GroceryItem) -> some View {
         Button {
+            // While typing, a tap on the list only puts the keyboard away.
+            if addingItem { addingItem = false; return }
             Task { await library.setChecked(item, !item.isChecked) }
         } label: {
             HStack(spacing: 12) {
@@ -184,13 +197,6 @@ struct GroceriesMenu: ToolbarContent {
                     confirmingClearAll = true
                 }
                 .disabled(library.groceries.isEmpty)
-                if library.remindersStatus != .unavailable {
-                    Divider()
-                    Toggle("Sync with Reminders", systemImage: "checklist", isOn: Binding(
-                        get: { library.remindersEnabled },
-                        set: { value in Task { await library.setRemindersEnabled(value) } }
-                    ))
-                }
             }
             .confirmationDialog("Clear the whole grocery list?", isPresented: $confirmingClearAll, titleVisibility: .visible) {
                 Button("Clear All", role: .destructive) { Task { await library.clearAllGroceries() } }

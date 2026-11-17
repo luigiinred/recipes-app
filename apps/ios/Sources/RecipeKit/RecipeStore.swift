@@ -25,9 +25,12 @@ public struct RecipeStore: Sendable {
         documents = DocumentStore(directory: directory)
     }
 
-    public func list(progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }) throws -> [Recipe] {
-        try documents.list(progress: progress).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    public func list(progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }, found: ([Recipe]) -> Void = { _ in },
+                     coordinated: Bool = true) throws -> [Recipe] {
+        try documents.list(progress: progress, found: { found($0.sorted(by: Self.byTitle)) }, coordinated: coordinated).sorted(by: Self.byTitle)
     }
+
+    private static func byTitle(_ a: Recipe, _ b: Recipe) -> Bool { a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending }
 
     @discardableResult
     public func save(_ recipe: Recipe) throws -> Recipe {

@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case tabs, home, recipes, search, aiImprovements, upNext, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
+    case tabs, home, recipes, search, aiImprovements, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
 }
 
 struct SettingsView: View {
@@ -37,7 +37,7 @@ struct SettingsView: View {
 
     private var stack: some View {
         NavigationStack {
-            Form { rows }
+            ThemedForm { rows }
                 .formStyle(.grouped)
                 .settingsSpacing()
                 .themedCanvas()
@@ -77,7 +77,6 @@ struct SettingsView: View {
             NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
             #endif
             NavigationLink(value: SettingsPage.feeds) { TabRowLabel(tab: .feeds) }
-            NavigationLink(value: SettingsPage.upNext) { TabRowLabel(tab: .upNext) }
             NavigationLink(value: SettingsPage.planner) { TabRowLabel(tab: .plan) }
             NavigationLink(value: SettingsPage.groceries) { TabRowLabel(tab: .groceries) }
         } header: {
@@ -155,7 +154,6 @@ struct SettingsView: View {
             #endif
         case .recipes: RecipesSettingsPage()
         case .search: SearchSettingsPage()
-        case .upNext: UpNextSettingsPage()
         case .planner: PlannerSettingsPage()
         case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
@@ -171,7 +169,6 @@ struct SettingsView: View {
 }
 
 private struct RecipesSettingsPage: View {
-    @AppStorage(AppSettings.Key.listStyle) private var listStyle = RecipeListStyle.list
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
     @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
@@ -181,11 +178,8 @@ private struct RecipesSettingsPage: View {
     #endif
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
-                Picker("Recipe list", selection: $listStyle) {
-                    ForEach(RecipeListStyle.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag($0) }
-                }
                 Picker("Mark recipes with", selection: $ratingStyle) {
                     ForEach(RatingStyle.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
                 }
@@ -372,28 +366,16 @@ private struct QuickFiltersSettingsPage: View {
 }
 #endif
 
-private struct UpNextSettingsPage: View {
-    var body: some View {
-        Form {
-            TabVisibilitySection(tab: .upNext)
-            Section {
-                Text("Swipe a recipe left to add it to Up Next. Planning a recipe takes it off the list.")
-                    .appFont(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .settingsPage("Up Next")
-    }
-}
-
 private struct PlannerSettingsPage: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.mealCalendar) private var syncsCalendar = false
+    @State private var calendarDenied = false
     @AppStorage(AppSettings.Key.defaultMeal) private var defaultMeal = MealChoice.automatic.rawValue
     @AppStorage(AppSettings.Key.hiddenMeals) private var hiddenMeals = ""
     @AppStorage(AppSettings.Key.weekStart) private var weekStart = AppSettings.WeekStart.system.rawValue
 
     var body: some View {
-        Form {
+        ThemedForm {
             TabVisibilitySection(tab: .plan)
             Section {
                 Picker("Add recipes as", selection: $defaultMeal) {
@@ -412,9 +394,36 @@ private struct PlannerSettingsPage: View {
                     Toggle(isOn: shown(meal)) { Label(meal.title, systemImage: meal.symbol) }
                 }
             }
+            Section {
+                Toggle(isOn: Binding(get: { syncsCalendar }, set: setCalendar)) {
+                    Label("Show in Calendar", systemImage: "calendar.badge.clock")
+                }
+            } footer: {
+                Text(calendarDenied
+                     ? "Recipes can't reach your calendars. Allow it in Settings → Privacy & Security → Calendars."
+                     : "Adds every planned meal to a “Meal Plan” calendar in the Calendar app, at breakfast, lunch, snack or dinner time, and keeps it up to date. Turning this off removes that calendar.")
+            }
         }
         .formStyle(.grouped)
         .settingsPage("Plan")
+    }
+
+    private func setCalendar(_ on: Bool) {
+        let sync = MealCalendarSync.shared
+        guard on else {
+            sync.removeCalendar()
+            syncsCalendar = false
+            return
+        }
+        Task {
+            guard await sync.requestAccess() else {
+                calendarDenied = true
+                return
+            }
+            calendarDenied = false
+            syncsCalendar = true
+            try? sync.sync(library.mealPlan)
+        }
     }
 
     private func shown(_ meal: Meal) -> Binding<Bool> {
@@ -433,7 +442,7 @@ private struct CookingSettingsPage: View {
     @AppStorage(AppSettings.Key.keepAwake) private var keepAwake = true
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 Toggle("Keep the screen awake", isOn: $keepAwake)
             } header: {
@@ -451,7 +460,7 @@ private struct GroceriesSettingsPage: View {
     @EnvironmentObject private var library: RecipeLibrary
 
     var body: some View {
-        Form {
+        ThemedForm {
             TabVisibilitySection(tab: .groceries)
             Section {
                 Toggle("Sync with Reminders", isOn: Binding(
@@ -483,7 +492,7 @@ struct RemindersSettingsPage: View {
     private var blocked: Bool { authorization == .denied }
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 reminder("Log dinner", isOn: $logOn, minutes: $logMinutes, weekday: nil)
             } header: {
@@ -573,7 +582,7 @@ struct FontSettingsPage: View {
     @AppStorage(AppSettings.Key.fontStyle) private var fontStyle = FontStyle.serif.rawValue
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 ThemePreview().themedRow(raised: true)
             }
@@ -763,7 +772,7 @@ struct CustomThemePage: View {
     }
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 ThemePreview().themedRow(raised: true)
             }
@@ -833,7 +842,7 @@ private struct IntelligenceSettingsPage: View {
 
     var body: some View {
         let status = override?.status ?? AppleIntelligence.status
-        Form {
+        ThemedForm {
             Section {
                 statusRow("Smart Plan for My Week", ready: status.isAvailable)
                 statusRow("Recipes from video captions", ready: status.isAvailable)
@@ -908,7 +917,7 @@ private struct PromptSettingsPage: View {
     }
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 Toggle("Customize this prompt", isOn: customizing)
             } footer: {
@@ -969,7 +978,7 @@ private struct DataSettingsPage: View {
     @State private var tidyMessage: String?
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 Button {
                     Task {
@@ -1100,7 +1109,7 @@ extension View {
 /// The tab bar as a list to reorder, with the tabs that aren't in it below to add.
 struct TabsSettingsPage: View {
     @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
-    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.tabs
+    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.standard
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var onHome: Bool { sizeClass != .regular && navigationStyle == .home }
@@ -1110,7 +1119,7 @@ struct TabsSettingsPage: View {
     var body: some View {
         let shown = shown
         let others = TabItem.allCases.filter { !shown.contains($0) && !(sizeClass == .regular && $0 == .settings) }
-        Form {
+        ThemedForm {
             if sizeClass != .regular {
                 Section {
                     Picker("Navigate With", selection: $navigationStyle) {

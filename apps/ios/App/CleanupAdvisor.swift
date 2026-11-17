@@ -219,7 +219,8 @@ struct CleanupReviewSheet: View {
         let sections = cleanup.changes.filter { $0.kind == .sections }
         let steps = cleanup.changes.filter { if case .step = $0.kind { true } else { false } }
         let notes = cleanup.changes.filter { $0.kind == .notes }
-        return [("Ingredients", ingredients), ("Sections", sections), ("Steps", steps), ("Notes", notes)].filter { !$0.1.isEmpty }
+        let title = cleanup.changes.filter { $0.kind == .title }
+        return [("Title", title), ("Ingredients", ingredients), ("Sections", sections), ("Steps", steps), ("Notes", notes)].filter { !$0.1.isEmpty }
     }
 
     private func binding(_ kind: RecipeCleanup.Change.Kind) -> Binding<Bool> {
@@ -387,10 +388,11 @@ private struct CleanupScanning: ViewModifier {
 
 /// A kind of change a cleanup can offer, each with its own switch in AI Improvements.
 enum CleanupKind: String, CaseIterable, Identifiable {
-    case ingredients, sections, steps, notes
+    case title, ingredients, sections, steps, notes
 
     init(_ kind: RecipeCleanup.Change.Kind) {
         switch kind {
+        case .title: self = .title
         case .ingredient: self = .ingredients
         case .sections: self = .sections
         case .step: self = .steps
@@ -404,6 +406,7 @@ enum CleanupKind: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .title: "Fix title capitals"
         case .ingredients: "Tidy ingredients"
         case .sections: "Ingredient sections"
         case .steps: "Split and tidy steps"
@@ -413,15 +416,17 @@ enum CleanupKind: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .ingredients: "Write amounts and units one way, like “1/2 cup” and “2 tbsp”."
+        case .title: "Write a title in all capitals, like “NO BAKE COOKIES”, as “No Bake Cookies”."
+        case .ingredients: "Write amounts and units one way, like “1/2 cup” and “2 tbsp”, and words in capitals, like “SUGAR”, in lowercase."
         case .sections: "Turn labels like “Dressing:” into sections, and rarely group a salad and its dressing."
-        case .steps: "Break run-together and numbered steps apart, and tidy their wording."
+        case .steps: "Break run-together and numbered steps apart, tidy their capitals, and add periods where sentences run together."
         case .notes: "Text before the steps, like tips, goes to Notes."
         }
     }
 
     var symbol: String {
         switch self {
+        case .title: "textformat"
         case .ingredients: "list.bullet"
         case .sections: "square.stack.3d.up"
         case .steps: "list.number"
@@ -440,7 +445,7 @@ struct AIImprovementsPage: View {
     var body: some View {
         let tidy = advisor.recipesToTidy(in: library.recipes)
         let waiting = advisor.waiting(in: library.recipes)
-        Form {
+        ThemedForm {
             Section {
                 Toggle(isOn: $suggestsCleanups) { Label("Suggest Improvements", systemImage: "sparkles") }
                 Toggle(isOn: $scansLibrary) { Label("Check in the Background", systemImage: "arrow.triangle.2.circlepath") }

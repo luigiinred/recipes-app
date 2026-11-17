@@ -7,20 +7,24 @@ public struct DocumentStore<Item: Codable & Identifiable & Sendable>: Sendable w
         self.directory = directory
     }
 
-    /// Reading a file iCloud hasn't downloaded yet waits for it, so `progress` reports each file as it finishes.
-    public func list(progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }) throws -> [Item] {
+    /// Files iCloud hasn't downloaded yet are fetched in the background and left out, so what's on this device lists without waiting.
+    /// `found` gets what's been read so far, from the first file on, so a caller can show it before the rest arrive.
+    /// Without `coordinated`, files are read without waiting on iCloud, for a first look at what's already on the device.
+    public func list(progress: (_ done: Int, _ total: Int) -> Void = { _, _ in }, found: ([Item]) -> Void = { _ in },
+                     coordinated: Bool = true) throws -> [Item] {
         try ensureDirectory()
-        let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: [])
+        let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.ubiquitousItemDownloadingStatusKey], options: [])
             .filter { $0.pathExtension == "json" || FileIO.isPlaceholder($0) }
         let decoder = RecipeCoding.makeDecoder()
         var items: [Item] = []
         progress(0, urls.count)
         for (index, url) in urls.enumerated() {
             defer { progress(index + 1, urls.count) }
-            if FileIO.startDownloadIfPlaceholder(url, in: directory) { continue }
-            guard let data = try? FileIO.read(url),
+            if FileIO.startDownloadIfPlaceholder(url, in: directory) || FileIO.startDownloadIfNotLocal(url) { continue }
+            guard let data = try? (coordinated ? FileIO.read(url) : Data(contentsOf: url)),
                   let item = try? decoder.decode(Item.self, from: data) else { continue }
             items.append(item)
+            if items.count == 1 || items.count.isMultiple(of: 10) { found(items) }
         }
         return items
     }

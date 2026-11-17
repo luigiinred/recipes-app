@@ -38,7 +38,7 @@ final class RecipesBrowseUITests: XCTestCase {
     func testHomeNarrowsByTagAndFilters() {
         let app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = library.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-recipeListStyle", "list", "-rememberRecipeSort", "YES", "-recipeHomeSort", "recent"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-rememberRecipeSort", "YES", "-recipeHomeSort", "recent"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["My Recipes"].waitForExistence(timeout: 15), "home lists every recipe")

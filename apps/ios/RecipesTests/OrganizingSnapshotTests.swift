@@ -6,13 +6,6 @@ import Testing
 @Suite("Organizing", .serialized)
 @MainActor
 struct OrganizingSnapshotTests {
-    @Test("compact list with small photos on the left (the default)")
-    func compactList() {
-        assertPageSnapshots(of: RecipeListView(
-            collection: .constant(.all), selection: .constant(nil), styleOverride: .list
-        ))
-    }
-
     @Test("syncing: the library hasn't loaded yet")
     func syncing() {
         assertPageSnapshots(of: RecipeListView(
@@ -43,7 +36,7 @@ struct OrganizingSnapshotTests {
     @Test("photo cards")
     func photoCards() {
         assertPageSnapshots(of: RecipeListView(
-            collection: .constant(.all), selection: .constant(nil), styleOverride: .cards
+            collection: .constant(.all), selection: .constant(nil)
         ))
     }
 

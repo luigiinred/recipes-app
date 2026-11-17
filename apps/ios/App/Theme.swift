@@ -432,6 +432,18 @@ private struct ThemedRow: ViewModifier {
     }
 }
 
+/// A form whose rows take the theme's card color, so grouped settings sit on the page in the theme's colors, not the system's gray.
+struct ThemedForm<Content: View>: View {
+    @Environment(\.appearance) private var appearance
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Form {
+            Group { content }.listRowBackground(appearance.surface)
+        }
+    }
+}
+
 extension View {
     /// `raised` rows are cards on the page, as in inset grouped lists; the rest sit flush on it.
     func themedRow(raised: Bool = false) -> some View { modifier(ThemedRow(raised: raised)) }

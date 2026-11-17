@@ -5,15 +5,15 @@ enum AppSection: Hashable {
     case recipes(RecipeCollection)
     case discover(UUID)
     case feeds
-    case upNext
     case plan
     case groceries
+    case settings
 }
 
 #if os(iOS)
 struct RootView: View {
     enum AppTab: Hashable {
-        case home, recipes, feeds, upNext, plan, groceries, settings, discover
+        case home, recipes, feeds, plan, groceries, settings, discover
         case collection(RecipeCollection)
     }
 
@@ -21,7 +21,7 @@ struct RootView: View {
     @EnvironmentObject private var discover: DiscoverController
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
-    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.tabs
+    @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.standard
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -70,7 +70,6 @@ struct RootView: View {
         case .home: .home
         case .recipes: .recipes
         case .feeds: .feeds
-        case .upNext: .upNext
         case .plan: .plan
         case .groceries: .groceries
         case .settings: .settings
@@ -90,7 +89,6 @@ struct RootView: View {
         Tab(item.title, systemImage: item.symbol, value: Self.appTab(item)) {
             switch item {
             case .feeds: AnyView(FeedStreamTab())
-            case .upNext: AnyView(UpNextTab())
             case .plan: AnyView(PlanTab(showsSmartPlan: showsSmartPlan))
             case .groceries: AnyView(GroceriesTab())
             default: AnyView(SettingsView(inSheet: false, splitsPages: sizeClass == .regular))
@@ -193,7 +191,6 @@ struct RootView: View {
     static func route(_ page: MainTab) -> RecipesRoute {
         switch page {
         case .feeds: .feeds
-        case .upNext: .upNext
         case .plan: .plan
         case .groceries: .groceries
         }
@@ -272,14 +269,24 @@ struct RecipesTab: View {
                 if let root { destination(root) }
                 else {
                     RecipesHomeView(selection: $selection, query: query, showsQuickFilters: isSearchOpen || isTyping || !query.isEmpty,
-                                    searchFieldAtBottom: searchAtBottom && isTyping,
+                                    searchFieldAtBottom: searchAtBottom && isTyping, keyboardIsUp: isTyping,
                                     showsAllRecipes: showsAllRecipes, isTabRoot: true, showsPages: searchAtBottom) { isTyping = false }
-                        .searchable(text: $query, isPresented: $isSearchOpen, placement: searchPlacement, prompt: "Search My Recipes")
+                        .searchable(text: $query, isPresented: $isSearchOpen, placement: searchPlacement, prompt: "Search")
+                        #if os(iOS)
+                        .searchToolbarBehavior(searchAtBottom ? .minimize : .automatic)
+                        .toolbar {
+                            if searchAtBottom {
+                                ToolbarSpacer(.flexible, placement: .bottomBar)
+                                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                            }
+                        }
+                        #endif
                         .searchFocused($isTyping)
                 }
             }
             .navigationDestination(for: RecipesRoute.self) { destination($0) }
         }
+        .recipeZoomScope()
         .environment(\.openRecipesRoute) { path.append($0) }
         .onChange(of: selection) { _, id in
             guard let id else { return }
@@ -328,12 +335,6 @@ struct RecipesRouteDestination: View {
             FeedStreamView()
         case .feedPost(let entry):
             FeedEntryPreview(entry: entry)
-        case .upNext:
-            MealBoardView { push(.recipe($0)) }
-                .navigationTitle("Up Next")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
         case .plan:
             MealBoardView { push(.recipe($0)) }
                 .navigationTitle("Plan")
@@ -349,22 +350,6 @@ struct RecipesRouteDestination: View {
                 }
         case .homeSettings:
             HomeSettingsPage()
-        }
-    }
-}
-
-struct UpNextTab: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @State private var path: [UUID] = []
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            MealBoardView { path.append($0) }
-                .navigationTitle("Up Next")
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationDestination(for: UUID.self) { id in
-                    if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe) }
-                }
         }
     }
 }
@@ -386,6 +371,7 @@ struct PlanTab: View {
                     }
                 }
         }
+        .recipeZoomScope()
         .onChange(of: router.reminder, initial: true) { _, kind in
             if kind == .logDinner || kind == .planWeek { router.reminder = nil }
         }
@@ -445,6 +431,7 @@ struct RootView: View {
     @State private var path: [Recipe.ID]
     @State private var selection: Recipe.ID?
     @State private var collection: RecipeCollection
+    @State private var query = ""
     init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil) {
         _section = State(initialValue: section)
         _path = State(initialValue: selection.map { [$0] } ?? [])
@@ -460,16 +447,26 @@ struct RootView: View {
         NavigationSplitView {
             SidebarView(section: $section)
         } detail: {
-            NavigationStack(path: $path) {
-                sectionRoot
-                    .navigationDestination(for: Recipe.ID.self) { id in
-                        if case .discover(let source) = section {
-                            DiscoverPage(sourceID: source, route: .recipe(id)) { _ in }.id(id)
-                        } else if let recipe = library.recipe(id: id) {
-                            RecipeDetailView(recipe: recipe).id(id)
+            if section == .settings {
+                SettingsView(inSheet: false)
+            } else {
+                NavigationStack(path: $path) {
+                    searchableRoot
+                        .navigationDestination(for: Recipe.ID.self) { id in
+                            if case .discover(let source) = section {
+                                DiscoverPage(sourceID: source, route: .recipe(id)) { _ in }.id(id)
+                            } else if let recipe = library.recipe(id: id) {
+                                RecipeDetailView(recipe: recipe).id(id)
+                            }
                         }
-                    }
+                }
             }
+        }
+        .searchable(text: $query, placement: .toolbar, prompt: "Search")
+        .onChange(of: router.showsSettings) { _, shows in
+            guard shows else { return }
+            section = .settings
+            router.showsSettings = false
         }
         .onChange(of: hiddenTabsRaw) {
             if let section, MainTab.allCases.contains(where: { $0.section == section && AppSettings.hiddenTabs(hiddenTabsRaw).contains($0) }) {
@@ -517,6 +514,26 @@ struct RootView: View {
         }
     }
 
+    /// Like Calendar, a search lists its results in a column at the window's trailing edge, from any page.
+    private var searchableRoot: some View {
+        let isSearching = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        return HStack(spacing: 0) {
+            sectionRoot
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .environment(\.windowSearchIsShowing, isSearching)
+            if isSearching {
+                Divider()
+                DiscoverSearchResults(query: query) { id in
+                    if case .discover = section { router.recipeID = id } else { path.append(id) }
+                }
+                .frame(minWidth: 0, idealWidth: 340, maxWidth: 340)
+                .accessibilityIdentifier("search.results")
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: query.isEmpty)
+    }
+
     @ViewBuilder
     private var sectionRoot: some View {
         switch section ?? .recipes(.all) {
@@ -528,10 +545,10 @@ struct RootView: View {
             FeedStreamView()
         case .plan:
             MealBoardView { path.append($0) }.navigationTitle("Plan")
-        case .upNext:
-            MealBoardView { path.append($0) }.navigationTitle("Up Next")
         case .groceries:
             GroceriesBoard()
+        case .settings:
+            EmptyView()
         }
     }
 }
@@ -585,8 +602,9 @@ struct SidebarView: View {
                         .appFont(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    SettingsLink { Image(systemName: "gearshape") }
+                    Button { section = .settings } label: { Image(systemName: "gearshape") }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Settings")
                         .foregroundStyle(.secondary)
                         .help("Settings")
                 }
@@ -628,7 +646,6 @@ extension MainTab {
     var section: AppSection {
         switch self {
         case .feeds: .feeds
-        case .upNext: .upNext
         case .plan: .plan
         case .groceries: .groceries
         }

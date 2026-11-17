@@ -126,6 +126,8 @@ func assertPageSnapshots<Page: View>(
 ) {
     guard isPinnedOSVersion() else { return }
     MascotCast.deterministic = true
+    // Pages are captured as their tab shows them, whatever the navigation default is.
+    SampleData.defaults.set(NavigationStyle.tabs.rawValue, forKey: AppSettings.Key.navigationStyle)
     #if os(iOS)
     UIView.setAnimationsEnabled(false)
     #endif
