@@ -14,12 +14,13 @@ struct FeedEntryPreview: View {
     /// A video's recipe waits for this, so a video being watched hands its place to the recipe page's player.
     @State private var showsRecipe = false
     @State private var resumeAt: Int?
+    @State private var openedAt = Date()
 
     private var videoID: String? { YouTubeImporter.videoID(from: entry.link) }
 
     var body: some View {
         Group {
-            if let result = loader.results[entry.id], showsRecipe || videoID == nil {
+            if let result = loader.results[entry.id], showsRecipe {
                 RecipeDetailView(recipe: result.recipe, previewSave: {
                     Task {
                         guard let saved = await library.add(result) else { return }
@@ -48,13 +49,15 @@ struct FeedEntryPreview: View {
             } else if let videoID {
                 VideoWhileReading(entry: entry, videoID: videoID, controller: earlyPlayer)
             } else {
-                RecipeDetailSkeleton(hasPhoto: entry.imageURL != nil)
+                pageWhileLoading
             }
         }
         .animation(.recipeArrives, value: loader.results[entry.id] != nil)
         .animation(.recipeArrives, value: showsRecipe)
         .onChange(of: loader.results[entry.id] != nil, initial: true) { _, found in
             guard found, !showsRecipe else { return }
+            // A recipe that comes quickly replaces the page; one that comes while the page is being read waits to be asked for.
+            guard videoID != nil || Date().timeIntervalSince(openedAt) < 1.5 else { return }
             Task {
                 resumeAt = await earlyPlayer.currentSeconds()
                 earlyPlayer.pause()
@@ -66,10 +69,48 @@ struct FeedEntryPreview: View {
             do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
         }
         .onAppear {
+            openedAt = Date()
             loader.opened(entry)
             if markMode == .onOpen { loader.markViewed([entry.id]) }
         }
         .onDisappear(perform: closed)
+    }
+
+    /// The page itself while its recipe is read in the background, with a button to the recipe once it's ready.
+    private var pageWhileLoading: some View {
+        let ready = loader.results[entry.id] != nil
+        return WebView(url: entry.link)
+            .navigationTitle(entry.title)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .overlay(alignment: .bottom) {
+                Group {
+                    if ready {
+                        Button { showsRecipe = true } label: {
+                            Label("View Recipe", systemImage: "list.bullet.rectangle")
+                                .appFont(.headline)
+                                .padding(.horizontal, 22)
+                                .frame(minHeight: 50)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .accessibilityIdentifier("feed.viewRecipe")
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    } else {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Finding the recipe…").appFont(.subheadline, weight: .semibold)
+                        }
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
+                        .glassEffect(.regular, in: Capsule())
+                        .transition(.opacity)
+                    }
+                }
+                .padding(.bottom, 16)
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: ready)
+            }
+            .sensoryFeedback(.success, trigger: ready) { _, new in new }
     }
 
     private func closed() {
