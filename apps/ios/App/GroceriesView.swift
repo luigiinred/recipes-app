@@ -13,6 +13,31 @@ struct GroceriesView: View {
     @FocusState private var addingItem: Bool
     /// Checked off but still in place, struck through, for a moment before moving to Completed; a second tap keeps it.
     @State private var lingering: Set<GroceryItem.ID> = []
+    @AppStorage(AppSettings.Key.groceryGrouping) private var grouping = GroceryGrouping.none
+    @ObservedObject private var aisles = GroceryAisles.shared
+
+    private struct Group: Identifiable {
+        let id: String
+        let title: String
+        let items: [GroceryItem]
+    }
+
+    /// To Buy split by aisle, in store order, or by the recipe each item came from, with hand-added ones last.
+    private var groups: [Group] {
+        switch grouping {
+        case .none:
+            return [Group(id: "all", title: "", items: toBuy)]
+        case .aisle:
+            let byAisle = Dictionary(grouping: toBuy) { aisles.aisle(for: $0) }
+            return GroceryAisle.allCases.compactMap { aisle in
+                byAisle[aisle].map { Group(id: aisle.rawValue, title: aisle.title, items: $0) }
+            }
+        case .recipe:
+            let byRecipe = Dictionary(grouping: toBuy) { $0.recipeID.flatMap { library.recipe(id: $0)?.title } ?? "" }
+            return byRecipe.keys.sorted { $0.isEmpty ? false : $1.isEmpty ? true : $0.localizedCompare($1) == .orderedAscending }
+                .map { Group(id: "recipe-\($0)", title: $0.isEmpty ? "Added by Hand" : $0, items: byRecipe[$0] ?? []) }
+        }
+    }
 
     private var toBuy: [GroceryItem] { sorted(library.groceries.filter { !$0.isChecked }) }
     private var completed: [GroceryItem] { sorted(library.groceries.filter(\.isChecked)) }
@@ -20,14 +45,16 @@ struct GroceriesView: View {
     var body: some View {
         List {
             if layout != .completed {
-                section(embedded ? "To Buy" : nil) {
-                    ForEach(toBuy) { row($0) }
-                    TextField("Add item", text: $newItem)
-                        .focused($addingItem)
-                        .onSubmit(addItem)
-                        .submitLabel(.next)
-                        .themedRow()
-                        .accessibilityIdentifier("groceries.add")
+                if grouping == .none {
+                    section(embedded ? "To Buy" : nil) {
+                        ForEach(toBuy) { row($0) }
+                        addField
+                    }
+                } else {
+                    ForEach(groups) { group in
+                        Section(group.title) { ForEach(group.items) { row($0) } }
+                    }
+                    Section { addField }
                 }
             }
             if layout != .toBuy, !completed.isEmpty || layout == .completed {
@@ -50,6 +77,10 @@ struct GroceriesView: View {
         .scrollDismissesKeyboard(.immediately)
         .themedCanvas()
         .animation(.snappy, value: toBuy.map(\.id) + completed.map(\.id))
+        .animation(.snappy, value: grouping)
+        .task(id: grouping == .aisle ? toBuy.map(\.name) : []) {
+            if grouping == .aisle { await aisles.sortUnknown(toBuy) }
+        }
         .onChange(of: router.add) { _, target in
             guard target == .groceries, layout != .completed else { return }
             router.add = nil
@@ -83,6 +114,15 @@ struct GroceriesView: View {
         guard !text.isEmpty else { return }
         newItem = ""
         Task { await library.addGroceries([GroceryItem(parsing: text)]) }
+    }
+
+    private var addField: some View {
+        TextField("Add item", text: $newItem)
+            .focused($addingItem)
+            .onSubmit(addItem)
+            .submitLabel(.next)
+            .themedRow()
+            .accessibilityIdentifier("groceries.add")
     }
 
     private func toggle(_ item: GroceryItem) {
@@ -206,11 +246,19 @@ private struct GroceriesChrome: ViewModifier {
 
 struct GroceriesMenu: ToolbarContent {
     @EnvironmentObject private var library: RecipeLibrary
+    @AppStorage(AppSettings.Key.groceryGrouping) private var grouping = GroceryGrouping.none
     @State private var confirmingClearAll = false
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu("Groceries Options", systemImage: "ellipsis.circle") {
+                Picker(selection: $grouping) {
+                    ForEach(GroceryGrouping.allCases, id: \.self) { Text($0.title).tag($0) }
+                } label: {
+                    Label("Group By", systemImage: "rectangle.3.group")
+                }
+                .pickerStyle(.menu)
+                Divider()
                 Button("Clear Completed", systemImage: "checkmark.circle") {
                     Task { await library.clearCompleted() }
                 }

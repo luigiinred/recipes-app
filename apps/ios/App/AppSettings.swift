@@ -153,6 +153,7 @@ enum AppSettings {
         static let navigationStyle = "navigationStyle"
         static let boardShowsUpNext = "boardShowsUpNext"
         static let mealCalendar = "syncMealPlanToCalendar"
+        static let groceryGrouping = "groceryGrouping"
         static let suggestCleanups = "suggestCleanups"
         static let scanForCleanups = "scanLibraryForCleanups"
 
