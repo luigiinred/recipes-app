@@ -28,6 +28,6 @@ struct SettingsSnapshotTests {
 
     @Test("add a meal: Up Next and search")
     func addMealSheet() {
-        assertPageSnapshots(of: AddMealSheet(day: SampleData.now, initialMeal: .lunch, source: .all), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: AddToPlanSheet(destination: .day(SampleData.now), meal: .lunch), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 }

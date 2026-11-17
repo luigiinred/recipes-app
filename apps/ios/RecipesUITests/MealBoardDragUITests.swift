@@ -22,7 +22,7 @@ final class MealBoardDragUITests: XCTestCase {
     private func launch() {
         app = XCUIApplication()
         app.launchEnvironment["RECIPES_DIR"] = root.path
-        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES"]
+        app.launchArguments += ["-syncGroceriesWithReminders", "NO", "-navigationStyle", "tabs", "-onboardingCompleted", "YES", "-reviewPromptDismissed", "YES", "-planShowsList", "NO"]
         app.launch()
         openPlan()
         XCTAssertTrue(element("board.upNext").waitForExistence(timeout: 15), "Plan opens the board")
@@ -88,32 +88,50 @@ final class MealBoardDragUITests: XCTestCase {
     private func recipe(_ title: String) throws -> Recipe? { try Library(root: root).recipes.list().first { $0.title == title } }
     private func plan() throws -> [MealPlanEntry] { try Library(root: root).mealPlan.list() }
 
-    func testTypingARecipeNameOffersItAndPlansIt() throws {
+    func testAddingToADayUsesTheAddSearch() throws {
         launch()
-        let field = app.textFields["quickAdd.day.\(today)"].firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
+        let add = app.buttons["board.add.\(today)"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let field = app.searchFields["Search recipes or type a meal"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "a day's add opens the same search as Up Next")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         field.typeText("Lentil")
-        let suggestion = app.buttons["Lentil Stew"].firstMatch
-        XCTAssertTrue(suggestion.waitForExistence(timeout: 3))
-        suggestion.tap()
-        waitFor({ try self.plan().contains { $0.title == "Lentil Stew" && $0.recipeID != nil && $0.day == self.today } }, "the suggested recipe is planned today")
+        let row = app.buttons["add.row.Lentil Stew"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        row.tap()
+        waitFor({ try self.plan().contains { $0.title == "Lentil Stew" && $0.recipeID != nil && $0.day == self.today } }, "the picked recipe is planned today")
     }
 
     func testTypingWordsAndPressingReturnAddsThemToUpNext() throws {
         launch()
-        let field: XCUIElement
-        if isPhone {
-            app.buttons["Add to Up Next"].firstMatch.tap()
-            field = app.searchFields.firstMatch
-        } else {
-            field = app.textFields["quickAdd.upNext"].firstMatch
-        }
+        app.buttons[isPhone ? "Add to Up Next" : "board.add.upNext"].firstMatch.tap()
+        let field = app.searchFields["Search recipes or type a meal"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         field.typeText("Takeout tacos\n")
         waitFor({ try Library(root: self.root).upNextNotes.list().contains { $0.title == "Takeout tacos" } }, "the words join Up Next as they are")
         XCTAssertTrue(card("Takeout tacos", in: "board.upNext").waitForExistence(timeout: 5))
+    }
+
+    func testTappingAPillInTheNextWeekShowsThatDay() throws {
+        launch()
+        guard isPhone else { return }
+        let nextWeek = DayKey.string(from: Calendar.current.date(byAdding: .day, value: 7, to: Date())!, calendar: .current)
+        app.buttons["board.pill.\(today)"].firstMatch.swipeLeft()
+        let pill = app.buttons["board.pill.\(nextWeek)"].firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        pill.tap()
+        XCTAssertTrue(element("board.day.\(nextWeek)").waitForExistence(timeout: 5), "the pager follows the picked day")
+    }
+
+    func testListShowsTheWholeWeek() throws {
+        launch()
+        guard isPhone else { return }
+        app.buttons["board.layout"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["board.add.\(today)"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'board.add.2'")).count, 1, "the list shows more than one day")
+        app.buttons["board.layout"].firstMatch.tap()
     }
 
     func testDraggingAnUpNextCardOntoADayPlansItAndDequeuesIt() throws {

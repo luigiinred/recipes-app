@@ -45,7 +45,7 @@ struct RecipeScreenSnapshotTests {
 
     @Test("pick a recipe for a day")
     func pickRecipe() {
-        assertPageSnapshots(of: AddMealSheet(day: SampleData.now), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
+        assertPageSnapshots(of: AddToPlanSheet(destination: .day(SampleData.now)), inNavigationStack: false, macSize: SnapshotEnvironment.macSheetSize, coverage: .sheet)
     }
 
     @Test("import from web")

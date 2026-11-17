@@ -36,8 +36,8 @@ struct MealBoardView: View {
     let open: (UUID) -> Void
 
     @State private var weekStart: Date
-    @State private var addingOn: Date?
-    @State private var addingToUpNext = false
+    @State private var adding: PlanDestination?
+    @AppStorage("planShowsList") private var showsList = false
     @State private var smartPlanning: Bool
     @State private var creatingPlan = false
     @State private var openNote: UpNextNote?
@@ -53,21 +53,16 @@ struct MealBoardView: View {
     @State private var edgeHover: Int?
     /// The iPhone strip's centered day, which is the one shown.
     @State private var centered: String?
-    @State private var strip = ScrollPosition(idType: String.self)
-    @State private var stripWidth: CGFloat = 0
+    @State private var stripWeek: Int?
     /// How far the pager has scrolled; a day's width of it is a pill's width of the strip, so the strip moves with it rather than after it.
     @State private var pagerX: CGFloat = 0
     @State private var pagerWidth: CGFloat = 0
-    @State private var stripX: CGFloat = 0
-    @State private var stripMoving = false
     /// While typing a meal on iPhone the Up Next tray steps aside for the keyboard.
-    @State private var addingMeal = false
     /// The iPhone's Up Next sheet: low, with a row of cards, or pulled up to show them all.
     @State private var sheetStep = SheetStep.cards
     @State private var sheetHeight: CGFloat = 0
     @State private var bottomInset: CGFloat = 0
     @State private var plannerHeight: CGFloat = 0
-    @State private var searchingUpNext = false
 
     init(open: @escaping (UUID) -> Void, showsSmartPlan: Bool = false) {
         self.open = open
@@ -102,10 +97,18 @@ struct MealBoardView: View {
         .onChange(of: router.add) { _, target in
             guard target == .plan else { return }
             router.add = nil
-            addingOn = today
+            adding = .day(today)
         }
         .sensoryFeedback(.selection, trigger: targetedColumn) { _, new in new != nil }
         .toolbar {
+            if isCompact {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { withAnimation(.snappy) { showsList.toggle() } } label: {
+                        Label(showsList ? "Show Days" : "Show List", systemImage: showsList ? "rectangle.split.3x1" : "list.bullet")
+                    }
+                    .accessibilityIdentifier("board.layout")
+                }
+            }
             if !isCompact {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showsUpNext.toggle() } label: {
@@ -123,8 +126,7 @@ struct MealBoardView: View {
                 } label: { Label("Plan My Week", systemImage: "sparkles") }
             }
         }
-        .panel(item: $addingOn) { AddMealSheet(day: $0) }
-        .panel(isPresented: $addingToUpNext) { UpNextPickerSheet() }
+        .panel(item: isCompact ? .constant(nil) : $adding) { AddToPlanSheet(destination: $0) }
         .panel(item: $openNote) { FreeTextSheet(item: .note($0), open: open) }
         .panel(item: $typedMeal) { FreeTextSheet(item: .entry($0), open: open) }
         .panel(isPresented: $smartPlanning) { SmartPlanSheet(weekStart: weekStart) }
@@ -165,7 +167,7 @@ struct MealBoardView: View {
                 Label("Up Next", systemImage: "text.line.first.and.arrowtriangle.forward").appFont(.headline).foregroundStyle(accent)
                 Text("\(queue.count)").appFont(.subheadline).foregroundStyle(.secondary)
             }
-            upNextQuickAdd
+            addButton("Add to Up Next", to: .upNext, identifier: "board.add.upNext")
             ScrollView { upNextGrid }
             .scrollIndicators(.never)
         }
@@ -210,12 +212,18 @@ struct MealBoardView: View {
         }
     }
 
-    private var upNextQuickAdd: some View {
-        QuickAddField(prompt: "Add to Up Next", identifier: "quickAdd.upNext") { recipe in
-            if !recipe.wantToCook { Task { await library.setQueued(recipe, true) } }
-        } addText: { text in
-            Task { await library.queue(text: text) }
+    /// Opens the Add search for a day or Up Next, named for where the pick will go.
+    private func addButton(_ title: String, to destination: PlanDestination, identifier: String) -> some View {
+        Button { adding = destination } label: {
+            Label(title, systemImage: "plus")
+                .appFont(.subheadline, weight: .semibold)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(accent)
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private var board: some View {
@@ -249,21 +257,20 @@ struct MealBoardView: View {
     private var compactPlanner: some View {
         VStack(spacing: 0) {
             dayStrip
-            dayPager
-                .padding(.bottom, addingMeal ? 0 : max(0, sheetHeight - bottomInset))
-        }
-        .overlay(alignment: .bottom) {
-            if !addingMeal {
-                upNextSheet
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            // The days run on under the glass sheet; their scrolling stops short of it so the last meal can still be reached.
+            Group {
+                if showsList { weekList } else { dayPager.environment(\.boardBottomClearance, sheetClearance) }
             }
         }
+        .overlay(alignment: .bottom) { upNextSheet }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { plannerHeight = $0 }
         #if os(iOS)
-        .fullScreenCover(isPresented: $searchingUpNext) { UpNextPickerSheet() }
+        .fullScreenCover(item: isCompact ? $adding : .constant(nil)) { AddToPlanSheet(destination: $0) }
         #endif
     }
+
+    private var sheetClearance: CGFloat { max(0, sheetHeight - bottomInset) + 8 }
 
     /// Nil lets the title step hug its title; the other steps take a share of the screen.
     private var sheetContentHeight: CGFloat? {
@@ -279,71 +286,94 @@ struct MealBoardView: View {
         withAnimation(.snappy) { sheetStep = next }
     }
 
-    private static let pillWidth: CGFloat = 48
-    private static let pillStride: CGFloat = pillWidth + 6
     /// A day is most of the width, centered, so the days either side peek in.
     private var pagerColumnWidth: CGFloat { max(0, pagerWidth * 0.82) }
     private var pagerStride: CGFloat { pagerColumnWidth + 12 }
 
-    /// Keeps the strip at the same fraction of a day as the pager while the pager moves.
-    private func followPager() {
-        guard !stripMoving, pagerStride > 12 else { return }
-        strip.scrollTo(x: pagerX / pagerStride * Self.pillStride)
+    /// Whole weeks either side of today, so the strip pages a week at a time.
+    private var stripDays: [Date] {
+        let back = calendar.date(byAdding: .day, value: -35, to: today) ?? today
+        let start = calendar.dateInterval(of: .weekOfYear, for: back)?.start ?? back
+        return (0..<(16 * 7)).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
-    /// Weeks either side of today, to swipe through.
-    private var stripDays: [Date] { (-35...70).compactMap { calendar.date(byAdding: .day, value: $0, to: today) } }
+    private func stripIndex(of key: String) -> Int? {
+        stripDays.firstIndex { DayKey.string(from: $0, calendar: calendar) == key }
+    }
 
-    /// A strip of days that snaps one to its center; the centered day is the one shown.
+    /// A week of days, seven across; swiping pages to the next week, and tapping a day shows it.
     private var dayStrip: some View {
-        HStack(spacing: 0) {
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 6) {
-                    ForEach(Array(stripDays.enumerated()), id: \.element) { index, day in
-                        let key = DayKey.string(from: day, calendar: calendar)
-                        pill(id: key, focus: pillFocus(index), top: day.formatted(.dateTime.weekday(.abbreviated)), count: entries(on: day).count,
-                             isToday: calendar.isDate(day, inSameDayAs: today)) {
-                            Text(day, format: .dateTime.day()).appFont(.headline).monospacedDigit()
-                        } select: {
-                            centered = key
-                        }
-                        .frame(width: Self.pillWidth)
-                        .id(key)
-                        .dropDestination(for: BoardCard.self) { cards, _ in drop(cards, on: day) } isTargeted: { target(key, $0) }
-                        .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide).month().day())), \(entries(on: day).count) meals")
-                        .accessibilityIdentifier("board.pill.\(key)")
+        let days = stripDays
+        return ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(0..<(days.count / 7), id: \.self) { week in
+                    HStack(spacing: 6) {
+                        ForEach((week * 7)..<(week * 7 + 7), id: \.self) { index in stripPill(days[index], index: index) }
                     }
-                }
-                .scrollTargetLayout()
-                .padding(.vertical, 6)
-            }
-            .contentMargins(.horizontal, max(0, (stripWidth - Self.pillWidth) / 2), for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition($strip, anchor: .center)
-            .scrollIndicators(.hidden)
-            .fixedSize(horizontal: false, vertical: true)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { stripWidth = $0 }
-            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in stripX = x }
-            .onScrollPhaseChange { old, new in
-                stripMoving = new == .interacting || new == .decelerating
-                // A swipe on the strip picks the day it settles on, and the pager follows.
-                if new == .idle, old == .interacting || old == .decelerating {
-                    let index = min(max(Int((stripX / Self.pillStride).rounded()), 0), stripDays.count - 1)
-                    withAnimation(.snappy) { centered = DayKey.string(from: stripDays[index], calendar: calendar) }
+                    .padding(.horizontal, 12)
+                    .containerRelativeFrame(.horizontal)
+                    .id(week)
                 }
             }
+            .scrollTargetLayout()
+            .padding(.vertical, 6)
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $stripWeek)
+        .scrollIndicators(.hidden)
+        .fixedSize(horizontal: false, vertical: true)
+        .onScrollPhaseChange { old, new in
+            // Paging to another week shows the same weekday in it, as Calendar does.
+            guard new == .idle, old == .interacting || old == .decelerating,
+                  let week = stripWeek, let index = stripIndex(of: selectedPage), index / 7 != week else { return }
+            withAnimation(.snappy) { centered = DayKey.string(from: days[week * 7 + index % 7], calendar: calendar) }
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
         .sensoryFeedback(.selection, trigger: centered)
         .onAppear {
             if centered == nil { centered = DayKey.string(from: today, calendar: calendar) }
-            strip.scrollTo(id: selectedPage, anchor: .center)
+            stripWeek = stripIndex(of: selectedPage).map { $0 / 7 }
         }
         .onChange(of: centered) { _, key in
             guard let key, let day = DayKey.date(from: key, calendar: calendar) else { return }
             weekStart = calendar.dateInterval(of: .weekOfYear, for: day)?.start ?? day
+            let week = stripIndex(of: key).map { $0 / 7 }
+            if week != stripWeek { withAnimation(.snappy) { stripWeek = week } }
         }
+    }
+
+    private func stripPill(_ day: Date, index: Int) -> some View {
+        let key = DayKey.string(from: day, calendar: calendar)
+        return pill(id: key, focus: pillFocus(index), top: day.formatted(.dateTime.weekday(.abbreviated)), count: entries(on: day).count,
+                    isToday: calendar.isDate(day, inSameDayAs: today)) {
+            Text(day, format: .dateTime.day()).appFont(.headline).monospacedDigit()
+        } select: {
+            centered = key
+        }
+        .dropDestination(for: BoardCard.self) { cards, _ in drop(cards, on: day) } isTargeted: { target(key, $0) }
+        .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide).month().day())), \(entries(on: day).count) meals")
+        .accessibilityIdentifier("board.pill.\(key)")
+    }
+
+    /// The picked week's days one under another, for an overview; the strip's day scrolls into view.
+    private var weekList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(days, id: \.self) { day in
+                    dayColumn(day).id(DayKey.string(from: day, calendar: calendar))
+                }
+            }
+            .scrollTargetLayout()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+        }
+        .contentMargins(.bottom, sheetClearance, for: .scrollContent)
+        .scrollPosition(id: $centered, anchor: .top)
+        .scrollDismissesKeyboard(.immediately)
+        .animation(.snappy, value: library.mealPlan.map(\.id))
+        .animation(.snappy, value: targetedColumn)
+        .animation(.snappy, value: mealHover)
     }
 
     /// A short capsule with its weekday on top; the picked one fills with the accent, and one under a dragged card grows.
@@ -374,7 +404,7 @@ struct MealBoardView: View {
 
     /// 1 for the day the pager is on, falling to 0 a day away, read from how far the pager has scrolled.
     private func pillFocus(_ index: Int) -> CGFloat {
-        guard pagerStride > 12 else { return selectedPage == DayKey.string(from: stripDays[index], calendar: calendar) ? 1 : 0 }
+        guard !showsList, pagerStride > 12 else { return selectedPage == DayKey.string(from: stripDays[index], calendar: calendar) ? 1 : 0 }
         return max(0, 1 - abs(CGFloat(index) - pagerX / pagerStride))
     }
 
@@ -428,7 +458,6 @@ struct MealBoardView: View {
         .scrollDismissesKeyboard(.immediately)
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in
             pagerX = x
-            followPager()
         }
         .overlay(alignment: .leading) { pagerEdge(-1) }
         .overlay(alignment: .trailing) { pagerEdge(1) }
@@ -483,13 +512,15 @@ struct MealBoardView: View {
                     if !queue.isEmpty { Text("\(queue.count)").appFont(.headline).foregroundStyle(.secondary) }
                     Spacer(minLength: 8)
                     if sheetStep != .title {
-                        Button { searchingUpNext = true } label: {
-                            Image(systemName: "plus")
-                                .appFont(.title3, weight: .semibold)
-                                .frame(width: 44, height: 44)
+                        Button { adding = .upNext } label: {
+                            Label("Add", systemImage: "plus")
+                                .appFont(.headline)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 40)
                         }
                         .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: Circle())
+                        .foregroundStyle(accent)
+                        .glassEffect(.regular.interactive(), in: Capsule())
                         .accessibilityLabel("Add to Up Next")
                         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
                         .transition(.scale.combined(with: .opacity))
@@ -497,6 +528,8 @@ struct MealBoardView: View {
                 }
             }
             .padding(.top, 8)
+            // Closed, the title has nothing under it, so it gets the grabber's space below too and sits centered.
+            .padding(.bottom, sheetStep == .title ? 19 : 0)
             .contentShape(Rectangle())
             .onTapGesture { withAnimation(.snappy) { sheetStep = sheetStep == .title ? .cards : .title } }
             .gesture(DragGesture(minimumDistance: 12).onEnded { value in
@@ -580,24 +613,25 @@ struct MealBoardView: View {
             HStack(spacing: 6) {
                 Text(day, format: .dateTime.weekday(.wide)).appFont(.headline)
                 Text(day, format: .dateTime.month(.abbreviated).day()).appFont(.subheadline).foregroundStyle(.secondary)
-                Spacer()
                 if isToday {
                     Text("Today").appFont(.caption2, weight: .bold).textCase(.uppercase)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }
+                Spacer(minLength: 8)
+                addToDayButton(day)
             }
             .foregroundStyle(isToday ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.primary))
         } cards: {
             ForEach(Meal.allCases, id: \.self) { meal in mealSection(meal, on: day) }
             if entries(on: day).isEmpty, targetedColumn != key, dragging == nil {
-                Text("Nothing planned yet. Type a meal, or drag one in from Up Next.")
+                Text("Nothing planned yet. Add a meal, or drag one in from Up Next.")
                     .appFont(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         } footer: {
-            quickAdd(on: day)
+            EmptyView()
         }
         .dropDestination(for: BoardCard.self) { cards, _ in
             drop(cards, on: day)
@@ -671,13 +705,18 @@ struct MealBoardView: View {
     /// Small photo cards, as many to a row as fit.
     private static let miniColumns = [GridItem(.adaptive(minimum: 92), spacing: 8)]
 
-    private func quickAdd(on day: Date) -> some View {
-        QuickAddField(prompt: "Add a meal", identifier: "quickAdd.day.\(DayKey.string(from: day, calendar: calendar))",
-                      onFocusChange: { focused in withAnimation(.snappy) { addingMeal = focused && isCompact } }) { recipe in
-            Task { await library.plan(recipe, on: day, meal: AppSettings.defaultMeal()) }
-        } addText: { text in
-            Task { await library.plan(text: text, on: day, meal: AppSettings.defaultMeal()) }
+    private func addToDayButton(_ day: Date) -> some View {
+        Button { adding = .day(day) } label: {
+            Image(systemName: "plus")
+                .appFont(.headline)
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
         }
+        .buttonStyle(.plain)
+        .foregroundStyle(accent)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel("Add to \(day.formatted(.dateTime.weekday(.wide)))")
+        .accessibilityIdentifier("board.add.\(DayKey.string(from: day, calendar: calendar))")
     }
 
     private func hoverMeal(_ id: UUID, _ isTargeted: Bool) {
@@ -794,9 +833,15 @@ private struct DragTracking: ViewModifier {
     }
 }
 
+extension EnvironmentValues {
+    /// How much of a day column's foot the Up Next sheet covers.
+    @Entry var boardBottomClearance: CGFloat = 0
+}
+
 private struct BoardColumn<Header: View, Cards: View, Footer: View>: View {
     @Environment(\.appearance) private var appearance
     @Environment(\.appAccent) private var accent
+    @Environment(\.boardBottomClearance) private var bottomClearance
     let isTargeted: Bool
     @ViewBuilder let header: Header
     @ViewBuilder let cards: Cards
@@ -813,11 +858,14 @@ private struct BoardColumn<Header: View, Cards: View, Footer: View>: View {
                     footer
                 }
             }
+            .contentMargins(.bottom, bottomClearance, for: .scrollContent)
             .scrollIndicators(.never)
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.immediately)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, bottomClearance > 0 ? 0 : 16)
         .frame(maxHeight: .infinity, alignment: .top)
         .background { Color.clear.contentShape(Rectangle()).onTapGesture(perform: dismissKeyboard) }
         .background(appearance.surface ?? Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -908,7 +956,6 @@ private struct BoardCardView: View {
             }
         }
         .padding(.horizontal, 4)
-        .background(appearance.surface ?? Color.clear)
         .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
@@ -924,6 +971,8 @@ extension View {
     // A drag preview is drawn outside the window's view tree, so it gets none of the app's environment.
     func dragPreviewEnvironment(_ library: RecipeLibrary, accent: Color, appearance: ThemePalette) -> some View {
         frame(width: 220)
+            .background(appearance.surface ?? Color(white: 0.5, opacity: 0.15))
+            .background(.background)
             .environmentObject(library)
             .environment(\.appAccent, accent)
             .environment(\.appearance, appearance)
