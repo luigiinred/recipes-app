@@ -1083,10 +1083,9 @@ struct HeroPick: Identifiable {
     var id: String { "\(kicker)-\(recipe.id)" }
 }
 
-/// The Today section: large photo cards a page at a time, with dots when there's more than one.
-/// Wide screens fit several cards side by side and scroll them like the other shelves.
+/// The Today section: photo cards with half of the next one showing, so it's clear there are more to swipe to.
 private struct HeroCarousel<Actions: View>: View {
-    static var minCardWidth: CGFloat { 340 }
+    static var minCardWidth: CGFloat { 220 }
 
     let picks: [HeroPick]
     let margin: CGFloat
@@ -1101,13 +1100,14 @@ private struct HeroCarousel<Actions: View>: View {
         max(1, Int((available + TagTile.spacing) / (Self.minCardWidth + TagTile.spacing)))
     }
 
+    /// Fills the row when every pick fits; otherwise leaves room for half a card more.
     private var cardWidth: CGFloat {
         let columns = CGFloat(columns)
-        return max((available - (columns - 1) * TagTile.spacing) / columns, 0)
+        if picks.count <= Int(columns) { return max((available - (columns - 1) * TagTile.spacing) / columns, 0) }
+        return max((available - columns * TagTile.spacing) / (columns + 0.5), 0)
     }
 
     var body: some View {
-        let pages = columns == 1
         VStack(spacing: 14) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: TagTile.spacing) {
@@ -1122,12 +1122,11 @@ private struct HeroCarousel<Actions: View>: View {
                 .scrollTargetLayout()
             }
             .contentMargins(.horizontal, margin, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned(limitBehavior: pages ? .always : .automatic))
+            .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $page)
             .scrollDisabled(picks.count <= columns)
             .scrollClipDisabled()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-            if pages, picks.count > 1 { TagPageDots(count: picks.count, current: page ?? 0) }
         }
     }
 }
