@@ -11,6 +11,8 @@ struct GroceriesView: View {
 
     @State private var newItem = ""
     @FocusState private var addingItem: Bool
+    /// Checked off but still in place, struck through, for a moment before moving to Completed; a second tap keeps it.
+    @State private var lingering: Set<GroceryItem.ID> = []
 
     private var toBuy: [GroceryItem] { sorted(library.groceries.filter { !$0.isChecked }) }
     private var completed: [GroceryItem] { sorted(library.groceries.filter(\.isChecked)) }
@@ -81,23 +83,41 @@ struct GroceriesView: View {
         Task { await library.addGroceries([GroceryItem(parsing: text)]) }
     }
 
+    private func toggle(_ item: GroceryItem) {
+        if item.isChecked {
+            Task { await library.setChecked(item, false) }
+        } else if lingering.contains(item.id) {
+            lingering.remove(item.id)
+        } else {
+            lingering.insert(item.id)
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                guard lingering.remove(item.id) != nil else { return }
+                await library.setChecked(item, true)
+            }
+        }
+    }
+
     private func row(_ item: GroceryItem) -> some View {
         Button {
             // While typing, a tap on the list only puts the keyboard away.
             if addingItem { addingItem = false; return }
-            Task { await library.setChecked(item, !item.isChecked) }
+            toggle(item)
         } label: {
+            let checked = item.isChecked || lingering.contains(item.id)
             HStack(spacing: 12) {
-                Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
+                Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                     .appFont(.title3)
-                    .foregroundStyle(item.isChecked ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(checked ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
+                    .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).appFont(.body, weight: .medium)
+                    Text(item.name).appFont(.body, weight: .medium).strikethrough(checked)
                     if !item.quantity.isEmpty {
-                        Text(item.quantity).appFont(.caption, weight: .bold).foregroundStyle(Theme.accent)
+                        Text(item.quantity).appFont(.caption, weight: .bold).foregroundStyle(Theme.accent).strikethrough(checked)
                     }
                 }
-                .foregroundStyle(item.isChecked ? .secondary : .primary)
+                .foregroundStyle(checked ? .secondary : .primary)
+                .animation(.snappy, value: checked)
                 Spacer()
             }
             .contentShape(Rectangle())
