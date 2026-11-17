@@ -364,8 +364,37 @@ private struct RecipeActionsModifier: ViewModifier {
         if scope == nil { actions(content) } else { content }
     }
 
+    /// On Mac a new recipe and an import's preview take the page's place instead of opening over it.
+    private var opensInPlace: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private var isInPlace: Bool { opensInPlace && (showingNew || draft != nil) }
+
+    @ViewBuilder
+    private func page(_ content: Content) -> some View {
+        if opensInPlace, showingNew {
+            newRecipeEditor(closeInline: { showingNew = false })
+        } else if opensInPlace, let draft {
+            ImportPreviewSheet(draft: draft, closeInline: { self.draft = nil }) { selection = $0.id }.id(draft.id)
+        } else {
+            content
+        }
+    }
+
+    private func newRecipeEditor(closeInline: (() -> Void)?) -> some View {
+        RecipeEditorView(recipe: Recipe(title: ""), closeInline: closeInline) { saved, image, steps in
+            Task { await library.save(saved, image: image, steps: steps) }
+            selection = saved.id
+        }
+    }
+
     private func actions(_ content: Content) -> some View {
-        content
+        page(content)
         .overlay {
             if let progressMessage {
                 VStack(spacing: 4) {
@@ -377,7 +406,8 @@ private struct RecipeActionsModifier: ViewModifier {
             }
         }
         .toolbar {
-            if let findRecipes {
+            if isInPlace {
+            } else if let findRecipes {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
@@ -395,12 +425,7 @@ private struct RecipeActionsModifier: ViewModifier {
             showingImport = true
             router.reminder = nil
         }
-        .panel(isPresented: $showingNew) {
-            RecipeEditorView(recipe: Recipe(title: "")) { saved, image, steps in
-                Task { await library.save(saved, image: image, steps: steps) }
-                selection = saved.id
-            }
-        }
+        .panel(isPresented: opensInPlace ? .constant(false) : $showingNew) { newRecipeEditor(closeInline: nil) }
         .panel(isPresented: $showingImport) {
             ImportURLView(
                 onReview: { result in
@@ -411,7 +436,7 @@ private struct RecipeActionsModifier: ViewModifier {
                 }
             )
         }
-        .panel(item: $draft) { draft in
+        .panel(item: opensInPlace ? .constant(nil) : $draft) { draft in
             ImportPreviewSheet(draft: draft) { selection = $0.id }
         }
         #if os(iOS)

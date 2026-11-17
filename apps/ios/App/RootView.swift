@@ -432,6 +432,7 @@ struct RootView: View {
     @State private var selection: Recipe.ID?
     @State private var collection: RecipeCollection
     @State private var query = ""
+    @State private var columns = NavigationSplitViewVisibility.automatic
     init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil) {
         _section = State(initialValue: section)
         _path = State(initialValue: selection.map { [$0] } ?? [])
@@ -444,7 +445,7 @@ struct RootView: View {
 
     /// The sidebar picks a section; a recipe opened from it fills the rest of the window.
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             SidebarView(section: $section)
         } detail: {
             if section == .settings {
@@ -482,7 +483,8 @@ struct RootView: View {
             path.append(id)
             selection = nil
         }
-        .panelHost()
+        .panelHost(sidebar: $columns)
+        .frame(minWidth: 720, minHeight: 480)
         .toastHost()
         .cleanupScanning()
         .cookModeCover(cook)
