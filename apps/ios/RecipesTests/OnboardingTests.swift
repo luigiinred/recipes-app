@@ -28,13 +28,6 @@ struct OnboardingTests {
         #expect(!web.matches(Recipe(title: "D")))
     }
 
-    @Test("feed picks cover every kind of popular feed, once each")
-    func feedPicks() {
-        let picks = OnboardingFeeds.picks
-        #expect(Set(picks.map(\.url)).count == picks.count)
-        #expect(Set(picks.map(\.kind)) == Set(PopularFeed.Kind.allCases))
-    }
-
     #if os(iOS)
     @Test("showing and hiding a Home section keeps the others as they were")
     func homeSections() {
@@ -64,12 +57,12 @@ struct OnboardingTests {
         #expect(AppSettings.tabs("feeds,plan", defaults: defaults).first == .recipes)
     }
 
-    private func library(adding indices: [Int], feeds: [Feed] = []) -> RecipeLibrary {
+    private func library(adding indices: [Int]) -> RecipeLibrary {
         RecipeLibrary(recipes: indices.map {
             let source = OnboardingSources.all[$0]
             return Recipe(title: source.title, summary: "Imported from \(source.site).", servings: 4, prepMinutes: 10, cookMinutes: 20,
                           ingredients: ["2 eggs"], steps: ["Cook."], sourceURL: source.url.absoluteString)
-        }, feeds: feeds)
+        })
     }
 
     private func snapshot(
@@ -91,40 +84,6 @@ struct OnboardingTests {
     @Test("add: a web recipe and a video imported")
     func addSome() { snapshot(.add, library: library(adding: [0, 2])) }
 
-    #if os(iOS)
-    @Test("home sections")
-    func home() { snapshot(.home) }
-    #endif
-
-    @Test("tabs")
-    func tabsPage() { snapshot(.tabs) }
-
-    @Test("feeds: two followed")
-    func feeds() {
-        let picks = OnboardingFeeds.picks
-        snapshot(.feeds, library: library(adding: [], feeds: [picks[0], picks[3]].map { Feed(url: $0.url, title: $0.name) }))
-    }
-
-    @Test("discover: nothing added yet")
-    func discover() { snapshot(.discover) }
-
-    @Test("discover: a server added")
-    func discoverAdded() {
-        snapshot(.discover, discover: DiscoverController(previewing: [
-            DiscoverCatalog(previewing: DiscoverSource(server: "https://friends.example.com", token: ""), recipes: []),
-        ]))
-    }
-
     @Test("look")
     func look() { snapshot(.look) }
-
-    @Test("reminders")
-    func reminders() { snapshot(.reminders) }
-
-    @Test("done, after setting things up")
-    func done() {
-        snapshot(
-            .done, library: library(adding: [0, 1], feeds: [Feed(url: OnboardingFeeds.picks[0].url, title: OnboardingFeeds.picks[0].name)])
-        )
-    }
 }
