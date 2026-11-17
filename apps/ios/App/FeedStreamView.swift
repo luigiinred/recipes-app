@@ -125,6 +125,7 @@ struct FeedStreamTab: View {
                     RecipesRouteDestination(route: route, selection: $selection) { path.append($0) }
                 }
         }
+        .recipeZoomScope()
         .environment(\.openRecipesRoute) { path.append($0) }
         .onChange(of: selection) { _, id in
             guard let id else { return }
@@ -686,6 +687,7 @@ struct FeedEntryRow: View {
     var body: some View {
         ThumbnailRow(title: entry.title) {
             FeedPhoto(url: entry.imageURL).saturation(viewed ? 0.4 : 1)
+                .recipeZoomSource(entry.zoomID, in: "feedRow", cornerRadius: 14)
         } subtitle: {
             if let date = entry.published { Text(date, format: .relative(presentation: .named)) }
         }
@@ -837,6 +839,7 @@ struct FeedCard: View {
         .overlay(alignment: .topTrailing) {
             if viewed { FeedViewedBadge().padding(12) }
         }
+        .recipeZoomSource(entry.zoomID, in: "feedCard", cornerRadius: PhotoCard<EmptyView, EmptyView>.cornerRadius)
         .opacity(viewed ? 0.6 : 1)
         .accessibilityValue(viewed ? "Viewed" : "")
     }

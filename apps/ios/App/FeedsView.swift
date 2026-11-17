@@ -15,11 +15,15 @@ struct FeedEntryPreview: View {
     @State private var showsRecipe = false
     @State private var resumeAt: Int?
     @State private var openedAt = Date()
+    /// The recipe rises over the page it was read from, which stays underneath.
+    @State private var slidesUp = false
+    @State private var topInset: CGFloat = 0
 
     private var videoID: String? { YouTubeImporter.videoID(from: entry.link) }
 
     var body: some View {
-        Group {
+        ZStack {
+            if !showsRecipe || slidesUp { underneath }
             if let result = loader.results[entry.id], showsRecipe {
                 RecipeDetailView(recipe: result.recipe, previewSave: {
                     Task {
@@ -27,9 +31,44 @@ struct FeedEntryPreview: View {
                         ToastCenter.shared.show("Added \(saved.title) to My Recipes") { await library.delete(saved) }
                     }
                 }, previewImage: result.imageData, previewSaveTitle: "Add to My Recipes", previewSaved: isSaved(result.recipe),
-                   resumesVideoAt: resumeAt)
-                .transition(.opacity)
-            } else if errorMessage != nil {
+                   resumesVideoAt: resumeAt, risesFromBelow: slidesUp)
+                .transition(slidesUp ? .identity : .opacity)
+                .zIndex(1)
+            }
+        }
+        .recipeZoomDestination(entry.zoomID)
+        .animation(.recipeArrives, value: loader.results[entry.id] != nil)
+        .onChange(of: loader.results[entry.id] != nil, initial: true) { _, found in
+            guard found, !showsRecipe else { return }
+            if videoID != nil {
+                Task {
+                    resumeAt = await earlyPlayer.currentSeconds()
+                    earlyPlayer.pause()
+                    withAnimation(.recipeArrives) { showsRecipe = true }
+                }
+            } else if Date().timeIntervalSince(openedAt) < 0.3 {
+                showsRecipe = true
+            } else {
+                slidesUp = true
+                showsRecipe = true
+            }
+        }
+        .task(id: entry.id) {
+            errorMessage = nil
+            do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
+        }
+        .onAppear {
+            openedAt = Date()
+            loader.opened(entry)
+            if markMode == .onOpen { loader.markViewed([entry.id]) }
+        }
+        .onDisappear(perform: closed)
+    }
+
+    @ViewBuilder
+    private var underneath: some View {
+        Group {
+            if errorMessage != nil {
                 if VideoRecipeFinder.isVideo(entry.link) {
                     VideoWithoutRecipe(entry: entry)
                 } else if opensInReader {
@@ -52,65 +91,45 @@ struct FeedEntryPreview: View {
                 pageWhileLoading
             }
         }
-        .animation(.recipeArrives, value: loader.results[entry.id] != nil)
-        .animation(.recipeArrives, value: showsRecipe)
-        .onChange(of: loader.results[entry.id] != nil, initial: true) { _, found in
-            guard found, !showsRecipe else { return }
-            // A recipe that comes quickly replaces the page; one that comes while the page is being read waits to be asked for.
-            guard videoID != nil || Date().timeIntervalSince(openedAt) < 1.5 else { return }
-            Task {
-                resumeAt = await earlyPlayer.currentSeconds()
-                earlyPlayer.pause()
-                showsRecipe = true
-            }
-        }
-        .task(id: entry.id) {
-            errorMessage = nil
-            do { try await loader.loadRecipe(for: entry) } catch { errorMessage = error.localizedDescription }
-        }
-        .onAppear {
-            openedAt = Date()
-            loader.opened(entry)
-            if markMode == .onOpen { loader.markViewed([entry.id]) }
-        }
-        .onDisappear(perform: closed)
     }
 
-    /// The page itself while its recipe is read in the background, with a button to the recipe once it's ready.
+    /// The page itself while its recipe is read in the background, under the post's photo where the recipe's will go.
     private var pageWhileLoading: some View {
         let ready = loader.results[entry.id] != nil
-        return WebView(url: entry.link)
-            .navigationTitle(entry.title)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .overlay(alignment: .bottom) {
-                Group {
-                    if ready {
-                        Button { showsRecipe = true } label: {
-                            Label("View Recipe", systemImage: "list.bullet.rectangle")
-                                .appFont(.headline)
-                                .padding(.horizontal, 22)
-                                .frame(minHeight: 50)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .accessibilityIdentifier("feed.viewRecipe")
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
-                    } else {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text("Finding the recipe…").appFont(.subheadline, weight: .semibold)
-                        }
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
-                        .glassEffect(.regular, in: Capsule())
-                        .transition(.opacity)
-                    }
-                }
-                .padding(.bottom, 16)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: ready)
+        return VStack(spacing: 0) {
+            if let imageURL = entry.imageURL {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: RecipeDetailView.bannerHeight + topInset)
+                    .overlay { FeedPhoto(url: imageURL) }
+                    .clipped()
+                    .padding(.bottom, -RecipeDetailView.cardRadius)
             }
-            .sensoryFeedback(.success, trigger: ready) { _, new in new }
+            WebView(url: entry.link)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: entry.imageURL == nil ? 0 : RecipeDetailView.cardRadius,
+                                                  topTrailingRadius: entry.imageURL == nil ? 0 : RecipeDetailView.cardRadius, style: .continuous))
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .ignoresSafeArea(edges: entry.imageURL == nil ? [] : .top)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { if $0 > 0 { topInset = $0 } }
+        .navigationTitle(entry.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .overlay(alignment: .bottom) {
+            if !ready {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Finding the recipe…").appFont(.subheadline, weight: .semibold)
+                }
+                .padding(.horizontal, 18)
+                .frame(minHeight: 44)
+                .glassEffect(.regular, in: Capsule())
+                .padding(.bottom, 16)
+                .transition(.opacity)
+                .accessibilityIdentifier("feed.findingRecipe")
+            }
+        }
     }
 
     private func closed() {

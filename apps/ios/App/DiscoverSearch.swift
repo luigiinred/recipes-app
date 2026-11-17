@@ -209,10 +209,11 @@ struct OnlineResultLink: View {
     var asCard = false
     /// In a shelf every result is a row, videos too, and each row is its own link.
     var inShelf = false
+    @State private var preview: PagePreview?
 
     var body: some View {
         PushLink(inList: !asCard && !inShelf) {
-            FeedEntryPreview(entry: FeedEntry(title: result.title, link: result.link, imageURL: result.imageURL))
+            FeedEntryPreview(entry: FeedEntry(title: result.title, link: result.link, imageURL: result.imageURL ?? preview?.imageURL))
         } label: {
             if inShelf { OnlineResultRow(result: result) }
             else if result.kind == .video { VideoResultCard(result: result) }
@@ -227,6 +228,7 @@ struct OnlineResultLink: View {
             }
             Link(destination: result.link) { Label("Open in Browser", systemImage: "safari") }
         }
+        .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
         .draggable(BoardCard.web(result.link, result.title)) {
             Label(result.title, systemImage: "globe")
                 .appFont(.subheadline, weight: .semibold)
@@ -275,6 +277,7 @@ struct OnlineResultRow: View {
     var body: some View {
         ThumbnailRow(title: result.title) {
             OnlineResultImage(result: result, preview: preview)
+                .recipeZoomSource(FeedEntry.zoomID(for: result.link), in: "webRow", cornerRadius: 14)
         } subtitle: {
             OnlineResultSource(result: result, preview: preview)
         }
@@ -292,6 +295,7 @@ struct OnlineResultCard: View {
         } detail: {
             OnlineResultSource(result: result, preview: preview)
         }
+        .recipeZoomSource(FeedEntry.zoomID(for: result.link), in: "webCard", cornerRadius: PhotoCard<EmptyView, EmptyView>.cornerRadius)
         .task(id: result.link) { preview = await OnlineResultPreviews.shared.preview(for: result) }
     }
 }

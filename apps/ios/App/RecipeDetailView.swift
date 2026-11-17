@@ -21,6 +21,8 @@ struct RecipeDetailView: View {
     var reservesArtwork = false
     /// Starts the video here, so one already playing on the loading page carries on.
     var resumesVideoAt: Int?
+    /// The page card rises from the bottom of the screen, over whatever was showing while the recipe loaded.
+    var risesFromBelow = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
@@ -43,6 +45,8 @@ struct RecipeDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// False for a moment after zooming out of a card, while the page's card rises into place under the photo.
     @State private var settled = false
+    /// Until a rising card is in place, the page is see-through so what's under it shows around the card.
+    @State private var risen = false
     @State private var sideInsets = EdgeInsets()
     @State private var sidePaneScrolled = false
     @State private var titleScrolledAway = false
@@ -95,8 +99,8 @@ struct RecipeDetailView: View {
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { sideInsets = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
-        .background(pageStyle)
-        .themedCanvas()
+        .background(risesFromBelow && !risen ? AnyShapeStyle(Color.clear) : pageStyle)
+        .themedCanvas(!risesFromBelow || risen)
         .onChange(of: cook.isPresented) { _, presented in
             if presented { player.pause() }
         }
@@ -253,7 +257,7 @@ struct RecipeDetailView: View {
                 .padding(.leading, hasArtwork ? sideInsets.leading : 0)
                 .padding(.trailing, hasArtwork ? sideInsets.trailing : 0)
                 .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
-                .offset(y: settled ? 0 : 32)
+                .offset(y: settled ? 0 : risesFromBelow ? max(viewportHeight, 600) : 32)
             }
             .textSelection(.enabled)
         }
@@ -268,12 +272,12 @@ struct RecipeDetailView: View {
 
     private func settle() {
         guard !settled else { return }
-        guard zoom?.source(for: recipe.id) != nil, previewSave == nil, !reduceMotion else { settled = true; return }
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(0.12)) { settled = true }
+        guard (zoom?.source(for: recipe.id) != nil && previewSave == nil) || risesFromBelow, !reduceMotion else { settled = true; return }
+        withAnimation(.spring(response: 0.55, dampingFraction: 0.86).delay(risesFromBelow ? 0.05 : 0.12)) { settled = true } completion: { risen = true }
     }
 
-    private static let bannerHeight: CGFloat = 240
-    private static let cardRadius: CGFloat = 28
+    static let bannerHeight: CGFloat = 240
+    static let cardRadius: CGFloat = 28
 
     private var pageStyle: AnyShapeStyle {
         appearance.canvas.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.background)
