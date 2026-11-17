@@ -1,4 +1,17 @@
+import CryptoKit
+import RecipeKit
 import SwiftUI
+
+extension FeedEntry {
+    /// A post's place in the zoom registry, the same for every card that links to its page.
+    static func zoomID(for link: URL) -> UUID {
+        let bytes = Array(Insecure.MD5.hash(data: Data(link.absoluteString.utf8)))
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
+
+    var zoomID: UUID { Self.zoomID(for: link) }
+}
 
 /// A navigation stack's zoom space. Each card reports where it sits, so a recipe's page zooms out of the copy showing on screen.
 struct RecipeZoom {

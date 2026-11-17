@@ -407,9 +407,10 @@ extension EnvironmentValues {
 /// Paints a screen with the chosen theme's page color and hides the system's list background so it shows.
 private struct ThemedCanvas: ViewModifier {
     @Environment(\.appearance) private var appearance
+    var isOn = true
 
     func body(content: Content) -> some View {
-        if let canvas = appearance.canvas {
+        if isOn, let canvas = appearance.canvas {
             content
                 .scrollContentBackground(.hidden)
                 .background(canvas.ignoresSafeArea())
@@ -449,5 +450,5 @@ extension View {
     func themedRow(raised: Bool = false) -> some View { modifier(ThemedRow(raised: raised)) }
     func appTheme() -> some View { modifier(AppThemeModifier()) }
     func appFont(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> some View { modifier(AppFont(style: style, weight: weight)) }
-    func themedCanvas() -> some View { modifier(ThemedCanvas()) }
+    func themedCanvas(_ isOn: Bool = true) -> some View { modifier(ThemedCanvas(isOn: isOn)) }
 }
