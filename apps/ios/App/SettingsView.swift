@@ -4,7 +4,7 @@ import SwiftUI
 import UserNotifications
 
 enum SettingsPage: Hashable {
-    case tabs, home, recipes, search, aiImprovements, planner, cooking, groceries, reminders, theme, feeds, mealie, mealieSharing, intelligence, data
+    case layout, recipes, planner, groceries, discover, notifications, theme, intelligence, data, about
 }
 
 struct SettingsView: View {
@@ -74,98 +74,115 @@ struct SettingsView: View {
     private var rows: some View {
         Section {
             #if os(iOS)
-            NavigationLink(value: SettingsPage.tabs) { Label("Arrange Tabs", systemImage: "square.grid.3x1.below.line.grid.1x2") }
-            NavigationLink(value: SettingsPage.home) { Label("Home", systemImage: "house") }
+            NavigationLink(value: SettingsPage.layout) { Label("Layout", systemImage: "square.grid.3x1.below.line.grid.1x2") }
             #endif
-            NavigationLink(value: SettingsPage.feeds) { TabRowLabel(tab: .feeds) }
-            NavigationLink(value: SettingsPage.planner) { TabRowLabel(tab: .plan) }
-            NavigationLink(value: SettingsPage.groceries) { TabRowLabel(tab: .groceries) }
-        } header: {
-            Text("Tabs")
-        } footer: {
-            Text("Choose which tabs show and in what order, or open one to change how it works.")
-        }
-        Section {
-            NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
-            NavigationLink(value: SettingsPage.search) { Label("Search", systemImage: "magnifyingglass") }
-            NavigationLink(value: SettingsPage.cooking) { Label("Cooking", systemImage: "frying.pan") }
-            NavigationLink(value: SettingsPage.reminders) { Label("Reminders", systemImage: "bell") }
-        }
-        Section {
             NavigationLink(value: SettingsPage.theme) { Label("Appearance", systemImage: "paintpalette") }
         }
         Section {
-            NavigationLink(value: SettingsPage.mealie) { Label("Mealie", image: "MealieLogo") }
-            NavigationLink(value: SettingsPage.mealieSharing) { Label("Mealie Sharing", systemImage: "person.2") }
-        } header: {
-            Text("Sync")
+            NavigationLink(value: SettingsPage.recipes) { Label("Recipes", systemImage: "book.closed") }
+            NavigationLink(value: SettingsPage.planner) { TabRowLabel(tab: .plan) }
+            NavigationLink(value: SettingsPage.groceries) { TabRowLabel(tab: .groceries) }
+            NavigationLink(value: SettingsPage.discover) { TabRowLabel(tab: .feeds) }
         }
         Section {
+            NavigationLink(value: SettingsPage.notifications) { Label("Notifications", systemImage: "bell") }
             NavigationLink(value: SettingsPage.intelligence) { Label("Apple Intelligence", systemImage: "sparkles") }
-            NavigationLink(value: SettingsPage.aiImprovements) { Label("AI Improvements", systemImage: "wand.and.stars") }
-        }
-        Section {
             NavigationLink(value: SettingsPage.data) { Label("Data & Developer", systemImage: "externaldrive") }
         }
-        if let listing, let writeReview {
-            Section {
+        Section {
+            if let writeReview {
                 Link(destination: writeReview) { Label("Leave a Review", systemImage: "star.bubble") }
-                ShareLink(
-                    item: listing,
-                    message: Text("I keep all my recipes in Recipes. It's free, open source, and has no ads or account.")
-                ) { Label("Tell a Friend Who Cooks", systemImage: "heart") }
-            } header: {
-                Text("Help Support Us")
-            } footer: {
-                Text("Recipes is free, open source, and will never show you an ad, so word of mouth is our whole marketing budget. A kind review is how the next home cook finds a recipe box that doesn't nag them.")
             }
-        }
-        Section {
-            Link(destination: FeedbackLink.url(for: .bug)) { Label("Report a Bug", systemImage: "ladybug") }
-            Link(destination: FeedbackLink.url(for: .feature)) { Label("Suggest a Change", systemImage: "lightbulb") }
-        } header: {
-            Text("Feedback")
+            NavigationLink(value: SettingsPage.about) { Label("About & Feedback", systemImage: "info.circle") }
         } footer: {
-            Text("Opens a ready-to-fill GitHub issue with your app version and system already added. Nothing from your recipes is included. You'll need a free GitHub account to send it.")
-        }
-        Section {
-            Button { showingTour = true } label: { Label("Show Welcome Tour", systemImage: "sparkles") }
-            Link(destination: URL(string: "https://github.com/luigiinred/recipes-app")!) {
-                Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
-            }
+            Text("Recipes is free, open source, and will never show you an ad.")
         }
     }
 
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
-        case .aiImprovements:
-            AIImprovementsPage()
-        case .tabs:
+        case .layout:
             #if os(iOS)
             TabsSettingsPage()
             #else
             EmptyView()
             #endif
-        case .home:
-            #if os(iOS)
-            HomeSettingsPage()
-            #else
-            EmptyView()
-            #endif
         case .recipes: RecipesSettingsPage()
-        case .search: SearchSettingsPage()
         case .planner: PlannerSettingsPage()
-        case .cooking: CookingSettingsPage()
         case .groceries: GroceriesSettingsPage()
-        case .reminders: RemindersSettingsPage()
+        case .discover: DiscoverSettingsPage()
+        case .notifications: RemindersSettingsPage()
         case .theme: AppearanceSettingsPage()
-        case .feeds: RecipeFeedsPage(showsTabToggle: true)
-        case .mealie: MealieSettingsPage()
-        case .mealieSharing: MealieSharingPage()
         case .intelligence: IntelligenceSettingsPage(override: intelligenceOverride)
         case .data: DataSettingsPage()
+        case .about: AboutSettingsPage(listing: listing) { showingTour = true }
         }
+    }
+}
+
+/// Feeds you follow and Mealie servers, the two places Discover finds recipes.
+private struct DiscoverSettingsPage: View {
+    var body: some View {
+        ThemedForm {
+            Section {
+                NavigationLink { RecipeFeedsPage(showsTabToggle: true) } label: {
+                    Label("Feeds", systemImage: "dot.radiowaves.up.forward")
+                }
+                NavigationLink { SearchSettingsPage() } label: {
+                    Label("Search Sources", systemImage: "magnifyingglass")
+                }
+            } footer: {
+                Text("Recipe sites, blogs and YouTube channels you follow, and where search looks online.")
+            }
+            Section {
+                NavigationLink { MealieSettingsPage() } label: { Label("Mealie", image: "MealieLogo") }
+                NavigationLink { MealieSharingPage() } label: { Label("Mealie Sharing", systemImage: "person.2") }
+            } header: {
+                Text("Mealie")
+            } footer: {
+                Text("Sync with your own Mealie server, or browse one a friend shares with you.")
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("Discover")
+    }
+}
+
+/// Sharing, feedback, the welcome tour and the source code.
+private struct AboutSettingsPage: View {
+    let listing: URL?
+    let showTour: () -> Void
+
+    var body: some View {
+        ThemedForm {
+            if let listing {
+                Section {
+                    ShareLink(
+                        item: listing,
+                        message: Text("I keep all my recipes in Recipes. It's free, open source, and has no ads or account.")
+                    ) { Label("Tell a Friend Who Cooks", systemImage: "heart") }
+                } footer: {
+                    Text("Word of mouth is our whole marketing budget, and a kind review is how the next home cook finds us.")
+                }
+            }
+            Section {
+                Link(destination: FeedbackLink.url(for: .bug)) { Label("Report a Bug", systemImage: "ladybug") }
+                Link(destination: FeedbackLink.url(for: .feature)) { Label("Suggest a Change", systemImage: "lightbulb") }
+            } header: {
+                Text("Feedback")
+            } footer: {
+                Text("Opens a ready-to-fill GitHub issue with your app version and system already added. Nothing from your recipes is included. You'll need a free GitHub account to send it.")
+            }
+            Section {
+                Button(action: showTour) { Label("Show Welcome Tour", systemImage: "sparkles") }
+                Link(destination: URL(string: "https://github.com/luigiinred/recipes-app")!) {
+                    Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .settingsPage("About & Feedback")
     }
 }
 
@@ -173,6 +190,7 @@ private struct RecipesSettingsPage: View {
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyle = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.showDeleteSwipe) private var showDeleteSwipe = false
     @AppStorage(AppSettings.Key.recipeDetails) private var recipeDetailsRaw = RecipeDetail.raw(RecipeDetail.defaults)
+    @AppStorage(AppSettings.Key.keepAwake) private var keepAwake = true
     #if os(iOS)
     @AppStorage(AppSettings.Key.remembersSort) private var remembersSort = true
     @AppStorage(AppSettings.Key.defaultSort) private var defaultSort = RecipeSort.recent
@@ -238,6 +256,13 @@ private struct RecipesSettingsPage: View {
                 Text("Swipe actions")
             } footer: {
                 Text("Swipe a recipe left for Up Next and Favorite. Turn this on to add Delete, which always asks before removing anything.")
+            }
+            Section {
+                Toggle("Keep the screen awake", isOn: $keepAwake)
+            } header: {
+                Text("Cook mode")
+            } footer: {
+                Text("Stops the screen from locking while you're following a recipe.")
             }
         }
         .formStyle(.grouped)
@@ -439,24 +464,6 @@ private struct PlannerSettingsPage: View {
     }
 }
 
-private struct CookingSettingsPage: View {
-    @AppStorage(AppSettings.Key.keepAwake) private var keepAwake = true
-
-    var body: some View {
-        ThemedForm {
-            Section {
-                Toggle("Keep the screen awake", isOn: $keepAwake)
-            } header: {
-                Text("Cook mode")
-            } footer: {
-                Text("Stops the screen from locking while you're following a recipe.")
-            }
-        }
-        .formStyle(.grouped)
-        .settingsPage("Cooking")
-    }
-}
-
 private struct GroceriesSettingsPage: View {
     @EnvironmentObject private var library: RecipeLibrary
 
@@ -530,7 +537,7 @@ struct RemindersSettingsPage: View {
             }
         }
         .formStyle(.grouped)
-        .settingsPage("Reminders")
+        .settingsPage("Notifications")
         .task { authorization = await ReminderCenter.shared.authorization }
         .onChange(of: [logOn, planOn, addOn]) { _, new in
             guard new.contains(true) else { return reschedule() }
@@ -1159,6 +1166,11 @@ struct TabsSettingsPage: View {
                      ? "Drag to reorder the tiles on Home."
                      : "Drag to reorder. Keep Home, Recipes, or both. The tab bar holds five tabs; without Settings in it, the gear on Home or Recipes opens it.")
             }
+            Section {
+                NavigationLink { HomeSettingsPage() } label: { Label("Home Sections", systemImage: "house") }
+            } footer: {
+                Text("What Home shows, and in what order.")
+            }
             if !others.isEmpty {
                 Section(onHome ? "More Pages" : "More Tabs") {
                     ForEach(others) { item in
@@ -1179,7 +1191,7 @@ struct TabsSettingsPage: View {
         }
         .formStyle(.grouped)
         .environment(\.editMode, .constant(.active))
-        .settingsPage("Tabs")
+        .settingsPage("Layout")
     }
 }
 #endif
