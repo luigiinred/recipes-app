@@ -19,6 +19,7 @@ struct RootView: View {
 
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var discover: DiscoverController
+    @EnvironmentObject private var feeds: FeedLoader
     @AppStorage(AppSettings.Key.ratingStyle) private var ratingStyleRaw = RatingStyle.favorites.rawValue
     @AppStorage(AppSettings.Key.tabOrder) private var tabOrderRaw = ""
     @AppStorage(AppSettings.Key.navigationStyle) private var navigationStyle = NavigationStyle.standard
@@ -94,6 +95,18 @@ struct RootView: View {
             default: AnyView(SettingsView(inSheet: false, splitsPages: sizeClass == .regular))
             }
         }
+        .badge(badge(for: item))
+    }
+
+    /// New posts on Discover, and what's left to buy on Groceries; nothing shows at zero.
+    private func badge(for item: TabItem) -> Text? {
+        let count = switch item {
+        case .feeds: feeds.items(for: library.feeds).count { !feeds.isViewed($0.entry) }
+        case .groceries: library.groceries.count { !$0.isChecked }
+        default: 0
+        }
+        guard count > 0 else { return nil }
+        return Text(count > 99 ? "99+" : "\(count)")
     }
 
     @TabContentBuilder<AppTab>
