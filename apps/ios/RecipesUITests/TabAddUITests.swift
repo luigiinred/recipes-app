@@ -37,12 +37,17 @@ final class TabAddUITests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "its search is ready to type")
     }
 
-    func testGroceriesTabButtonFocusesNewItemField() {
+    func testGroceriesAddsFromTheFieldAtTheEndOfTheList() {
         app.tabBars.buttons["Groceries"].tap()
-        let add = app.navigationBars.buttons["Add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
-        add.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the Add item field should take focus")
+        XCTAssertFalse(app.navigationBars.buttons["Add"].waitForExistence(timeout: 3), "the field is always there, so there's no + for it")
+        let field = app.textFields["groceries.add"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        field.typeText("Limes\n")
+        let limes = app.staticTexts["Limes"]
+        XCTAssertTrue(limes.waitForExistence(timeout: 5))
+        XCTAssertLessThan(limes.frame.minY, field.frame.minY, "new items land above the field, which stays at the end")
     }
 
     func testPlanHasNoAddInItsNavigationBar() {

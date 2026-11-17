@@ -401,11 +401,6 @@ struct GroceriesTab: View {
                 GroceriesBoard()
             } else {
                 GroceriesView(layout: .combined)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { router.add = .groceries } label: { Label("Add", systemImage: "plus") }
-                        }
-                    }
             }
         }
     }

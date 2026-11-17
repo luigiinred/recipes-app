@@ -21,11 +21,13 @@ struct GroceriesView: View {
         List {
             if layout != .completed {
                 section(embedded ? "To Buy" : nil) {
+                    ForEach(toBuy) { row($0) }
                     TextField("Add item", text: $newItem)
                         .focused($addingItem)
                         .onSubmit(addItem)
+                        .submitLabel(.next)
                         .themedRow()
-                    ForEach(toBuy) { row($0) }
+                        .accessibilityIdentifier("groceries.add")
                 }
             }
             if layout != .toBuy, !completed.isEmpty || layout == .completed {
