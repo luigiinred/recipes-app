@@ -740,7 +740,7 @@ extension FeedLoader {
     }
 }
 
-#if os(iOS)
+
 /// The newest followed posts as a swipeable row, for the Recipes home.
 struct FeedShelf: View {
     static let limit = 10
@@ -784,7 +784,7 @@ struct FeedShelf: View {
         .task(id: library.feeds.map(\.id)) { await loader.loadAll(library.feeds) }
     }
 }
-#endif
+
 
 extension FeedEntry {
     /// Stand-in post whose title gives a loading card its shape.

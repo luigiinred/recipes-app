@@ -452,3 +452,13 @@ extension View {
     func appFont(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> some View { modifier(AppFont(style: style, weight: weight)) }
     func themedCanvas(_ isOn: Bool = true) -> some View { modifier(ThemedCanvas(isOn: isOn)) }
 }
+
+extension Color {
+    static var groupedSurface: Color {
+        #if os(iOS)
+        Color(.secondarySystemGroupedBackground)
+        #else
+        Color(nsColor: .controlBackgroundColor)
+        #endif
+    }
+}
