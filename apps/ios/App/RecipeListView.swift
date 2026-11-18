@@ -533,7 +533,7 @@ extension View {
     }
 }
 
-#if os(iOS)
+
 enum RecipesRoute: Hashable {
     case collection(RecipeCollection)
     case recipe(UUID)
@@ -617,7 +617,7 @@ struct FolderTile: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(appearance.surface ?? .groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -636,7 +636,7 @@ extension FolderTile {
     }
 }
 
-#endif
+
 
 extension View {
     /// Keeps the search field visible at the top on iPhone instead of scrolling away with the list.

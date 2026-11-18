@@ -1,4 +1,4 @@
-#if os(iOS)
+
 import RecipeKit
 import SwiftUI
 
@@ -288,7 +288,9 @@ struct RecipesHomeView: View {
     @State private var online = OnlineRecipeSearch()
     @State private var keyboardShown = false
     @State private var freeTextItem: FreeTextItem?
+    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     @Environment(\.referenceDate) private var referenceDate
     @Environment(HomeBrowsing.self) private var browsing
     @Environment(\.openRecipesRoute) private var openRoute
@@ -344,7 +346,12 @@ struct RecipesHomeView: View {
     @State private var showingSettings = false
 
     private var ratingStyle: RatingStyle { RatingStyle(rawValue: ratingStyleRaw) ?? .favorites }
+    #if os(iOS)
     private var isRegular: Bool { sizeClass == .regular }
+    #else
+    /// The Mac shows Home as a narrow column, so it always uses the list.
+    private let isRegular = false
+    #endif
     private var margin: CGFloat { isRegular ? 28 : 20 }
     private var sort: RecipeSort { remembersSort ? savedSort : chosenSort ?? defaultSort }
     private var sortBinding: Binding<RecipeSort> {
@@ -430,8 +437,10 @@ struct RecipesHomeView: View {
         #endif
         .recipeActions(selection: $selection, addsAtTrailing: isHome)
         .task(id: onlineQuery) { await searchOnline() }
+        #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardShown = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardShown = false }
+        #endif
         .toolbar {
             #if os(iOS)
             if isTabRoot, query.isEmpty, !isRegular, showsPages || !AppSettings.barTabs(hiddenTabsRaw).contains(.settings) {
@@ -1306,12 +1315,14 @@ private struct HomeFilterSheet: View {
             }
             .navigationTitle("Filters")
             .navigationSubtitle("\(remaining) of \(library.recipes.count) recipes")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(role: .close) { dismiss() }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Button("Reset") { withAnimation(.snappy) { filter = HomeFilter(query: filter.query) } }
                         .disabled(!filter.isActive)
                 }
@@ -1412,9 +1423,9 @@ private struct TimeHistogram: View {
     }
 }
 
-#endif
 
-#if os(iOS)
+
+
 /// Home Screen mode's way around the app: a tile for each page chosen in Settings → Tabs, in that order.
 struct HomePages: View {
     @EnvironmentObject private var library: RecipeLibrary
@@ -1450,7 +1461,7 @@ struct HomePages: View {
     }
 
     private func route(_ page: TabItem) -> RecipesRoute {
-        page.feature.map(RootView.route) ?? .allRecipes
+        page.feature?.route ?? .allRecipes
     }
 
     private func detail(_ page: TabItem) -> String {
@@ -1464,9 +1475,9 @@ struct HomePages: View {
         }
     }
 }
-#endif
 
-#if os(iOS)
+
+
 /// Every Home section's heading: the title, and at most one accessory, always a tinted link with a small chevron.
 struct HomeSectionHeader: View {
     struct Accessory {
@@ -1503,4 +1514,4 @@ struct HomeSectionHeader: View {
         }
     }
 }
-#endif
+

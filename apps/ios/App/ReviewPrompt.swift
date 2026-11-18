@@ -71,6 +71,7 @@ private struct ReviewPromptAccessory: ViewModifier {
         }
     }
 }
+#endif
 
 /// iPad shows the banner at the bottom of the recipe list, so it never changes the tab view's own safe area.
 private struct ReviewPromptInset: ViewModifier {
@@ -88,7 +89,9 @@ private struct ReviewPromptInset: ViewModifier {
 }
 
 extension View {
+    #if os(iOS)
     func reviewPrompt() -> some View { modifier(ReviewPromptAccessory()) }
+    #endif
     func reviewPromptInset() -> some View { modifier(ReviewPromptInset()) }
 }
-#endif
+

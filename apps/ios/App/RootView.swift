@@ -177,7 +177,7 @@ struct RootView: View {
             case .groceries: .groceries
             case .feeds: .feeds
             }
-            if usesHomeScreen { recipesPath = [Self.route(target)] }
+            if usesHomeScreen { recipesPath = [target.route] }
             else if inBar(target) { tab = Self.appTab(TabItem(target)) }
             router.destination = nil
         }
@@ -198,14 +198,6 @@ struct RootView: View {
             case .addRecipe: tab = libraryTab
             case nil: break
             }
-        }
-    }
-
-    static func route(_ page: MainTab) -> RecipesRoute {
-        switch page {
-        case .feeds: .feeds
-        case .plan: .plan
-        case .groceries: .groceries
         }
     }
 
@@ -322,51 +314,6 @@ struct RecipesTab: View {
     }
 }
 
-/// Where a pushed `RecipesRoute` lands, in any stack that pushes them.
-struct RecipesRouteDestination: View {
-    @EnvironmentObject private var library: RecipeLibrary
-    @EnvironmentObject private var router: AppRouter
-    let route: RecipesRoute
-    @Binding var selection: Recipe.ID?
-    let push: (RecipesRoute) -> Void
-
-    var body: some View {
-        switch route {
-        case .collection(let collection):
-            RecipeListView(collection: .constant(collection), selection: $selection)
-        case .recipe(let id):
-            if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
-        case .discoverSources:
-            DiscoverSourcesView()
-        case .discover(let source, let route):
-            DiscoverPage(sourceID: source, route: route) { push(.discover(source, .recipe($0))) }
-        case .tag(let path):
-            RecipesHomeView(selection: $selection, tag: path).id(path)
-        case .allRecipes:
-            RecipesHomeView(selection: $selection, showsAllRecipes: true)
-        case .feeds:
-            FeedStreamView()
-        case .feedPost(let entry):
-            FeedEntryPreview(entry: entry)
-        case .plan:
-            MealBoardView { push(.recipe($0)) }
-                .navigationTitle("Plan")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-        case .groceries:
-            GroceriesView(layout: .combined)
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { router.add = .groceries } label: { Label("Add", systemImage: "plus") }
-                    }
-                }
-        case .homeSettings:
-            HomeSettingsPage()
-        }
-    }
-}
-
 struct PlanTab: View {
     @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var router: AppRouter
@@ -407,6 +354,65 @@ struct GroceriesTab: View {
 }
 #endif
 
+/// Where a pushed `RecipesRoute` lands, in any stack that pushes them.
+struct RecipesRouteDestination: View {
+    @EnvironmentObject private var library: RecipeLibrary
+    @EnvironmentObject private var router: AppRouter
+    let route: RecipesRoute
+    @Binding var selection: Recipe.ID?
+    let push: (RecipesRoute) -> Void
+
+    var body: some View {
+        switch route {
+        case .collection(let collection):
+            RecipeListView(collection: .constant(collection), selection: $selection)
+        case .recipe(let id):
+            if let recipe = library.recipe(id: id) { RecipeDetailView(recipe: recipe).id(id) }
+        case .discoverSources:
+            DiscoverSourcesView()
+        case .discover(let source, let route):
+            DiscoverPage(sourceID: source, route: route) { push(.discover(source, .recipe($0))) }
+        case .tag(let path):
+            RecipesHomeView(selection: $selection, tag: path).id(path)
+        case .allRecipes:
+            RecipesHomeView(selection: $selection, showsAllRecipes: true)
+        case .feeds:
+            FeedStreamView()
+        case .feedPost(let entry):
+            FeedEntryPreview(entry: entry)
+        case .plan:
+            MealBoardView { push(.recipe($0)) }
+                .navigationTitle("Plan")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+        case .groceries:
+            GroceriesView(layout: .combined)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { router.add = .groceries } label: { Label("Add", systemImage: "plus") }
+                    }
+                }
+        case .homeSettings:
+            #if os(iOS)
+            HomeSettingsPage()
+            #else
+            ContentUnavailableView("Customize Home in Settings", systemImage: "gearshape")
+            #endif
+        }
+    }
+}
+
+extension MainTab {
+    var route: RecipesRoute {
+        switch self {
+        case .feeds: .feeds
+        case .plan: .plan
+        case .groceries: .groceries
+        }
+    }
+}
+
 /// To buy beside completed, for screens wide enough to show both; on an unfolded Duo the fold divides them.
 struct GroceriesBoard: View {
     var body: some View {
@@ -429,67 +435,58 @@ struct GroceriesBoard: View {
 }
 
 #if os(macOS)
+/// Home is the left column and whatever it opens fills the right one, with its own stack for drilling in.
 struct RootView: View {
-    @EnvironmentObject private var library: RecipeLibrary
     @EnvironmentObject private var cook: CookSession
     @EnvironmentObject private var router: AppRouter
-    @AppStorage(AppSettings.Key.tabOrder) private var hiddenTabsRaw = ""
-
-    @State private var section: AppSection?
-    @State private var path: [Recipe.ID]
-    @State private var selection: Recipe.ID?
-    @State private var collection: RecipeCollection
-    @State private var query = ""
     @State private var columns = NavigationSplitViewVisibility.automatic
-    init(section: AppSection = .recipes(.all), selection: Recipe.ID? = nil) {
-        _section = State(initialValue: section)
-        _path = State(initialValue: selection.map { [$0] } ?? [])
-        if case .recipes(let collection) = section {
-            _collection = State(initialValue: collection)
-        } else {
-            _collection = State(initialValue: .all)
-        }
+    @State private var browsing = HomeBrowsing()
+    @State private var query = ""
+    @State private var homeSelection: Recipe.ID?
+    @State private var detail: [RecipesRoute]
+    @State private var detailSelection: Recipe.ID?
+    @State private var showsSettings = false
+
+    init(selection: Recipe.ID? = nil) {
+        _detail = State(initialValue: selection.map { [.recipe($0)] } ?? [])
     }
 
-    /// The sidebar picks a section; a recipe opened from it fills the rest of the window.
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
-            SidebarView(section: $section)
+            RecipesHomeView(selection: $homeSelection, query: query, showsQuickFilters: !query.isEmpty, isTabRoot: true)
+                .searchable(text: $query, placement: .sidebar, prompt: "Search My Recipes")
+                .environment(\.openRecipesRoute) { route in
+                    homeSelection = nil
+                    open(route)
+                }
+                .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 520)
         } detail: {
-            if section == .settings {
+            if showsSettings {
                 SettingsView(inSheet: false)
             } else {
-                NavigationStack(path: $path) {
-                    searchableRoot
-                        .navigationDestination(for: Recipe.ID.self) { id in
-                            if case .discover(let source) = section {
-                                DiscoverPage(sourceID: source, route: .recipe(id)) { _ in }.id(id)
-                            } else if let recipe = library.recipe(id: id) {
-                                RecipeDetailView(recipe: recipe).id(id)
-                            }
+                NavigationStack(path: $detail) {
+                    ContentUnavailableView("Nothing Open", systemImage: "sidebar.right",
+                                           description: Text("Recipes, pages, and posts you open from Home appear here."))
+                        .navigationDestination(for: RecipesRoute.self) { route in
+                            RecipesRouteDestination(route: route, selection: $detailSelection) { detail.append($0) }
                         }
                 }
+                .environment(\.openRecipesRoute) { detail.append($0) }
             }
         }
-        .searchable(text: $query, placement: .toolbar, prompt: "Search")
+        .environment(browsing)
+        .onChange(of: homeSelection) { _, id in
+            if let id { open(.recipe(id)) }
+        }
+        .onChange(of: detailSelection) { _, id in
+            guard let id else { return }
+            detail.append(.recipe(id))
+            detailSelection = nil
+        }
         .onChange(of: router.showsSettings) { _, shows in
             guard shows else { return }
-            section = .settings
+            showsSettings = true
             router.showsSettings = false
-        }
-        .onChange(of: hiddenTabsRaw) {
-            if let section, MainTab.allCases.contains(where: { $0.section == section && AppSettings.hiddenTabs(hiddenTabsRaw).contains($0) }) {
-                self.section = .recipes(.all)
-            }
-        }
-        .onChange(of: section) { _, new in
-            if case .recipes(let newCollection) = new { collection = newCollection }
-            path = []
-        }
-        .onChange(of: selection) { _, id in
-            guard let id else { return }
-            path.append(id)
-            selection = nil
         }
         .panelHost(sidebar: $columns)
         .frame(minWidth: 720, minHeight: 480)
@@ -498,68 +495,35 @@ struct RootView: View {
         .cookModeCover(cook)
         .onChange(of: router.destination, initial: true) { _, destination in
             guard let destination else { return }
-            let target: MainTab = switch destination {
+            let route: RecipesRoute = switch destination {
             case .plan: .plan
             case .groceries: .groceries
             case .feeds: .feeds
             }
-            if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(target) { section = target.section }
+            open(route)
             router.destination = nil
         }
         .onChange(of: router.recipeID, initial: true) { _, id in
             guard let id else { return }
-            section = .recipes(.all)
-            path = [id]
+            open(.recipe(id))
             router.recipeID = nil
         }
+        .onChange(of: router.feedPost, initial: true) { _, entry in
+            guard let entry else { return }
+            open(.feedPost(entry))
+            router.feedPost = nil
+        }
         .onChange(of: router.reminder, initial: true) { _, kind in
-            switch kind {
-            case .logDinner, .planWeek:
-                if !AppSettings.hiddenTabs(hiddenTabsRaw).contains(.plan) { section = .plan }
+            if kind == .logDinner || kind == .planWeek {
+                open(.plan)
                 router.reminder = nil
-            case .addRecipe:
-                section = .recipes(.all)
-            case nil: break
             }
         }
     }
 
-    /// Like Calendar, a search lists its results in a column at the window's trailing edge, from any page.
-    private var searchableRoot: some View {
-        let isSearching = !query.trimmingCharacters(in: .whitespaces).isEmpty
-        return HStack(spacing: 0) {
-            sectionRoot
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .environment(\.windowSearchIsShowing, isSearching)
-            if isSearching {
-                Divider()
-                DiscoverSearchResults(query: query) { id in
-                    if case .discover = section { router.recipeID = id } else { path.append(id) }
-                }
-                .frame(minWidth: 0, idealWidth: 340, maxWidth: 340)
-                .accessibilityIdentifier("search.results")
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-        }
-        .animation(.snappy, value: query.isEmpty)
-    }
-
-    @ViewBuilder
-    private var sectionRoot: some View {
-        switch section ?? .recipes(.all) {
-        case .recipes:
-            RecipeListView(collection: $collection, selection: $selection)
-        case .discover(let source):
-            DiscoverPage(sourceID: source, route: .home) { path.append($0) }.id(source)
-        case .feeds:
-            FeedStreamView()
-        case .plan:
-            MealBoardView { path.append($0) }.navigationTitle("Plan")
-        case .groceries:
-            GroceriesBoard()
-        case .settings:
-            EmptyView()
-        }
+    private func open(_ route: RecipesRoute) {
+        showsSettings = false
+        detail = [route]
     }
 }
 

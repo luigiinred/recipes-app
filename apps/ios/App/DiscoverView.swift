@@ -154,7 +154,7 @@ struct DiscoverAddButton: View {
     }
 }
 
-#if os(iOS)
+
 /// Discover when more than one server has been shared: pick which one to browse.
 struct DiscoverSourcesView: View {
     @EnvironmentObject private var discover: DiscoverController
@@ -203,7 +203,7 @@ struct DiscoverEntryTile: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(appearance.surface ?? .groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.borderless)
@@ -215,7 +215,12 @@ struct DiscoverEntryTile: View {
 private struct DiscoverHomeView: View {
     @EnvironmentObject private var library: RecipeLibrary
     @Environment(\.discover) private var scope
+    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
+    private var isRegular: Bool { sizeClass == .regular }
+    #else
+    private let isRegular = false
+    #endif
     @ObservedObject var catalog: DiscoverCatalog
 
     private var collections: [RecipeCollection] {
@@ -226,7 +231,7 @@ private struct DiscoverHomeView: View {
         Group {
             if library.recipes.isEmpty {
                 DiscoverStatusView(catalog: catalog)
-            } else if sizeClass == .regular {
+            } else if isRegular {
                 grid
             } else {
                 list
@@ -397,7 +402,7 @@ private struct MealieServerTile: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(appearance.surface ?? Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(appearance.surface ?? .groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
@@ -415,4 +420,4 @@ extension RecipesRoute {
         return .discover(scope.catalog.source.id, .collection(collection))
     }
 }
-#endif
+
