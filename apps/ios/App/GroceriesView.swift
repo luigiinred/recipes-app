@@ -251,7 +251,7 @@ struct GroceriesMenu: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Menu("Groceries Options", systemImage: "ellipsis.circle") {
+            Menu("Groceries Options", systemImage: "ellipsis") {
                 Picker(selection: $grouping) {
                     ForEach(GroceryGrouping.allCases, id: \.self) { Text($0.title).tag($0) }
                 } label: {

@@ -412,7 +412,7 @@ private struct RecipeActionsModifier: ViewModifier {
                     Menu {
                         Menu { addItems } label: { Label("Add Recipe", systemImage: "plus") }
                         Button("Find Recipes for \(findRecipes.title)", systemImage: "sparkle.magnifyingglass", action: findRecipes.perform)
-                    } label: { Label("More", systemImage: "ellipsis.circle") }
+                    } label: { Label("More", systemImage: "ellipsis") }
                 }
             } else {
                 ToolbarItem(placement: addPlacement) {

@@ -1,3 +1,4 @@
+import ImageIO
 import ImagePlayground
 import PhotosUI
 import RecipeKit
@@ -49,6 +50,10 @@ struct RecipeDetailView: View {
     @State private var risen = false
     @State private var sideInsets = EdgeInsets()
     @State private var sidePaneScrolled = false
+    @State private var heroTints: [HeroTint.Edge: Color] = [:]
+    @State private var heroHeight: CGFloat = 0
+    @State private var directionsHeight: CGFloat = 0
+    @State private var scrollHeight: CGFloat = 0
     @State private var titleScrolledAway = false
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @State private var addingToGroceries = false
@@ -88,8 +93,10 @@ struct RecipeDetailView: View {
     private var page: some View {
         GeometryReader { geometry in
             let fold = geometry.verticalFold
-            if geometry.size.width >= 760 || fold != nil, !recipe.isIdea {
+            if let fold, !recipe.isIdea {
                 twoColumns(width: geometry.size.width, fold: fold, trailingInset: geometry.safeAreaInsets.trailing)
+            } else if geometry.size.width >= 760, !recipe.isIdea {
+                editorial(width: geometry.size.width)
             } else {
                 oneColumn
             }
@@ -158,7 +165,7 @@ struct RecipeDetailView: View {
                         }
                         Divider()
                         Button("Edit", systemImage: "pencil") { editing = true }
-                    } label: { Label("More", systemImage: "ellipsis.circle") }
+                    } label: { Label("More", systemImage: "ellipsis") }
                 }
             }
         }
@@ -217,6 +224,7 @@ struct RecipeDetailView: View {
                 CleanupSuggestionCard(recipe: recipe, cleanup: cleanup)
             }
         }
+        .task(id: heroPhotoStamp) { await sampleHeroTints() }
         .task(id: recipe.id) {
             guard previewSave == nil else { return }
             shareThumbnail = await library.loadThumbnail(for: recipe.id)
@@ -230,22 +238,69 @@ struct RecipeDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var oneColumn: some View {
+        if Self.fixesVideoAtTop, recipe.youTubeVideoID != nil {
+            // As in the YouTube app: the player holds at the top and the page scrolls under it.
+            VStack(spacing: 0) {
+                video(edgeToEdge: true)
+                    .padding(.top, statusBarHeight)
+                    .background(.black)
+                    .zIndex(1)
+                scrollingColumn
+            }
+            .ignoresSafeArea(edges: .top)
+        } else {
+            scrollingColumn
+        }
+    }
+
+    private var scrollingColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if hasArtwork {
+                    PhotoBanner(height: oneColumnBannerHeight + topInset) { artwork }
+                        .overlay {
+                            if heroPhoto {
+                                LinearGradient(stops: [.init(color: .clear, location: 0.4), .init(color: tint(.bottom), location: 1)], startPoint: .top, endPoint: .bottom)
+                            }
+                        }
+                        .padding(.bottom, heroPhoto ? 0 : -Self.cardRadius)
+                }
+                VStack(spacing: 0) {
                 if recipe.youTubeVideoID != nil {
-                    video.padding([.horizontal, .top], 24)
-                } else if hasArtwork {
-                    PhotoBanner(height: Self.bannerHeight + topInset) { artwork }
+                    VStack(alignment: .leading, spacing: 24) {
+                        if !Self.fixesVideoAtTop { video }
+                        header(onPhoto: true)
+                    }
+                    .padding([.horizontal, .top], 24)
+                    .padding(.bottom, 24 + Self.cardRadius)
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .environment(\.colorScheme, .dark)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heroHeight = $0 }
+                    .padding(.bottom, -Self.cardRadius)
+                    .zIndex(1)
+                } else if heroPhoto {
+                    header(onPhoto: true)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24 + Self.cardRadius)
+                        .frame(maxWidth: 900, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                        .padding(.leading, sideInsets.leading)
+                        .padding(.trailing, sideInsets.trailing)
+                        .environment(\.colorScheme, .dark)
+                        .background { tint(.bottom).padding(.top, Self.heroOverlap) }
+                        .padding(.top, -Self.heroOverlap)
                         .padding(.bottom, -Self.cardRadius)
                 }
                 VStack(alignment: .leading, spacing: 24) {
-                    header
+                    if !tintedHero { header() }
                     if recipe.isIdea {
                         ideaNote
                     } else {
                         TwoPaneLayout {
-                            ingredients
+                            ingredientList(alignsAmounts: false)
                             steps
                         }
                     }
@@ -256,7 +311,9 @@ struct RecipeDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.leading, hasArtwork ? sideInsets.leading : 0)
                 .padding(.trailing, hasArtwork ? sideInsets.trailing : 0)
-                .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork ? Self.cardRadius : 0, topTrailingRadius: hasArtwork ? Self.cardRadius : 0, style: .continuous))
+                .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: hasArtwork || tintedHero ? Self.cardRadius : 0, topTrailingRadius: hasArtwork || tintedHero ? Self.cardRadius : 0, style: .continuous))
+                }
+                .background(alignment: .top) { videoHeroTint }
                 .offset(y: settled ? 0 : risesFromBelow ? max(viewportHeight, 600) : 32)
             }
             .textSelection(.enabled)
@@ -264,8 +321,8 @@ struct RecipeDetailView: View {
         // The photo and the card's corners reach the screen edges; the text keeps to the safe area above.
         .ignoresSafeArea(edges: hasArtwork ? [.top, .horizontal] : [])
         .scrollEdgeEffectHidden(hasArtwork && !titleScrolledAway, for: .top)
-        .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
-        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? Self.bannerHeight : 0) + 60 } action: { _, scrolledAway in
+        .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil && !Self.fixesVideoAtTop)
+        .onScrollGeometryChange(for: Bool.self) { [oneColumnBannerHeight] in $0.contentOffset.y + $0.contentInsets.top > (hasArtwork ? oneColumnBannerHeight : 0) + 60 } action: { _, scrolledAway in
             titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
         }
     }
@@ -277,7 +334,173 @@ struct RecipeDetailView: View {
     }
 
     static let bannerHeight: CGFloat = 240
+    #if os(iOS)
+    private var statusBarHeight: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.statusBarManager?.statusBarFrame.height ?? 0
+    }
+
+    static let fixesVideoAtTop = true
+    #else
+    private var statusBarHeight: CGFloat { 0 }
+
+    static let fixesVideoAtTop = false
+    #endif
+    static let heroBannerHeight: CGFloat = 340
+    static let heroOverlap: CGFloat = 72
     static let cardRadius: CGFloat = 28
+
+    private var oneColumnBannerHeight: CGFloat { heroPhoto ? Self.heroBannerHeight : Self.bannerHeight }
+
+    private var tintedHero: Bool { heroPhoto || recipe.youTubeVideoID != nil }
+
+    /// Drawn behind the page rather than the video's hero, so the video can sit above the card while it pins on scroll.
+    /// It runs on up past the top, under the bars and any overscroll.
+    @ViewBuilder
+    private var videoHeroTint: some View {
+        if recipe.youTubeVideoID != nil {
+            tint(.bottom).frame(height: heroHeight + 1000).offset(y: -1000)
+        }
+    }
+
+    /// A real photo (or one on its way) gets the hero, with the page's header on a colour taken from it.
+    private var heroPhoto: Bool {
+        guard recipe.youTubeVideoID == nil else { return false }
+        if reservesArtwork { return true }
+        return previewSave != nil ? previewImage != nil : library.hasImage(recipe.id)
+    }
+
+    private var heroPhotoStamp: String {
+        "\(recipe.id)|\(previewImage?.count ?? -1)|\(String(describing: library.imageStamps[recipe.id]))"
+    }
+
+    private func tint(_ edge: HeroTint.Edge) -> Color { heroTints[edge] ?? Color(white: 0.14) }
+
+    private func sampleHeroTints() async {
+        let image: CGImage?
+        if let videoID = recipe.youTubeVideoID {
+            image = await Self.videoThumbnail(videoID)
+            guard let image, let color = HeroTint.color(from: image, edge: .center) else { return }
+            heroTints = [.leading: color, .bottom: color]
+            return
+        } else if previewSave != nil {
+            image = previewImage.flatMap { RecipeImageProcessing.thumbnail(from: $0, maxPixelSize: 200) }
+        } else {
+            if let cached = library.cachedThumbnail(for: recipe.id) { image = cached } else { image = await library.loadThumbnail(for: recipe.id) }
+        }
+        guard let image else { return }
+        var tints: [HeroTint.Edge: Color] = [:]
+        for edge in [HeroTint.Edge.leading, .bottom] { tints[edge] = HeroTint.color(from: image, edge: edge) }
+        heroTints = tints
+    }
+
+    private static func videoThumbnail(_ videoID: String) async -> CGImage? {
+        guard let url = URL(string: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg"),
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    /// The photo and header run across the top; below, the ingredients stay in view beside the directions until the directions end.
+    private func editorial(width: CGFloat) -> some View {
+        let sideWidth = min(400, max(300, width * 0.34))
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                wideHero(width: width)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heroHeight = $0 }
+                    .zIndex(recipe.youTubeVideoID != nil ? 1 : 0)
+                HStack(alignment: .top, spacing: 40) {
+                    ingredientList(alignsAmounts: true)
+                        .frame(width: sideWidth)
+                        .visualEffect { [directionsHeight, scrollHeight, topInset] content, proxy in
+                            content.offset(y: Self.pinnedOffset(
+                                top: proxy.frame(in: .scrollView(axis: .vertical)).minY,
+                                height: proxy.size.height,
+                                travel: directionsHeight - proxy.size.height,
+                                visible: scrollHeight,
+                                pin: topInset + 16
+                            ))
+                        }
+                    VStack(alignment: .leading, spacing: 28) {
+                        steps
+                        footer
+                    }
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { directionsHeight = $0 }
+                }
+                .padding(.horizontal, 40)
+                .padding(.vertical, 32)
+                .frame(maxWidth: 1240, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(.leading, heroPhoto ? sideInsets.leading : 0)
+                .padding(.trailing, heroPhoto ? sideInsets.trailing : 0)
+                .background(pageStyle, in: UnevenRoundedRectangle(topLeadingRadius: tintedHero ? Self.cardRadius : 0, topTrailingRadius: tintedHero ? Self.cardRadius : 0, style: .continuous))
+                .padding(.top, tintedHero ? -Self.cardRadius : 0)
+                .offset(y: settled ? 0 : risesFromBelow ? max(viewportHeight, 600) : 32)
+            }
+            .background(alignment: .top) { videoHeroTint }
+            .textSelection(.enabled)
+        }
+        .ignoresSafeArea(edges: heroPhoto ? [.top, .horizontal] : [])
+        .scrollEdgeEffectHidden(heroPhoto && !titleScrolledAway, for: .top)
+        .trackingVideoScroll($scrolled, active: recipe.youTubeVideoID != nil)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in scrollHeight = height }
+        .onScrollGeometryChange(for: Bool.self) { [heroHeight] in $0.contentOffset.y + $0.contentInsets.top > heroHeight - 40 } action: { _, scrolledAway in
+            titleScrolledAway = scrolledAway && recipe.youTubeVideoID == nil
+        }
+    }
+
+    /// Like CSS `position: sticky`: a column taller than the screen scrolls until its end is in view, then holds there.
+    nonisolated static func pinnedOffset(top: CGFloat, height: CGFloat, travel: CGFloat, visible: CGFloat, pin: CGFloat) -> CGFloat {
+        let overflow = max(0, height - (visible - pin - 16))
+        return min(max(0, pin - overflow - top), max(0, travel))
+    }
+
+    @ViewBuilder
+    private func wideHero(width: CGFloat) -> some View {
+        let panel = min(480, max(340, width * 0.4))
+        if heroPhoto {
+            header(onPhoto: true)
+                .frame(width: panel, alignment: .leading)
+                .padding(.leading, 40 + sideInsets.leading)
+                .padding(.top, topInset + 32)
+                .padding(.bottom, 40 + Self.cardRadius)
+                .frame(maxWidth: .infinity, minHeight: min(max(440, scrollHeight * 0.55), 640), alignment: .bottomLeading)
+                .environment(\.colorScheme, .dark)
+                .background {
+                    ZStack(alignment: .trailing) {
+                        tint(.leading)
+                        artwork
+                            .frame(width: max(0, width + sideInsets.leading + sideInsets.trailing - 40 - panel * 0.7))
+                            .frame(maxHeight: .infinity)
+                            .clipped()
+                            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.35), location: 0.16), .init(color: .black.opacity(0.8), location: 0.32), .init(color: .black, location: 0.45)], startPoint: .leading, endPoint: .trailing))
+                    }
+                }
+        } else if recipe.youTubeVideoID != nil {
+            HStack(alignment: .top, spacing: 40) {
+                header(onPhoto: true).frame(width: panel, alignment: .leading)
+                video.frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 24)
+            .padding(.bottom, 40 + Self.cardRadius)
+            .frame(maxWidth: 1240, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .environment(\.colorScheme, .dark)
+        } else {
+            HStack(alignment: .top, spacing: 40) {
+                header().frame(width: panel, alignment: .leading)
+                artwork
+                    .aspectRatio(4 / 3, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 24)
+            .frame(maxWidth: 1240, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+    }
 
     private var pageStyle: AnyShapeStyle {
         appearance.canvas.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.background)
@@ -291,7 +514,7 @@ struct RecipeDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     if recipe.youTubeVideoID != nil { video }
-                    header
+                    header()
                     steps
                     footer
                 }
@@ -315,7 +538,7 @@ struct RecipeDetailView: View {
                             .overlay { artwork }
                             .clipped()
                     }
-                    ingredients.padding(24).padding(.trailing, trailingInset)
+                    ingredientList(alignsAmounts: false).padding(24).padding(.trailing, trailingInset)
                 }
             }
             .ignoresSafeArea(edges: .top)
@@ -335,15 +558,27 @@ struct RecipeDetailView: View {
         if !recipe.notes.isEmpty {
             section("Notes") { Text(recipe.notes).foregroundStyle(.secondary) }
         }
-        if let source = recipe.sourceURL, let url = URL(string: source) {
+        if sourceLink == nil, recipe.youTubeVideoID == nil, let source = recipe.sourceURL, let url = URL(string: source) {
             Link(destination: url) { Label(url.host ?? source, systemImage: "link") }
         }
     }
 
-    @ViewBuilder
-    private var video: some View {
+    private var sourceLink: (url: URL, name: String)? {
         if let videoID = recipe.youTubeVideoID {
-            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled, viewportHeight: viewportHeight)
+            return URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(player.startSeconds)s").map { ($0, "Open in YouTube") }
+        }
+        guard let url = recipe.sourceURL.flatMap(URL.init(string:)), url.scheme?.hasPrefix("http") == true,
+              let host = url.host() else { return nil }
+        return (url, host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
+    }
+
+    @ViewBuilder
+    private var video: some View { video(edgeToEdge: false) }
+
+    @ViewBuilder
+    private func video(edgeToEdge: Bool) -> some View {
+        if let videoID = recipe.youTubeVideoID {
+            YouTubeEmbed(recipe: recipe, videoID: videoID, controller: player, scrolled: scrolled, viewportHeight: viewportHeight, isEdgeToEdge: edgeToEdge, showsOpenLink: false)
                 .zIndex(1)
         }
     }
@@ -388,9 +623,21 @@ struct RecipeDetailView: View {
         Task { await library.save(recipe, image: .set(jpeg)) }
     }
 
-    private var header: some View {
+    private func header(onPhoto: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 12) {
+                if let source = sourceLink {
+                    Link(destination: source.url) {
+                        HStack(spacing: 4) {
+                            Text(source.name)
+                            Image(systemName: "arrow.up.right").imageScale(.small)
+                        }
+                        .appFont(.subheadline, weight: .semibold)
+                        .foregroundStyle(onPhoto ? AnyShapeStyle(Color.white.opacity(0.75)) : AnyShapeStyle(Theme.accent))
+                    }
+                    .accessibilityLabel(recipe.youTubeVideoID != nil ? source.name : "Original recipe on \(source.name)")
+                    .padding(.bottom, -6)
+                }
                 Text(recipe.title)
                     .appFont(.largeTitle, weight: .bold)
                     .accessibilityAddTraits(.isHeader)
@@ -400,7 +647,7 @@ struct RecipeDetailView: View {
             if previewSave == nil, ratingStyle == .stars || recipe.rating != nil {
                 StarRatingView(rating: recipe.rating) { value in Task { await library.setRating(recipe, value) } }
             }
-            if previewSave == nil { actionTiles }
+            if previewSave == nil { actionTiles(onPhoto: onPhoto) }
             if !recipe.summary.isEmpty {
                 Text(recipe.summary).appFont(.callout).foregroundStyle(.secondary)
             }
@@ -467,33 +714,33 @@ struct RecipeDetailView: View {
         return rest == 0 ? "\(hours) hr" : "\(hours) hr \(rest) min"
     }
 
-    private var actionTiles: some View {
+    private func actionTiles(onPhoto: Bool) -> some View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 if !recipe.isIdea {
-                    tile("Cook", systemImage: "frying.pan", prominent: true) { cook.start(recipe, scale: scale) }
+                    tile("Cook", systemImage: "frying.pan", prominent: true, onPhoto: onPhoto) { cook.start(recipe, scale: scale) }
                         .disabled(recipe.steps.isEmpty)
-                    tile("Groceries", systemImage: "checklist") { addingToGroceries = true }
+                    tile("Groceries", systemImage: "checklist", onPhoto: onPhoto) { addingToGroceries = true }
                         .disabled(recipe.ingredients.isEmpty)
                 }
-                tile(recipe.wantToCook ? "Queued" : "Up Next", systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward") {
+                tile(recipe.wantToCook ? "Queued" : "Up Next", systemImage: recipe.wantToCook ? "checkmark.circle.fill" : "text.line.first.and.arrowtriangle.forward", onPhoto: onPhoto) {
                     Task { await library.setQueued(recipe, !recipe.wantToCook) }
                 }
-                tile("Plan", systemImage: "calendar.badge.plus") { addingToCalendar = true }
+                tile("Plan", systemImage: "calendar.badge.plus", onPhoto: onPhoto) { addingToCalendar = true }
             }
         }
     }
 
-    private func tile(_ title: String, systemImage: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+    private func tile(_ title: String, systemImage: String, prominent: Bool = false, onPhoto: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: systemImage).appFont(.title3)
                 Text(title).appFont(.caption, weight: .medium)
             }
             .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
+            .foregroundStyle(prominent || onPhoto ? AnyShapeStyle(Color.white) : AnyShapeStyle(Theme.accent))
             .glassEffect(
-                prominent ? .regular.tint(accent).interactive() : .regular.tint(accent.opacity(0.1)).interactive(),
+                prominent ? .regular.tint(accent).interactive() : .regular.tint(onPhoto ? Color.white.opacity(0.08) : accent.opacity(0.1)).interactive(),
                 in: RoundedRectangle(cornerRadius: 18)
             )
         }
@@ -526,7 +773,7 @@ struct RecipeDetailView: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private var ingredients: some View {
+    private func ingredientList(alignsAmounts: Bool) -> some View {
         section("Ingredients", trailing: { if previewSave == nil, !recipe.ingredients.isEmpty { ScaleMenu(scale: $scale) } }) {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(scaled.ingredientGroups.enumerated()), id: \.offset) { _, group in
@@ -538,7 +785,11 @@ struct RecipeDetailView: View {
                     }
                     ForEach(group.items, id: \.index) { index, text in
                         HStack {
-                            IngredientLine(text: text).multilineTextAlignment(.leading)
+                            if alignsAmounts {
+                                AlignedIngredientLine(text: text)
+                            } else {
+                                IngredientLine(text: text).multilineTextAlignment(.leading)
+                            }
                             Spacer(minLength: 0)
                         }
                         .padding(12)

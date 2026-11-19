@@ -39,6 +39,37 @@ struct IngredientLine: View {
     }
 }
 
+/// The number in its own right-aligned column, so a list of amounts reads down one edge.
+struct AlignedIngredientLine: View {
+    let text: String
+
+    var body: some View {
+        let ingredient = Ingredient(parsing: text)
+        let quantity = Ingredient.standardQuantity(ingredient.quantity, unit: ingredient.unit)
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(quantity)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(width: 40, alignment: .trailing)
+            Text(quantity.isEmpty ? IngredientLine.styled(text) : Self.remainder(of: ingredient, quantity: quantity))
+                .multilineTextAlignment(.leading)
+        }
+    }
+
+    private static func remainder(of ingredient: Ingredient, quantity: String) -> AttributedString {
+        var result = AttributedString([ingredient.unit?.label(forQuantity: quantity), ingredient.name].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " "))
+        if !ingredient.preparation.isEmpty {
+            var note = AttributedString(" " + ingredient.preparation)
+            note.inlinePresentationIntent = .emphasized
+            note.foregroundColor = .secondary
+            result += note
+        }
+        return result
+    }
+}
+
 extension View {
     /// Press and hold an ingredient to see its amount in other units; choosing one copies it.
     func conversionMenu(for text: String) -> some View {
