@@ -176,6 +176,9 @@ struct YouTubeEmbed: View {
     var viewportHeight: CGFloat = 0
     /// A small player without the "Open in YouTube" row.
     var isCompact = false
+    /// Square corners, for a player that runs to the screen edges.
+    var isEdgeToEdge = false
+    var showsOpenLink = true
     @State private var width: CGFloat = 0
     @State private var aspect: Double = 16 / 9
     @State private var corner = MiniCorner.topTrailing
@@ -211,7 +214,7 @@ struct YouTubeEmbed: View {
             .aspectRatio(aspect, contentMode: .fit)
             .frame(maxHeight: isCompact ? Self.compactMaxHeight : Self.maxHeight)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : 16 - 8 * progress))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 12 : isEdgeToEdge ? 0 : 16 - 8 * progress))
             .frame(maxWidth: .infinity)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .task(id: videoID) { aspect = await Self.ratio(for: videoID) }
@@ -227,7 +230,7 @@ struct YouTubeEmbed: View {
             if let message = controller.errorMessage {
                 Label(message, systemImage: "exclamationmark.triangle").appFont(.footnote).foregroundStyle(.orange)
             }
-            if !isCompact, let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
+            if !isCompact, showsOpenLink, let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)&t=\(controller.startSeconds)s") {
                 Link(destination: url) { Label("Open in YouTube", systemImage: "arrow.up.right.square") }
                     .appFont(.footnote)
                     .foregroundStyle(Theme.accent)
